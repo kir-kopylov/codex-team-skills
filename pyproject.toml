@@ -1,0 +1,18 @@
+[project]
+name = "codex-team-skills"
+version = "0.1.0"
+description = "Pragmatic registry and validation suite for team Codex skills."
+requires-python = ">=3.11"
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+

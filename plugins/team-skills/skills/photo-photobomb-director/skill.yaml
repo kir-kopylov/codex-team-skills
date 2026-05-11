@@ -1,0 +1,27 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Adds layered comic photobomb elements to photos while preserving existing subjects and backgrounds."
+use_cases:
+  - "Add playful photobomb layers to a photo without changing people, animals, objects, text, or background."
+  - "Escalate a visual joke from subtle to absurd across iterative image edits."
+  - "Translate natural requests like детский вайб, мемнее, or ещё уровень into safe image-edit prompts."
+do_not_use_for:
+  - "Forensic, legal, or evidentiary image editing."
+  - "Identity deception, harassment, or edits that alter real people's faces, expressions, or poses."
+  - "Horror, gore, realistic injury, or disaster aftermath."
+natural_triggers:
+  - "сделай фотобомбинг"
+  - "добавь людей/животных"
+  - "усиль абсурд"
+  - "сделай мемнее"
+  - "ещё уровень"
+  - "детский вайб"
+  - "пенсионный вайб"
+example_files:
+  - "examples/good-01-friends-chat.md"
+  - "examples/good-02-child-safe.md"
+  - "examples/good-03-escalation.md"
+  - "examples/anti-01-do-not-change-subjects.md"
+  - "examples/anti-02-no-horror-disaster.md"
+last_reviewed: "2026-05-11"
+
