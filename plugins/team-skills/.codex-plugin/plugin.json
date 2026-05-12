@@ -1,23 +1,22 @@
 {
   "name": "team-skills",
   "version": "0.1.0",
-  "description": "Private team plugin package for reusable Codex skills with practical examples and registry metadata.",
+  "description": "Приватный командный plugin с переиспользуемыми Codex skills, практическими примерами и registry-метаданными.",
   "license": "UNLICENSED",
   "keywords": ["codex", "skills", "team", "registry"],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Team Skills",
-    "shortDescription": "Reusable private Codex skills",
-    "longDescription": "A private team package of reusable Codex skills with owners, examples, anti-examples, and lightweight validation.",
-    "developerName": "Team",
+    "displayName": "Командные скиллы",
+    "shortDescription": "Приватные Codex skills команды",
+    "longDescription": "Приватный командный пакет Codex skills с владельцами, примерами, анти-примерами и лёгкими проверками качества.",
+    "developerName": "Команда",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
     "defaultPrompt": [
-      "Find a team skill for this task.",
-      "Сделай фотобомбинг: друзья, уровень 2.",
-      "Create a draft team skill from this workflow."
+      "Найди командный skill для этой задачи.",
+      "Покажи, какие командные skills доступны.",
+      "Создай черновик командного skill из этого workflow."
     ],
     "brandColor": "#2563EB"
   }
 }
-

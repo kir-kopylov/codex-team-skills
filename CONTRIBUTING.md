@@ -1,18 +1,18 @@
-# Contributing Skills
+# Как Добавлять Скиллы
 
-Every PR must answer four questions:
+Каждый Pull Request должен ответить на четыре вопроса:
 
-1. What recurring pain does this skill solve?
-2. Who is the audience?
-3. When should the skill not be used?
-4. Which examples prove it works?
+1. Какую повторяющуюся боль решает этот skill?
+2. Для кого он нужен?
+3. Когда его нельзя применять?
+4. Какие примеры доказывают, что он полезен?
 
-## Rules
+## Правила
 
-- Use `kebab-case` for skill folders and `name:` in `SKILL.md`.
-- Prefer natural triggers over asking users to remember `$skill-name`.
-- Keep `SKILL.md` concise and procedural.
-- Put evidence in `examples/`: good examples and anti-examples.
-- Do not commit secrets, raw PII, absolute personal file paths, pasted private context, or generated private images.
-- `agents/openai.yaml` is optional. Add it only when UI metadata helps.
+- Папка скилла и `name:` в `SKILL.md` пишутся в `kebab-case`.
+- Пользователь должен иметь возможность запускать skill обычной фразой, а не помнить `$skill-name`.
+- `SKILL.md` должен быть коротким, процедурным и применимым.
+- Доказательства пользы кладём в `examples/`: хорошие примеры и анти-примеры.
+- Нельзя коммитить секреты, raw PII, абсолютные личные пути, приватный контекст из переписок, pasteboard/download paths и приватные изображения.
+- `agents/openai.yaml` необязателен. Добавляйте его только если скиллу нужны UI-имя, короткое описание или default prompt.
 

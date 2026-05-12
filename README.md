@@ -1,37 +1,73 @@
 # Codex Team Skills Registry
 
-Private team registry for reusable Codex skills packaged as one local plugin: `team-skills`.
+Это приватное командное хранилище Codex skills. Оно упаковано как один локальный plugin: `team-skills`.
 
-The goal is practical reuse, not a file dump. Each team-ready skill must have:
+Смысл проекта — не склад файлов, а понятный рабочий процесс для команды:
 
-- a clear natural-language entry point,
-- an owner,
-- concrete use cases and boundaries,
-- good examples and anti-examples,
-- passing lightweight CI checks.
+- коллега находит нужный скилл по задаче;
+- понимает, какой фразой запустить его в Codex;
+- видит владельца, границы применения и примеры;
+- может установить скиллы локально;
+- может предложить новый скилл через Pull Request;
+- проверки не дают случайно добавить мусор, приватные данные или сломанный skill.
 
-Start with [quickstart.md](quickstart.md), then use [catalog.md](catalog.md) to find a skill by task.
+Если вы не инженер, начните с [colleague-onboarding.md](colleague-onboarding.md): там есть готовые фразы, которые можно отправить Codex, чтобы он вёл вас по шагам.
 
-## Repository Shape
+Если вы уверенно работаете с терминалом, используйте [quickstart.md](quickstart.md).
+
+Чтобы понять, какие скиллы уже есть, откройте [catalog.md](catalog.md).
+
+Чтобы не смешивать платформу и первый пример, прочитайте:
+
+- [docs/platform-overview.md](docs/platform-overview.md) — что такое общее хранилище скиллов;
+- [docs/seed-skill-example.md](docs/seed-skill-example.md) — почему фотобомбинг здесь только первый пример.
+
+Языковой контракт проекта описан в [language-policy.md](language-policy.md): человеческий интерфейс на русском, технические ключи и команды остаются стабильными.
+
+## Как Устроен Проект
 
 ```text
 plugins/team-skills/
-  .codex-plugin/plugin.json
+  .codex-plugin/plugin.json       # паспорт plugin для Codex
   skills/<skill-name>/
-    SKILL.md
-    skill.yaml
-    examples/
-catalog.md
-quickstart.md
-scripts/
-tests/
+    SKILL.md                      # инструкция, которую читает Codex
+    skill.yaml                    # карточка скилла для команды
+    examples/                     # хорошие примеры и анти-примеры
+catalog.md                        # каталог для людей
+quickstart.md                     # короткий технический старт
+colleague-onboarding.md           # старт для не-инженеров через Codex
+scripts/                          # установка plugin и создание новых скиллов
+tests/                            # проверки структуры, примеров и приватности
 ```
 
-## Contribution Loop
+## Как Добавляется Новый Скилл
 
-1. Create a draft skill with `python scripts/new_skill.py <skill-name> --owner @yourname`.
-2. Fill `SKILL.md`, `skill.yaml`, and examples.
-3. Add or update the entry in `catalog.md`.
-4. Run `python -m pytest`.
-5. Open a PR that answers: pain solved, audience, when not to use, and examples that prove usefulness.
+1. Автор создаёт черновик:
 
+   ```bash
+   python scripts/new_skill.py <skill-name> --owner @github-login
+   ```
+
+2. Автор заполняет `SKILL.md`, `skill.yaml` и `examples/`.
+3. Автор добавляет строку в `catalog.md`.
+4. Автор запускает проверки:
+
+   ```bash
+   python -m pytest
+   ```
+
+5. Автор открывает Pull Request и объясняет:
+   - какую повторяющуюся боль решает skill;
+   - для кого он нужен;
+   - когда его нельзя применять;
+   - какие примеры доказывают полезность.
+
+## Что Считать Хорошим Скиллом
+
+Хороший командный skill:
+
+- запускается обычной человеческой фразой, а не только `$skill-name`;
+- решает повторяемую задачу;
+- имеет понятные границы применения;
+- содержит хорошие примеры и анти-примеры;
+- не содержит токены, личные пути, приватные данные и сырой контекст клиентов.
