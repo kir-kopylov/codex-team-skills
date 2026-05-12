@@ -7,7 +7,8 @@
 - `README.md`
 - `catalog.md`
 - `quickstart.md`
-- `colleague-onboarding.md`
+- `SEND_TO_COLLEAGUE.md`
+- `admin-onboarding-guide.md`
 - `CONTRIBUTING.md`
 - `.github/pull_request_template.md`
 - человекочитаемые описания в `plugin.json`
@@ -30,4 +31,3 @@
 ## Как Это Защищено
 
 CI запускает `pytest` на каждом Pull Request. Тест `test_language_policy.py` проверяет, что пользовательский слой проекта остаётся русскоязычным, а технические ключи и команды не переводятся.
-

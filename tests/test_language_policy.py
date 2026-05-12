@@ -17,8 +17,8 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "README.md",
     ROOT / "catalog.md",
     ROOT / "quickstart.md",
-    ROOT / "colleague-onboarding.md",
-    ROOT / "colleague-codex-start.md",
+    ROOT / "SEND_TO_COLLEAGUE.md",
+    ROOT / "admin-onboarding-guide.md",
     ROOT / "CONTRIBUTING.md",
     ROOT / "language-policy.md",
     ROOT / "docs" / "platform-overview.md",
@@ -178,3 +178,14 @@ def test_technical_contract_terms_are_preserved() -> None:
             "last_reviewed:",
         ):
             assert key in registry_text, f"{skill_dir.name} потерял технический ключ {key}"
+
+
+def test_colleague_entrypoint_is_unambiguous() -> None:
+    assert (ROOT / "SEND_TO_COLLEAGUE.md").exists()
+    assert (ROOT / "admin-onboarding-guide.md").exists()
+    assert not (ROOT / "colleague-codex-start.md").exists()
+    assert not (ROOT / "colleague-onboarding.md").exists()
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "единственный файл" in readme
+    assert "SEND_TO_COLLEAGUE.md" in readme
