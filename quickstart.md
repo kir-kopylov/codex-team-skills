@@ -1,35 +1,38 @@
-# Quickstart
+# Быстрый Старт
 
-## Install Or Update
+Если вы не уверены в Git или терминале, начните с [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md). Это единственный файл, который нужно загрузить в Codex, чтобы он вёл вас по шагам.
 
-From the repo root:
+## Установить Или Обновить Plugin
+
+Из корня этого repo:
 
 ```bash
 ./scripts/install_plugin.sh
 ```
 
-Then restart Codex so the local plugin and skills are reloaded.
+После установки перезапустите Codex, чтобы он перечитал локальный plugin и скиллы.
 
-## First Smoke Run
+## Первый Smoke Test
 
-In Codex, attach a photo and write:
+После перезапуска Codex напишите:
 
 ```text
-Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.
+Открой catalog.md командного хранилища skills и покажи, какие командные скиллы мне доступны.
 ```
 
-Expected behavior: Codex should use the photobomb skill without you remembering its internal name, preserve existing subjects and background, and add only new comic photobomb elements.
+Ожидаемое поведение: Codex должен найти каталог, кратко объяснить доступные skills и показать первую фразу для запуска каждого `team-ready` скилла.
 
-## Add A Skill
+Дополнительный smoke test для текущего seed-skill можно сделать так: прикрепить фото и написать `Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.`
+
+## Добавить Новый Skill
 
 ```bash
-python scripts/new_skill.py my-skill --owner @yourname --summary "Short practical summary"
+python scripts/new_skill.py my-skill --owner @yourname --summary "Коротко: что делает скилл"
 python -m pytest
 ```
 
-Update `catalog.md` before marking a skill `team-ready`.
+Перед переводом скилла в статус `team-ready` обновите `catalog.md`.
 
-## Private Repo Setup
+## Приватность
 
-This repository is intended to be private. Keep raw client data, tokens, pasteboard paths, downloads paths, and personal examples out of committed skill content.
-
+Этот repo рассчитан на публичный доступ для чтения. Не добавляйте сюда сырые данные клиентов, токены, приватные ключи, pasteboard/download paths, личные файлы и случайно вставленный приватный контекст.

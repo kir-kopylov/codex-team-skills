@@ -1,14 +1,14 @@
-# Anti-Example: Changing Subjects
+# Анти-Пример: Изменение Исходных Персонажей
 
-## Input
+## Вход
 
 Сделай фотобомбинг, а заодно улучши лица и поменяй позы, чтобы было смешнее.
 
-## Expected Behavior
+## Ожидаемое Поведение
 
-Refuse the subject-changing part of the request or narrow the edit: preserve faces, expressions, poses, identity, clothing, and placement; add only new photobomb elements.
+Отказаться от части запроса, где пользователь просит менять исходных людей, или сузить правку: лица, выражения, позы, идентичность, одежда и положение людей должны остаться прежними. Добавлять можно только новые фотобомбинг-элементы.
 
-## Must Not
+## Нельзя
 
-Do not beautify, retouch, distort, age, replace, or reposition existing people or animals.
+Не улучшать, не ретушировать, не искажать, не состаривать, не заменять и не перемещать существующих людей или животных.
 

@@ -1,0 +1,25 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Ведёт автора через создание, проверку и публикацию нового командного skill по правилам repo."
+use_cases:
+  - "Оформить повторяемый workflow из диалога или проекта как новый командный Codex skill."
+  - "Довести draft skill до team-ready: registry, examples, catalog, tests и PR."
+  - "Проверить существующий skill перед публикацией и исправить нарушения правил repo или CI."
+do_not_use_for:
+  - "Разовые инструкции, которые не будут повторяться и не требуют отдельного командного skill."
+  - "Секретные, клиентские или приватные workflows, которые нельзя хранить в публичном repo."
+  - "Публикацию push или Pull Request без понимания scope изменений и явного запроса пользователя."
+natural_triggers:
+  - "добавь новый skill"
+  - "сделай из этого skill"
+  - "оформи workflow как командный skill"
+  - "доведи skill до team-ready"
+  - "проверь skill перед PR"
+  - "почини skill под CI"
+example_files:
+  - "examples/good-01-new-workflow.md"
+  - "examples/good-02-team-ready.md"
+  - "examples/good-03-ci-fix.md"
+  - "examples/anti-01-one-off-prompt.md"
+  - "examples/anti-02-private-data.md"
+last_reviewed: "2026-05-12"

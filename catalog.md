@@ -1,15 +1,17 @@
-# Team Skills Catalog
+# Каталог Командных Скиллов
 
-This is the human entry point. Search by task, then use the first request phrase directly in Codex.
+Это главный вход для людей. Ищите задачу, копируйте первую фразу в Codex и используйте skill без запоминания его внутреннего имени.
 
-| Task | Skill | Status | First request | Use when | Do not use when |
+Это каталог всех командных скиллов. Среди них есть seed-skill: `photo-photobomb-director`, то есть первый пример, на котором показан стандарт качества и структура repo.
+
+| Задача | Skill | Статус | Первая фраза для Codex | Когда использовать | Когда не использовать |
 | --- | --- | --- | --- | --- | --- |
-| Add layered comic photobomb edits to a photo | [photo-photobomb-director](plugins/team-skills/skills/photo-photobomb-director/SKILL.md) | team-ready | `Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.` | You want playful, escalating image edits while preserving existing people, animals, objects, text, and background. | You need legal/forensic image editing, identity deception, harmful disaster realism, or edits where the original subjects may be changed. |
+| Добавить новый командный skill по правилам repo | [add-team-skill](plugins/team-skills/skills/add-team-skill/SKILL.md) | `team-ready` | `Добавь новый skill и доведи его до team-ready.` | Нужно превратить повторяемый workflow в skill, заполнить `SKILL.md`, `skill.yaml`, examples, catalog, пройти tests и подготовить PR. | Задача разовая, содержит приватные данные для публичного repo или пользователь не просил публиковать изменения. |
+| Добавить на фото несколько слоёв комичного фотобомбинга | [photo-photobomb-director](plugins/team-skills/skills/photo-photobomb-director/SKILL.md) | `team-ready` | `Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.` | Нужно весело усилить фото, добавляя только новые элементы и сохраняя людей, животных, объекты, текст и фон. | Нужна юридически значимая/форензическая правка, обман личности, травля, реалистичная катастрофа или изменение лиц/поз/выражений исходных людей. |
 
-## Status Meanings
+## Что Значат Статусы
 
-- `draft`: usable by the author, not yet trusted by the team.
-- `team-ready`: has owner, examples, anti-examples, catalog entry, and green checks.
-- `internal-only`: useful but requires private context or team-specific guardrails.
-- `deprecated`: kept for history; use the replacement or read the reason.
-
+- `draft` — черновик: автор уже может пробовать, но команда ещё не должна на него полагаться.
+- `team-ready` — готово для команды: есть владелец, примеры, анти-примеры, строка в каталоге и зелёные проверки.
+- `internal-only` — полезно, но требует внутреннего контекста или особых ограничений.
+- `deprecated` — устарело: оставлено для истории, рядом должна быть замена или причина.

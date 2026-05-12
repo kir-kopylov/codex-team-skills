@@ -1,14 +1,14 @@
-# Good Example: Child-Safe Vibe
+# Хороший Пример: Детский Вайб
 
-## Input
+## Вход
 
 Детский вайб: 2 слоя, радость, бабочки или животные, без крипоты.
 
-## Expected Behavior
+## Ожидаемое Поведение
 
-Use Child-Safe, Level 1-2. Prefer cheerful animals, butterflies, balloons, or harmless props. Keep high joy and wholesomeness, low grotesque, and no danger-shaped jokes.
+Использовать `Child-Safe`, уровень 1-2. Предпочитать дружелюбных животных, бабочек, шарики или безобидные предметы. Держать высокую радость и доброту, низкий гротеск и отсутствие опасных шуток.
 
-## Must Not
+## Нельзя
 
-Do not add scary insects, horror styling, weapons, injury, disaster imagery, or adult/crude humor.
+Не добавлять страшных насекомых, хоррор-стилистику, оружие, травмы, катастрофы или грубый взрослый юмор.
 

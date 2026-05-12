@@ -1,14 +1,14 @@
-# Good Example: Friends Chat Photobomb
+# Хороший Пример: Фотобомбинг Для Друзей
 
-## Input
+## Вход
 
 Прикрепляю фото. Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.
 
-## Expected Behavior
+## Ожидаемое Поведение
 
-Use the friends-chat preset and create one or two clear but plausible photobomb additions. Preserve all existing people, faces, expressions, poses, clothing, animals, objects, text, rocks, plants, lighting, crop, and background.
+Использовать пресет `friends-chat` и добавить один-два заметных, но правдоподобных фотобомбинг-элемента. Сохранить всех исходных людей, лица, выражения, позы, одежду, животных, объекты, текст, камни, растения, свет, кадрирование и фон.
 
-## Must Not
+## Нельзя
 
-Do not ask the user to remember `$photo-photobomb-director`. Do not change the original subjects or relight/recompose the photo.
+Не просить пользователя вспомнить `$photo-photobomb-director`. Не менять исходных персонажей, не пересвечивать и не пересобирать фото.
 

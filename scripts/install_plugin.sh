@@ -8,7 +8,7 @@ PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/$PLUGIN_NAME}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$HOME/.agents/plugins/marketplace.json}"
 
 if [[ ! -f "$PLUGIN_SRC/.codex-plugin/plugin.json" ]]; then
-  echo "Plugin source not found: $PLUGIN_SRC" >&2
+  echo "Источник plugin не найден: $PLUGIN_SRC" >&2
   exit 1
 fi
 
@@ -67,7 +67,6 @@ else:
 marketplace_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 PY
 
-echo "Installed $PLUGIN_NAME to $PLUGIN_DEST"
-echo "Updated marketplace: $MARKETPLACE_PATH"
-echo "Restart Codex to reload the plugin."
-
+echo "Plugin $PLUGIN_NAME установлен в $PLUGIN_DEST"
+echo "Marketplace обновлён: $MARKETPLACE_PATH"
+echo "Перезапустите Codex, чтобы он перечитал plugin."

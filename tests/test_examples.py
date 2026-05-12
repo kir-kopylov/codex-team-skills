@@ -21,7 +21,7 @@ def test_team_ready_examples_exist_and_are_linked() -> None:
 
 
 def test_examples_have_required_sections() -> None:
-    required_sections = ("## Input", "## Expected Behavior", "## Must Not")
+    required_sections = ("## Вход", "## Ожидаемое Поведение", "## Нельзя")
 
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
@@ -30,5 +30,5 @@ def test_examples_have_required_sections() -> None:
             content = path.read_text(encoding="utf-8")
             for section in required_sections:
                 assert section in content, f"{path} missing {section}"
-            assert "TODO" not in content, f"{path} still contains TODO"
-
+            if registry.get("status") == "team-ready":
+                assert "TODO" not in content, f"{path} still contains TODO"

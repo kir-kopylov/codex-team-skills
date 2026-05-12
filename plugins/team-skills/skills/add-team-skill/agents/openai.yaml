@@ -1,0 +1,7 @@
+interface:
+  display_name: "Add Team Skill"
+  short_description: "Создание командных skills по правилам repo"
+  default_prompt: "Use $add-team-skill, or just say 'добавь новый skill и доведи его до team-ready'."
+
+policy:
+  allow_implicit_invocation: true

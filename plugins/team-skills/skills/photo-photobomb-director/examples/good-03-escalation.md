@@ -1,14 +1,14 @@
-# Good Example: Escalating Layer
+# Хороший Пример: Следующий Уровень
 
-## Input
+## Вход
 
 Добавь ещё уровень, мемнее, но всех уже добавленных персонажей сохрани в точности.
 
-## Expected Behavior
+## Ожидаемое Поведение
 
-Treat the latest generated image as the target. Preserve all previous edits exactly and add only one new photobomb layer at the next escalation level.
+Взять последнюю сгенерированную картинку как цель редактирования. Сохранить все предыдущие правки в точности и добавить только один новый слой фотобомбинга следующего уровня.
 
-## Must Not
+## Нельзя
 
-Do not regenerate the whole image, remove previous additions, shift people, change expressions, alter the background, or introduce harm.
+Не генерировать всё фото заново, не удалять предыдущие добавления, не смещать людей, не менять выражения лиц, не менять фон и не добавлять вред/травмы.
 

@@ -1,8 +1,7 @@
 interface:
   display_name: "Photo Photobomb Director"
-  short_description: "Layered comic photobomb edits"
+  short_description: "Слои комичного фотобомбинга"
   default_prompt: "Use $photo-photobomb-director, or just say 'сделай фотобомбинг: друзья, уровень 2, фон и людей не трогать'."
 
 policy:
   allow_implicit_invocation: true
-
