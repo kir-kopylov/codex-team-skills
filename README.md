@@ -13,6 +13,8 @@
 
 Если вы не инженер, начните с [colleague-onboarding.md](colleague-onboarding.md): там есть готовые фразы, которые можно отправить Codex, чтобы он вёл вас по шагам.
 
+Для самого простого onboarding отправьте коллеге файл [colleague-codex-start.md](colleague-codex-start.md) с комментарием: “загрузи в Codex, нажми отправить и следуй инструкциям”.
+
 Если вы уверенно работаете с терминалом, используйте [quickstart.md](quickstart.md).
 
 Чтобы понять, какие скиллы уже есть, откройте [catalog.md](catalog.md).

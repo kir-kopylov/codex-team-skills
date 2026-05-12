@@ -18,6 +18,7 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "catalog.md",
     ROOT / "quickstart.md",
     ROOT / "colleague-onboarding.md",
+    ROOT / "colleague-codex-start.md",
     ROOT / "CONTRIBUTING.md",
     ROOT / "language-policy.md",
     ROOT / "docs" / "platform-overview.md",
