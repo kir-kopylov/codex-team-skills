@@ -11,6 +11,10 @@ SCAN_PATHS = [
     ROOT / "catalog.md",
     ROOT / "quickstart.md",
     ROOT / "CONTRIBUTING.md",
+    ROOT / "SEND_TO_COLLEAGUE.md",
+    ROOT / "admin-onboarding-guide.md",
+    ROOT / "installer",
+    ROOT / ".github",
     ROOT / "plugins",
 ]
 
@@ -32,7 +36,8 @@ def iter_scanned_files() -> list[Path]:
             files.extend(
                 child
                 for child in path.rglob("*")
-                if child.is_file() and child.suffix.lower() in {".md", ".yaml", ".yml", ".json"}
+                if child.is_file()
+                and child.suffix.lower() in {".md", ".yaml", ".yml", ".json", ".ps1", ".cmd", ".command", ".sh"}
             )
     return sorted(files)
 
@@ -42,4 +47,3 @@ def test_no_obvious_private_material_or_secrets() -> None:
         content = path.read_text(encoding="utf-8")
         for label, pattern in DENY_PATTERNS.items():
             assert not pattern.search(content), f"{path} appears to contain {label}"
-

@@ -16,3 +16,6 @@ test = [
 addopts = "-q"
 testpaths = ["tests"]
 
+[tool.setuptools]
+packages = []
+py-modules = []

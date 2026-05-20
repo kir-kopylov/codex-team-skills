@@ -136,6 +136,24 @@ def test_script_user_messages_are_russian() -> None:
     assert "## Нельзя" in new_skill
 
 
+def test_installer_user_messages_are_russian() -> None:
+    installer_files = [
+        ROOT / "installer" / "install-team-skills.ps1",
+        ROOT / "installer" / "update-team-skills.ps1",
+        ROOT / "installer" / "uninstall-team-skills.ps1",
+        ROOT / "installer" / "team-skills-status.ps1",
+        ROOT / "installer" / "install-team-skills.command",
+        ROOT / "installer" / "update-team-skills.sh",
+        ROOT / "installer" / "uninstall-team-skills.command",
+        ROOT / "installer" / "team-skills-status.command",
+    ]
+
+    for path in installer_files:
+        content = path.read_text(encoding="utf-8")
+        assert CYRILLIC_RE.search(content), f"{path} должен содержать русские сообщения для пользователя"
+        assert "team-skills" in content
+
+
 def test_old_english_interface_phrases_do_not_return() -> None:
     checked_files = STRICT_RUSSIAN_FILES + [
         ROOT / "plugins/team-skills/.codex-plugin/plugin.json",
@@ -156,6 +174,8 @@ def test_old_english_interface_phrases_do_not_return() -> None:
 
 def test_technical_contract_terms_are_preserved() -> None:
     quickstart = (ROOT / "quickstart.md").read_text(encoding="utf-8")
+    assert "install-team-skills.ps1" in quickstart
+    assert "install-team-skills.command" in quickstart
     assert "./scripts/install_plugin.sh" in quickstart
     assert "python -m pytest" in quickstart
 

@@ -6,9 +6,12 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   pytest:
-    name: pytest и language policy
+    name: pytest, language policy и release-bundle
     runs-on: ubuntu-latest
 
     steps:
@@ -26,3 +29,76 @@ jobs:
 
       - name: Run tests and language policy checks
         run: python -m pytest
+
+      - name: Build installable team-skills bundle
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import zipfile
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path.cwd()
+          dist = root / "dist"
+          dist.mkdir(exist_ok=True)
+
+          plugin_root = root / "plugins" / "team-skills"
+          manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
+          plugin_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          bundle_path = dist / "team-skills-bundle.zip"
+          with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(plugin_root.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, Path("team-skills") / path.relative_to(plugin_root))
+
+          sha256 = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+          release_base = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
+          bundle_manifest = {
+              "name": "team-skills",
+              "version": plugin_manifest["version"],
+              "commit": "${{ github.sha }}",
+              "created_at": datetime.now(timezone.utc).isoformat(),
+              "bundle": "team-skills-bundle.zip",
+              "bundle_url": f"{release_base}/team-skills-bundle.zip",
+              "sha256": sha256,
+          }
+          (dist / "manifest.json").write_text(
+              json.dumps(bundle_manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+
+          for name in (
+              "install-team-skills.cmd",
+              "install-team-skills.ps1",
+              "install-team-skills.command",
+              "update-team-skills.ps1",
+              "update-team-skills.sh",
+              "uninstall-team-skills.ps1",
+              "uninstall-team-skills.command",
+              "team-skills-status.ps1",
+              "team-skills-status.command",
+          ):
+              shutil.copy2(root / "installer" / name, dist / name)
+          PY
+
+      - name: Upload installable bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: team-skills-installable-bundle
+          path: dist/*
+
+      - name: Publish latest validated bundle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete team-skills-latest -y --cleanup-tag || true
+          git tag -f team-skills-latest "$GITHUB_SHA"
+          git push origin refs/tags/team-skills-latest --force
+          gh release create team-skills-latest dist/* \
+            --title "Team Skills latest validated bundle" \
+            --notes "Последняя проверенная CI версия plugin team-skills." \
+            --latest
