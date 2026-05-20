@@ -2,271 +2,89 @@
 
 Эта инструкция для человека, который помогает коллегам подключиться к общему хранилищу Codex skills.
 
-Коллеге отправляйте только один файл: [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md).
+Коллеге по-прежнему отправляйте один файл: [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md). Разница в том, что обычный пользователь больше не проходит ручное скачивание repo и не устанавливает plugin через отдельное desktop-приложение.
 
-[SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) — это рабочий стартовый prompt для Codex. Коллега загружает его в Codex, нажимает отправить и дальше следует шагам Codex.
+## Два Режима
 
-Этот файл, `admin-onboarding-guide.md`, не нужно отправлять коллеге как основной вход. Он нужен организатору: что проверить, что сказать, как поддерживать поток и как объяснить публикацию новых skills.
+**User mode** — для коллег, которые только пользуются skills. Им нужен Codex Desktop и один установщик. GitHub аккаунт, локальная копия repo и Pull Request не нужны.
 
-Главный принцип: **один шаг -> подтверждение -> следующий шаг**. У коллеги на каждом этапе должна быть понятная ситуация успеха.
+**Author mode** — для коллег, которые хотят добавить свои skills в общее хранилище. Им нужен GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
 
-## Что Мы Подключаем
+## User Mode: Что Делает Коллега
 
-Мы подключаем общее хранилище командных Codex skills:
+1. Открывает Codex Desktop.
+2. Загружает [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md).
+3. Отвечает, какая у него система: Windows или macOS.
+4. Запускает одну команду, которую даст Codex.
+5. Перезапускает Codex.
+6. Проверяет фразой: `Покажи, какие командные skills доступны.`
 
-- хранилище называется `codex-team-skills`;
-- внутри лежит общий plugin `team-skills`;
-- после установки коллега сможет пользоваться командными скиллами в Codex обычными фразами;
-- коллега не обязан помнить внутренние названия скиллов и не обязан понимать Git глубоко.
-- repo публичный для чтения и установки, поэтому не нужно вручную добавлять GitHub username каждому пользователю.
+Ситуация успеха: plugin `team-skills` установлен, автообновление включено, коллега видит доступные командные skills.
 
-Публичная ссылка:
+## Что Делает Установщик
 
-```text
-https://github.com/kir-kopylov/codex-team-skills
+Установщик скачивает не сырой `main`, а последний проверенный release-bundle:
+
+- `manifest.json` — версия, commit, дата сборки и checksum;
+- `team-skills-bundle.zip` — plugin `team-skills`;
+- служебные scripts для обновления, статуса и удаления.
+
+Перед заменой активного plugin установщик проверяет checksum, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json` и только потом заменяет локальную версию.
+
+## Auto Update
+
+Автообновление включается без выбора пользователя:
+
+- Windows: user-level Windows Task Scheduler, задача `Codex Team Skills Auto Update`;
+- macOS: user-level LaunchAgent `com.codex-team-skills.autoupdate`;
+- интервал: раз в двое суток.
+
+Если интернет недоступен или bundle повреждён, текущий рабочий plugin остаётся на месте. Следующая попытка будет при очередном запуске автообновления.
+
+## Команды Поддержки
+
+Windows:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\team-skills-status.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\uninstall-team-skills.ps1"
 ```
 
-## Что Коллега Делает Сам
+macOS:
 
-Минимальный путь для использования skills:
-
-1. Установить Codex Desktop.
-2. Установить GitHub Desktop: <https://desktop.github.com>
-3. Открыть публичную ссылку repo.
-4. Загрузить [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) в Codex и следовать инструкциям.
-
-GitHub аккаунт нужен не для чтения, а для публикации изменений: branch, commit, push и Pull Request.
-
-Ситуация успеха: коллега открыл Codex Desktop, GitHub Desktop установлен, ссылка на repo открывается.
-
-## Сообщение Админа Коллеге
-
-Лучший поток для не-инженера: отправьте коллеге файл [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) и короткий комментарий ниже.
-
-```text
-Загрузи этот .md файл в Codex, нажми отправить и следуй инструкциям Codex.
-
-В любой непонятной ситуации спрашивай у Codex:
-“Что мне делать дальше? Какой мой следующий шаг?”
-
-Codex должен вести тебя по одному шагу и говорить, какая ситуация успеха на каждом этапе.
+```bash
+"$HOME/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command"
+"$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh"
+"$HOME/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command"
 ```
 
-Если файл отправить неудобно, скопируйте и отправьте коллеге текст:
+## Что Отправить Коллеге
+
+Отправьте файл [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) и короткий текст:
 
 ```text
-Мы подключаем общее хранилище командных Codex skills.
+Загрузи этот .md файл в Codex Desktop, нажми отправить и следуй инструкциям.
 
-Что тебе нужно сделать руками:
-
-1. Установить GitHub Desktop:
-https://desktop.github.com
-
-2. Установить Codex Desktop.
-
-3. Открыть repo:
-https://github.com/kir-kopylov/codex-team-skills
-
-4. Открыть Codex и загрузить файл SEND_TO_COLLEAGUE.md.
-
-Codex должен вести тебя пошагово, спокойно и не давать сразу много действий.
+Codex определит твою систему, даст одну команду для установки и включит автообновление командных skills.
 ```
 
-Ссылку на repo можно отправлять сразу:
+## Author Mode: Если Коллега Хочет Добавлять Skills
+
+Только для авторов нужен GitHub workflow:
+
+1. GitHub аккаунт.
+2. Локальная рабочая копия repo `codex-team-skills`.
+3. Branch для изменения.
+4. Черновик через `python scripts/new_skill.py`.
+5. Заполненные `SKILL.md`, `skill.yaml`, `examples/`.
+6. `python -m pytest`.
+7. Pull Request.
+
+Ситуация успеха: Pull Request создан, CI проходит, ревьюер видит цель skill, аудиторию, ограничения и примеры.
+
+## Короткое Объяснение Для Коллег
 
 ```text
-https://github.com/kir-kopylov/codex-team-skills
-```
-
-## Первое Сообщение Коллеги В Codex
-
-Коллега открывает Codex и вставляет:
-
-```text
-Помоги мне подключиться к командному хранилищу Codex skills.
-
-Я не инженер. Будь моим проводником: веди меня спокойно, по одному маленькому шагу.
-
-Моя цель: открыть публичный repo codex-team-skills, склонировать его через GitHub Desktop, установить team-skills plugin и проверить, что скиллы работают.
-
-Пожалуйста:
-1. Сначала проверь, что я в Codex Desktop, GitHub Desktop установлен и ссылка на repo открывается.
-2. Не давай больше одного действия за раз.
-3. После каждого действия скажи, какой результат я должен увидеть.
-4. Если я застряну, не ругайся и не перескакивай: помоги понять, на каком экране я нахожусь.
-5. Терминал используй только если это действительно проще; если можно, веди через GitHub Desktop.
-```
-
-Ситуация успеха: Codex отвечает не длинной лекцией, а первым коротким шагом.
-
-## Как Codex Должен Вести Коллегу
-
-Codex должен работать как сопровождающий:
-
-- говорить простым языком;
-- давать один шаг за раз;
-- после каждого шага спрашивать, что коллега видит;
-- явно называть “что считается успехом”;
-- если что-то не получилось, диагностировать экран/состояние, а не сыпать новыми командами;
-- отделять ручные действия от того, что Codex может сделать сам;
-- не требовать знания Git-терминов без объяснения.
-
-## Шаг 1. Проверить Среду И Приложения
-
-Codex задаёт коллеге короткий чек:
-
-```text
-Ответь коротко по пунктам:
-
-1. Ты сейчас в Codex Desktop?
-2. GitHub Desktop установлен?
-3. Ссылка https://github.com/kir-kopylov/codex-team-skills открывается?
-4. Ты хочешь только пользоваться skills или ещё публиковать свои skills?
-```
-
-Ситуация успеха: Codex Desktop открыт, GitHub Desktop установлен, ссылка на repo открывается.
-
-Если чего-то нет, Codex останавливается и даёт только один следующий шаг:
-
-- не Codex Desktop -> открыть Codex Desktop и отправить туда [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md);
-- нет GitHub Desktop -> открыть <https://desktop.github.com>;
-- ссылка не открывается -> проверить интернет, браузер и точный адрес repo;
-- нужно публиковать skills -> создать GitHub аккаунт на <https://github.com/signup>.
-
-## Шаг 2. Склонировать Repo Через GitHub Desktop
-
-Коллега пишет Codex:
-
-```text
-Ссылка на repo открывается. Проведи меня через GitHub Desktop, чтобы склонировать codex-team-skills.
-```
-
-Codex ведёт по шагам:
-
-1. Открой GitHub Desktop.
-2. Нажми `File`.
-3. Нажми `Clone Repository`.
-4. Открой вкладку `URL`.
-5. Вставь ссылку на repo.
-6. Выбери папку, куда сохранить repo.
-7. Нажми `Clone`.
-
-Ситуация успеха: в GitHub Desktop открыт repo `codex-team-skills`, а на компьютере появилась папка `codex-team-skills`.
-
-Если GitHub Desktop пишет, что доступа нет, Codex должен сказать:
-
-```text
-Это не ошибка скиллов. Repo должен быть публичным. Проверь, что ссылка точная: https://github.com/kir-kopylov/codex-team-skills. Если ошибка остаётся, пришли админу текст ошибки.
-```
-
-## Шаг 3. Установить Team Skills Plugin
-
-Коллега пишет Codex:
-
-```text
-Я склонировал repo codex-team-skills. Найди эту папку и установи team-skills plugin.
-Если нужно запустить install_plugin.sh, сделай это сам или дай мне одну точную команду.
-```
-
-Codex должен:
-
-1. Найти локальную папку `codex-team-skills`.
-2. Запустить установщик:
-
-   ```bash
-   ./scripts/install_plugin.sh
-   ```
-
-3. Сказать, что plugin установлен.
-4. Попросить перезапустить Codex.
-
-Ситуация успеха: установщик сообщил, что `team-skills` установлен, а Codex перезапущен.
-
-## Шаг 4. Проверить, Что Всё Работает
-
-После перезапуска коллега пишет Codex:
-
-```text
-Проверь, что team-skills подключился. Открой каталог скиллов и скажи, какие командные скиллы мне доступны.
-```
-
-Codex должен найти `catalog.md` и кратко объяснить доступные скиллы.
-
-Потом коллега делает smoke test. Например:
-
-```text
-Сделай фотобомбинг: друзья, уровень 2, людей и фон не трогать.
-```
-
-Ситуация успеха: Codex понимает обычную фразу и использует командный skill без требования вспомнить `$photo-photobomb-director`.
-
-## Как Коллега Обновляет Скиллы
-
-Коллега пишет Codex:
-
-```text
-Обнови командные скиллы из codex-team-skills. Веди меня через GitHub Desktop и установщик. Давай один шаг за раз.
-```
-
-Codex ведёт:
-
-1. Открыть GitHub Desktop.
-2. Выбрать repo `codex-team-skills`.
-3. Нажать `Fetch origin`.
-4. Если появилась кнопка `Pull origin`, нажать её.
-5. Запустить `./scripts/install_plugin.sh`.
-6. Перезапустить Codex.
-
-Ситуация успеха: repo обновлён, plugin переустановлен, Codex перезапущен.
-
-## Как Коллега Публикует Новый Skill
-
-Коллега пишет Codex:
-
-```text
-Помоги мне добавить новый skill в codex-team-skills.
-Я хочу, чтобы ты вёл меня как автора: branch, шаблон скилла, заполнение файлов, тесты, commit, push, Pull Request.
-Давай один шаг за раз и после каждого шага говори, что должно получиться.
-```
-
-Codex ведёт:
-
-1. В GitHub Desktop создать branch.
-2. Создать draft skill:
-
-   ```bash
-   python scripts/new_skill.py skill-name --owner @github-login --summary "Коротко: что делает скилл"
-   ```
-
-3. Заполнить `SKILL.md`.
-4. Заполнить `skill.yaml`.
-5. Заполнить `examples/`.
-6. Добавить строку в `catalog.md`.
-7. Запустить:
-
-   ```bash
-   python -m pytest
-   ```
-
-8. Сделать commit в GitHub Desktop.
-9. Нажать `Push origin`.
-10. Открыть Pull Request.
-
-Ситуация успеха: Pull Request создан, CI проходит, ревьюер видит цель, аудиторию, ограничения и примеры.
-
-## Короткая Версия Для Коллеги
-
-Если нужно совсем коротко, отправьте коллеге:
-
-```text
-1. Создай GitHub аккаунт: https://github.com/signup
-2. Установи GitHub Desktop: https://desktop.github.com
-3. Установи Codex Desktop.
-4. Открой repo: https://github.com/kir-kopylov/codex-team-skills
-5. Открой Codex и вставь:
-
-Помоги мне подключиться к командному хранилищу Codex skills.
-Я не инженер. Будь моим проводником: веди меня спокойно, по одному маленькому шагу.
-Моя цель: открыть публичный repo codex-team-skills, склонировать его через GitHub Desktop, установить team-skills plugin и проверить, что скиллы работают.
-После каждого шага говори, какой результат я должен увидеть.
+Система сама раз в двое суток ставит последнюю проверенную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте.
 ```
