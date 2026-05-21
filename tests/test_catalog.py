@@ -25,7 +25,7 @@ def test_markdown_links_resolve() -> None:
         ROOT / "README.md",
         ROOT / "catalog.md",
         ROOT / "quickstart.md",
-        ROOT / "SEND_TO_COLLEAGUE.md",
+        ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
         ROOT / "admin-onboarding-guide.md",
         ROOT / "CONTRIBUTING.md",
         ROOT / "language-policy.md",

@@ -73,7 +73,7 @@ def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
 
 
 def test_user_docs_do_not_require_github_desktop() -> None:
-    colleague = read(ROOT / "SEND_TO_COLLEAGUE.md")
+    colleague = read(ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md")
     admin = read(ROOT / "admin-onboarding-guide.md")
 
     assert "GitHub Desktop" not in colleague

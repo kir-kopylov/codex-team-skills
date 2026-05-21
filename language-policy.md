@@ -7,7 +7,7 @@
 - `README.md`
 - `catalog.md`
 - `quickstart.md`
-- `SEND_TO_COLLEAGUE.md`
+- `START_HERE_CONNECT_CODEX_SKILLS.md`
 - `admin-onboarding-guide.md`
 - `CONTRIBUTING.md`
 - `.github/pull_request_template.md`

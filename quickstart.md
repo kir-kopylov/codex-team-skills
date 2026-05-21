@@ -1,6 +1,6 @@
 # Быстрый Старт
 
-Если вы просто хотите пользоваться командными skills, начните с [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md). Codex определит вашу систему и даст одну команду для установки.
+Если вы просто хотите пользоваться командными skills, начните с [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md). Codex определит вашу систему и даст одну команду для установки.
 
 ## User Mode: Установить Готовый Plugin
 
