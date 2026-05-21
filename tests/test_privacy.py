@@ -11,7 +11,7 @@ SCAN_PATHS = [
     ROOT / "catalog.md",
     ROOT / "quickstart.md",
     ROOT / "CONTRIBUTING.md",
-    ROOT / "SEND_TO_COLLEAGUE.md",
+    ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
     ROOT / "admin-onboarding-guide.md",
     ROOT / "installer",
     ROOT / ".github",

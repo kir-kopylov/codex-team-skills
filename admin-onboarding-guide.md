@@ -2,7 +2,7 @@
 
 Эта инструкция для человека, который помогает коллегам подключиться к общему хранилищу Codex skills.
 
-Коллеге по-прежнему отправляйте один файл: [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md). Разница в том, что обычный пользователь больше не проходит ручное скачивание repo и не устанавливает plugin через отдельное desktop-приложение.
+Коллеге по-прежнему отправляйте один файл: [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md). Разница в том, что обычный пользователь больше не проходит ручное скачивание repo и не устанавливает plugin через отдельное desktop-приложение.
 
 ## Два Режима
 
@@ -13,7 +13,7 @@
 ## User Mode: Что Делает Коллега
 
 1. Открывает Codex Desktop.
-2. Загружает [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md).
+2. Загружает [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md).
 3. Отвечает, какая у него система: Windows или macOS.
 4. Запускает одну команду, которую даст Codex.
 5. Перезапускает Codex.
@@ -61,7 +61,7 @@ macOS:
 
 ## Что Отправить Коллеге
 
-Отправьте файл [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) и короткий текст:
+Отправьте файл [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md) и короткий текст:
 
 ```text
 Загрузи этот .md файл в Codex Desktop, нажми отправить и следуй инструкциям.

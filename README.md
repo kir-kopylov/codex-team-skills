@@ -12,7 +12,7 @@
 - может предложить новый скилл через Pull Request;
 - проверки не дают случайно добавить мусор, приватные данные или сломанный skill.
 
-Если вы не инженер, начните с одного файла: [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md). Его можно загрузить в Codex, нажать отправить и дальше следовать инструкциям.
+Если вы не инженер, начните с одного файла: [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md). Его можно загрузить в Codex, нажать отправить и дальше следовать инструкциям.
 
 Если вы организуете подключение коллег, используйте [admin-onboarding-guide.md](admin-onboarding-guide.md). Это внутренний гид для организатора, а не основной файл для коллеги.
 
@@ -38,7 +38,7 @@ plugins/team-skills/
     examples/                     # хорошие примеры и анти-примеры
 catalog.md                        # каталог для людей
 quickstart.md                     # короткий технический старт
-SEND_TO_COLLEAGUE.md              # единственный файл, который отправляют коллеге
+START_HERE_CONNECT_CODEX_SKILLS.md # стартовый файл, который отправляют коллеге
 admin-onboarding-guide.md         # внутренний гид для организатора onboarding
 installer/                        # user-mode установка, автообновление, status и uninstall
 scripts/                          # установка plugin и создание новых скиллов
@@ -47,7 +47,7 @@ tests/                            # проверки структуры, при�
 
 ## User Mode И Author Mode
 
-Обычный пользователь не клонирует repo руками. Он загружает [SEND_TO_COLLEAGUE.md](SEND_TO_COLLEAGUE.md) в Codex, получает OS-specific installer и ставит последнюю проверенную версию `team-skills` из release-bundle.
+Обычный пользователь не клонирует repo руками. Он загружает [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md) в Codex, получает OS-specific installer и ставит последнюю проверенную версию `team-skills` из release-bundle.
 
 Автор скиллов работает через Pull Request: создаёт branch, добавляет skill, запускает `python -m pytest` и отправляет изменения на review.
 
