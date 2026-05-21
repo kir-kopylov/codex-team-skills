@@ -10,7 +10,7 @@ $TaskName = "Codex Team Skills Auto Update"
 $InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } else { Join-Path $env:LOCALAPPDATA "CodexTeamSkills" }
 $BinDir = Join-Path $InstallRoot "bin"
 $LogDir = Join-Path $InstallRoot "logs"
-$UpdateScript = Join-Path $BinDir "update-team-skills.ps1"
+$BootstrapScript = Join-Path $BinDir "bootstrap-team-skills.ps1"
 
 if (-not $ManifestUrl) {
     $ManifestUrl = "$RepoReleaseBase/manifest.json"
@@ -48,7 +48,7 @@ function Register-AutoUpdateTask() {
     $triggerTime = Get-Date -Hour 10 -Minute 0 -Second 0
     $action = New-ScheduledTaskAction `
         -Execute "powershell.exe" `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$UpdateScript`""
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$BootstrapScript`""
     $trigger = New-ScheduledTaskTrigger -Daily -DaysInterval 2 -At $triggerTime
     $settings = New-ScheduledTaskSettingsSet `
         -AllowStartIfOnBatteries `
@@ -70,12 +70,18 @@ Ensure-Directory $InstallRoot
 Ensure-Directory $BinDir
 Ensure-Directory $LogDir
 
+Install-SupportFile "bootstrap-team-skills.ps1"
 Install-SupportFile "update-team-skills.ps1"
 Install-SupportFile "uninstall-team-skills.ps1"
 Install-SupportFile "team-skills-status.ps1"
+Install-SupportFile "team-skills-public-key.pem"
 
 Write-Info "Ставлю последнюю проверенную версию командных Codex skills."
-& $UpdateScript -ManifestUrl $ManifestUrl
+if ($ManifestUrl) {
+    & $BootstrapScript -ForwardArgs @("-ManifestUrl", $ManifestUrl)
+} else {
+    & $BootstrapScript
+}
 
 Register-AutoUpdateTask
 

@@ -31,10 +31,15 @@ jobs:
         run: python -m pytest
 
       - name: Build installable team-skills bundle
+        env:
+          GITHUB_SHA_VALUE: ${{ github.sha }}
+          GITHUB_RUN_NUMBER_VALUE: ${{ github.run_number }}
+          GITHUB_RUN_ATTEMPT_VALUE: ${{ github.run_attempt }}
         run: |
           python - <<'PY'
           import hashlib
           import json
+          import os
           import shutil
           import zipfile
           from datetime import datetime, timezone
@@ -42,46 +47,102 @@ jobs:
 
           root = Path.cwd()
           dist = root / "dist"
+          shutil.rmtree(dist, ignore_errors=True)
           dist.mkdir(exist_ok=True)
 
           plugin_root = root / "plugins" / "team-skills"
           manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
           plugin_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          commit = os.environ["GITHUB_SHA_VALUE"]
+          short_sha = commit[:7]
+          run_number = os.environ["GITHUB_RUN_NUMBER_VALUE"]
+          run_attempt = os.environ["GITHUB_RUN_ATTEMPT_VALUE"]
+          release_id = f"r{run_number}.{run_attempt}-{short_sha}"
+          release_tag = f"team-skills-v{release_id}"
+          product_version = plugin_manifest["version"]
+          runtime_version = f"{product_version}-r.{run_number}.{run_attempt}.{short_sha}"
+          release_base = f"https://github.com/kir-kopylov/codex-team-skills/releases/download/{release_tag}"
 
-          bundle_path = dist / "team-skills-bundle.zip"
-          with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as archive:
-              for path in sorted(plugin_root.rglob("*")):
-                  if path.is_file():
-                      archive.write(path, Path("team-skills") / path.relative_to(plugin_root))
-
-          sha256 = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
-          release_base = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
-          bundle_manifest = {
-              "name": "team-skills",
-              "version": plugin_manifest["version"],
-              "commit": "${{ github.sha }}",
-              "created_at": datetime.now(timezone.utc).isoformat(),
-              "bundle": "team-skills-bundle.zip",
-              "bundle_url": f"{release_base}/team-skills-bundle.zip",
-              "sha256": sha256,
-          }
-          (dist / "manifest.json").write_text(
-              json.dumps(bundle_manifest, ensure_ascii=False, indent=2) + "\n",
+          release_plugin_root = dist / "bundle-root" / "team-skills"
+          shutil.copytree(plugin_root, release_plugin_root)
+          release_manifest_path = release_plugin_root / ".codex-plugin" / "plugin.json"
+          release_plugin_manifest = json.loads(release_manifest_path.read_text(encoding="utf-8"))
+          release_plugin_manifest["product_version"] = product_version
+          release_plugin_manifest["version"] = runtime_version
+          release_plugin_manifest["release_id"] = release_id
+          release_plugin_manifest["commit"] = commit
+          release_manifest_path.write_text(
+              json.dumps(release_plugin_manifest, ensure_ascii=False, indent=2) + "\n",
               encoding="utf-8",
           )
 
-          for name in (
+          bundle_path = dist / "team-skills-bundle.zip"
+          with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(release_plugin_root.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, Path("team-skills") / path.relative_to(release_plugin_root))
+          shutil.rmtree(dist / "bundle-root", ignore_errors=True)
+
+          support_names = (
               "install-team-skills.cmd",
               "install-team-skills.ps1",
               "install-team-skills.command",
+              "bootstrap-team-skills.ps1",
+              "bootstrap-team-skills.sh",
               "update-team-skills.ps1",
               "update-team-skills.sh",
               "uninstall-team-skills.ps1",
               "uninstall-team-skills.command",
               "team-skills-status.ps1",
               "team-skills-status.command",
-          ):
+              "team-skills-registry.py",
+              "team-skills-public-key.pem",
+          )
+          for name in support_names:
               shutil.copy2(root / "installer" / name, dist / name)
+
+          def asset(name: str, path: Path) -> dict[str, str | int]:
+              return {
+                  "name": name,
+                  "url": f"{release_base}/{name}",
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "size": path.stat().st_size,
+              }
+
+          plugin_bundle = asset("team-skills-bundle.zip", bundle_path)
+          support_files = [asset(name, dist / name) for name in support_names]
+          manifest = {
+              "name": "team-skills",
+              "product_version": product_version,
+              "runtime_version": runtime_version,
+              "release_id": release_id,
+              "release_tag": release_tag,
+              "commit": commit,
+              "channel": "stable",
+              "minimum_bootstrap_version": "1.0.0",
+              "minimum_updater_version": "1.0.0",
+              "created_at": datetime.now(timezone.utc).isoformat(),
+              "plugin_bundle": plugin_bundle,
+              "support_files": support_files,
+          }
+          (dist / "manifest.json").write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          latest = {
+              "name": "team-skills",
+              "channel": "stable",
+              "release_id": release_id,
+              "release_tag": release_tag,
+              "runtime_version": runtime_version,
+              "commit": commit,
+              "manifest_url": f"{release_base}/manifest.json",
+              "created_at": manifest["created_at"],
+          }
+          (dist / "latest.json").write_text(
+              json.dumps(latest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
           PY
 
       - name: Upload installable bundle artifact
@@ -90,15 +151,30 @@ jobs:
           name: team-skills-installable-bundle
           path: dist/*
 
-      - name: Publish latest validated bundle
+      - name: Sign release metadata
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          TEAM_SKILLS_SIGNING_KEY_PEM: ${{ secrets.TEAM_SKILLS_SIGNING_KEY_PEM }}
+        run: |
+          test -n "$TEAM_SKILLS_SIGNING_KEY_PEM"
+          printf '%s\n' "$TEAM_SKILLS_SIGNING_KEY_PEM" > dist/signing-key.pem
+          openssl dgst -sha256 -sign dist/signing-key.pem -out dist/latest.json.sig dist/latest.json
+          openssl dgst -sha256 -sign dist/signing-key.pem -out dist/manifest.json.sig dist/manifest.json
+          rm -f dist/signing-key.pem
+
+      - name: Publish immutable validated bundle
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete team-skills-latest -y --cleanup-tag || true
-          git tag -f team-skills-latest "$GITHUB_SHA"
-          git push origin refs/tags/team-skills-latest --force
-          gh release create team-skills-latest dist/* \
-            --title "Team Skills latest validated bundle" \
-            --notes "Последняя проверенная CI версия plugin team-skills." \
+          RELEASE_TAG="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("dist/latest.json").read_text(encoding="utf-8"))["release_tag"])
+          PY
+          )"
+          gh release create "$RELEASE_TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Team Skills $RELEASE_TAG" \
+            --notes "Проверенная CI версия plugin team-skills. latest.json и manifest.json подписаны." \
             --latest

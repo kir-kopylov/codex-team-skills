@@ -23,13 +23,14 @@
 
 ## Что Делает Установщик
 
-Установщик скачивает не сырой `main`, а последний проверенный release-bundle:
+Установщик скачивает не сырой `main`, а последний подписанный release:
 
-- `manifest.json` — версия, commit, дата сборки и checksum;
+- `latest.json` — подписанный pointer на последний stable immutable release;
+- `manifest.json` — подписанная schema с `product_version`, `runtime_version`, `release_id`, commit, channel и checksum assets;
 - `team-skills-bundle.zip` — plugin `team-skills`;
-- служебные scripts для обновления, статуса и удаления.
+- служебные scripts для bootstrap, обновления, repair, статуса и удаления.
 
-Перед заменой активного plugin установщик проверяет checksum, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json` и только потом заменяет локальную версию.
+Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. `~/.codex/plugins/cache` не является контрактом updater и не изменяется вручную.
 
 ## Auto Update
 
@@ -39,7 +40,11 @@
 - macOS: user-level LaunchAgent `com.codex-team-skills.autoupdate`;
 - интервал: раз в двое суток.
 
-Если интернет недоступен или bundle повреждён, текущий рабочий plugin остаётся на месте. Следующая попытка будет при очередном запуске автообновления.
+Если интернет недоступен, подпись невалидна или bundle повреждён, текущий рабочий plugin остаётся на месте. Следующая попытка будет при очередном запуске автообновления.
+
+## Release Signing
+
+Публикация release после merge требует GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`. Он должен содержать приватный ключ, соответствующий публичному ключу `installer/team-skills-public-key.pem`. Без этого CI должен падать на publish-step, потому что unsigned release не должен становиться источником автообновления.
 
 ## Команды Поддержки
 
@@ -48,6 +53,7 @@ Windows:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\team-skills-status.ps1"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1" -RepairInstall
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\uninstall-team-skills.ps1"
 ```
 
@@ -56,6 +62,7 @@ macOS:
 ```bash
 "$HOME/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command"
 "$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh"
+"$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh" --repair-install
 "$HOME/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command"
 ```
 
@@ -86,5 +93,5 @@ Codex определит твою систему, даст одну команд
 ## Короткое Объяснение Для Коллег
 
 ```text
-Система сама раз в двое суток ставит последнюю проверенную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте.
+Система сама раз в двое суток ставит последнюю подписанную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте. После успешного обновления нужен перезапуск Codex, чтобы новая runtime-версия skill стала видна.
 ```

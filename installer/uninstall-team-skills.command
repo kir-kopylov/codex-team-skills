@@ -3,8 +3,11 @@ set -euo pipefail
 
 PLUGIN_NAME="team-skills"
 INSTALL_ROOT="${CODEX_TEAM_SKILLS_HOME:-$HOME/Library/Application Support/CodexTeamSkills}"
+BIN_DIR="$INSTALL_ROOT/bin"
 PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$HOME/.agents/plugins/marketplace.json}"
+CODEX_CONFIG_PATH="${CODEX_TEAM_SKILLS_CODEX_CONFIG:-$HOME/.codex/config.toml}"
+REGISTRY_HELPER="${CODEX_TEAM_SKILLS_REGISTRY_HELPER:-$BIN_DIR/team-skills-registry.py}"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.codex-team-skills.autoupdate.plist"
 
 info() {
@@ -31,6 +34,11 @@ data["plugins"] = [entry for entry in data.get("plugins", []) if entry.get("name
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
   info "Запись team-skills удалена из marketplace."
+fi
+
+if [[ -f "$REGISTRY_HELPER" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 "$REGISTRY_HELPER" remove --config "$CODEX_CONFIG_PATH" >/dev/null || true
+  info "Запись team-skills удалена из Codex registry."
 fi
 
 rm -rf "$INSTALL_ROOT"

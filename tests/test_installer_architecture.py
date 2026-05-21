@@ -19,12 +19,16 @@ def test_installer_files_exist() -> None:
         "install-team-skills.cmd",
         "install-team-skills.ps1",
         "install-team-skills.command",
+        "bootstrap-team-skills.ps1",
+        "bootstrap-team-skills.sh",
         "update-team-skills.ps1",
         "update-team-skills.sh",
         "uninstall-team-skills.ps1",
         "uninstall-team-skills.command",
         "team-skills-status.ps1",
         "team-skills-status.command",
+        "team-skills-registry.py",
+        "team-skills-public-key.pem",
     ]
     for name in expected:
         path = INSTALLER_DIR / name
@@ -43,13 +47,18 @@ def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
     assert "Codex Team Skills Auto Update" in install
 
     assert "manifest.json" in update
+    assert "latest.json" in update
     assert "team-skills-bundle.zip" in update
     assert "Get-FileHash -Algorithm SHA256" in update
     assert ".codex-plugin\\plugin.json" in update
     assert "previous" in update
+    assert "Verify-Signature" in update
+    assert "runtime_version" in update
+    assert "codex-team-skills" in update
 
     assert "Unregister-ScheduledTask" in uninstall
     assert "marketplace.json" in uninstall
+    assert "codex-team-skills managed block" in uninstall
 
 
 def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
@@ -61,15 +70,22 @@ def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
     assert "com.codex-team-skills.autoupdate" in install
     assert "<integer>172800</integer>" in install
     assert "launchctl load" in install
+    assert "bootstrap-team-skills.sh" in install
 
     assert "manifest.json" in update
+    assert "latest.json" in update
     assert "team-skills-bundle.zip" in update
-    assert "shasum -a 256" in update
+    assert "hashlib.sha256" in update
     assert ".codex-plugin/plugin.json" in update
     assert "previous" in update
+    assert "verify_signature" in update
+    assert "runtime_version" in update
+    assert "team-skills-registry.py" in update
+    assert ".codex/plugins/cache" not in update
 
     assert "launchctl unload" in uninstall
     assert "marketplace.json" in uninstall
+    assert "Codex registry" in uninstall
 
 
 def test_user_docs_do_not_require_github_desktop() -> None:
@@ -93,6 +109,13 @@ def test_ci_builds_validated_release_bundle() -> None:
     assert "python -m pytest" in step_text
     assert "team-skills-bundle.zip" in step_text
     assert "manifest.json" in step_text
+    assert "latest.json" in step_text
     assert "sha256" in step_text
+    assert "runtime_version" in step_text
+    assert "release_id" in step_text
+    assert "manifest.json.sig" in step_text
+    assert "latest.json.sig" in step_text
+    assert "team-skills-v" in step_text
     assert "actions/upload-artifact" in step_text
-    assert "gh release create team-skills-latest" in step_text
+    assert "gh release create" in step_text
+    assert "gh release delete team-skills-latest" not in step_text
