@@ -1,5 +1,6 @@
 param(
     [switch]$SkipSchedule,
+    [switch]$ValidateOnly,
     [string]$ManifestUrl = $env:CODEX_TEAM_SKILLS_MANIFEST_URL
 )
 
@@ -14,6 +15,11 @@ $BootstrapScript = Join-Path $BinDir "bootstrap-team-skills.ps1"
 
 if (-not $ManifestUrl) {
     $ManifestUrl = "$RepoReleaseBase/manifest.json"
+}
+
+if ($ValidateOnly) {
+    Write-Host "[team-skills] ValidateOnly: install-team-skills.ps1 parsed and initialized."
+    exit 0
 }
 
 function Write-Info($Message) {

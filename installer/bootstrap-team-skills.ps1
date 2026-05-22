@@ -1,5 +1,6 @@
 param(
-    [string[]]$ForwardArgs
+    [string[]]$ForwardArgs,
+    [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,6 +9,11 @@ $InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } 
 $BinDir = Join-Path $InstallRoot "bin"
 $UpdateScript = Join-Path $BinDir "update-team-skills.ps1"
 $NextUpdateScript = "$UpdateScript.next"
+
+if ($ValidateOnly) {
+    Write-Host "[team-skills] ValidateOnly: bootstrap-team-skills.ps1 parsed and initialized."
+    exit 0
+}
 
 if (-not (Test-Path $UpdateScript)) {
     Write-Host "[team-skills] Updater не найден: $UpdateScript"

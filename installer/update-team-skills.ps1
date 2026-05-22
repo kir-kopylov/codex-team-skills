@@ -1,7 +1,8 @@
 param(
     [string]$ManifestUrl = $env:CODEX_TEAM_SKILLS_MANIFEST_URL,
     [string]$LatestUrl = $env:CODEX_TEAM_SKILLS_LATEST_URL,
-    [switch]$RepairInstall
+    [switch]$RepairInstall,
+    [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,6 +27,11 @@ $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
 
 if (-not $LatestUrl) {
     $LatestUrl = "$RepoReleaseBase/latest.json"
+}
+
+if ($ValidateOnly) {
+    Write-Host "[team-skills] ValidateOnly: update-team-skills.ps1 parsed and initialized."
+    exit 0
 }
 
 function Ensure-Directory($Path) {
