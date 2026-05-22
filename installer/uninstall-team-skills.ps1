@@ -1,4 +1,6 @@
-param()
+param(
+    [switch]$ValidateOnly
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -9,6 +11,11 @@ $PluginDest = if ($env:CODEX_TEAM_SKILLS_PLUGIN_DIR) { $env:CODEX_TEAM_SKILLS_PL
 $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT } else { $HOME }
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
 $CodexConfigPath = if ($env:CODEX_TEAM_SKILLS_CODEX_CONFIG) { $env:CODEX_TEAM_SKILLS_CODEX_CONFIG } else { Join-Path $HOME ".codex\config.toml" }
+
+if ($ValidateOnly) {
+    Write-Host "[team-skills] ValidateOnly: uninstall-team-skills.ps1 parsed and initialized."
+    exit 0
+}
 
 function Write-Info($Message) {
     Write-Host "[team-skills] $Message"

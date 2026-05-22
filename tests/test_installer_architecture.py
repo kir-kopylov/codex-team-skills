@@ -107,15 +107,21 @@ def test_ci_builds_validated_release_bundle() -> None:
     step_text = "\n".join(str(step) for step in job["steps"])
 
     assert "python -m pytest" in step_text
-    assert "team-skills-bundle.zip" in step_text
-    assert "manifest.json" in step_text
-    assert "latest.json" in step_text
-    assert "sha256" in step_text
-    assert "runtime_version" in step_text
-    assert "release_id" in step_text
-    assert "manifest.json.sig" in step_text
-    assert "latest.json.sig" in step_text
-    assert "team-skills-v" in step_text
+    assert "scripts/build_release_bundle.py" in step_text
     assert "actions/upload-artifact" in step_text
-    assert "gh release create" in step_text
-    assert "gh release delete team-skills-latest" not in step_text
+
+    build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
+    assert "team-skills-bundle.zip" in build_script
+    assert "manifest.json" in build_script
+    assert "latest.json" in build_script
+    assert "sha256" in build_script
+    assert "runtime_version" in build_script
+    assert "release_id" in build_script
+    assert "team-skills-v" in build_script
+
+    workflow_text = "\n".join(str(job) for job in workflow["jobs"].values())
+    assert "manifest.json.sig" in workflow_text
+    assert "latest.json.sig" in workflow_text
+    assert "windows-powershell-smoke" in workflow["jobs"]
+    assert "gh release create" in workflow_text
+    assert "gh release delete team-skills-latest" not in workflow_text

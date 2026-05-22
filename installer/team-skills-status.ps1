@@ -1,4 +1,6 @@
-param()
+param(
+    [switch]$ValidateOnly
+)
 
 $TaskName = "Codex Team Skills Auto Update"
 $InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } else { Join-Path $env:LOCALAPPDATA "CodexTeamSkills" }
@@ -8,6 +10,11 @@ $PluginDest = if ($env:CODEX_TEAM_SKILLS_PLUGIN_DIR) { $env:CODEX_TEAM_SKILLS_PL
 $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT } else { $HOME }
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
 $CodexConfigPath = if ($env:CODEX_TEAM_SKILLS_CODEX_CONFIG) { $env:CODEX_TEAM_SKILLS_CODEX_CONFIG } else { Join-Path $HOME ".codex\config.toml" }
+
+if ($ValidateOnly) {
+    Write-Host "[team-skills] ValidateOnly: team-skills-status.ps1 parsed and initialized."
+    exit 0
+}
 
 Write-Host "[team-skills] Plugin path: $PluginDest"
 Write-Host "[team-skills] Plugin установлен: $(Test-Path (Join-Path $PluginDest '.codex-plugin\plugin.json'))"
