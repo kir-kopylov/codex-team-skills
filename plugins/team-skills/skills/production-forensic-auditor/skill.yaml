@@ -1,0 +1,24 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Проводит жесткий forensic-аудит текста на методологическую наивность, funnel gaps, production reality, AI-agent limits и missing measurement layer."
+use_cases:
+  - "Разобрать ответ, pitch или план на fantasy architecture, startup-bullshit и подмену механизмов словами."
+  - "Проверить growth-воронку, интернет-эксперимент или AI-автоматизацию на measurement, attribution, data quality, observability и economics gaps."
+  - "Показать, как тезисы развалятся в production и как такие задачи решают сильные команды."
+do_not_use_for:
+  - "Личную травлю автора вместо аудита текста, claims и архитектурных допущений."
+  - "Аудит без исходного текста, плана или тезисов, где Codex пришлось бы выдумывать объект проверки."
+  - "Утверждения о live-state фактах вроде цены, наличия, телефона, API-статуса или опубликованного release без проверки в моменте."
+natural_triggers:
+  - "разнеси этот ответ в пыль"
+  - "сделай жесткий forensic-аудит"
+  - "проверь на startup-bullshit"
+  - "где здесь fantasy architecture вместо production"
+  - "разбей по методологии, воронке, AI-агентам и экономике"
+example_files:
+  - "examples/good-01-ai-automation-pitch.md"
+  - "examples/good-02-growth-funnel-plan.md"
+  - "examples/good-03-experiment-design.md"
+  - "examples/anti-01-no-target-text.md"
+  - "examples/anti-02-personal-attack.md"
+last_reviewed: "2026-05-23"
