@@ -7,7 +7,7 @@
 Windows:
 
 ```powershell
-$u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $p; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
 ```
 
 macOS:
@@ -16,7 +16,7 @@ macOS:
 curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.command && chmod +x /tmp/install-team-skills.command && /tmp/install-team-skills.command
 ```
 
-После установки перезапустите Codex, чтобы он перечитал локальный plugin и скиллы.
+Установщик берёт signed `latest.json`, signed `manifest.json`, проверяет checksum assets, регистрирует локальный marketplace в Codex config и просит перезапустить Codex. После установки перезапустите Codex, чтобы он перечитал локальный plugin и скиллы.
 
 ## Проверить Установку
 
@@ -30,12 +30,17 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 ## Обновление И Удаление
 
-Автообновление включается установщиком и запускается раз в двое суток. Если обновление не удалось, старая рабочая версия остаётся на месте.
+Автообновление включается установщиком и запускается раз в двое суток. Если обновление не удалось, старая рабочая версия остаётся на месте. Runtime-видимость skill подтверждается только после перезапуска Codex; status-команда проверяет файлы, registry и состояние обновления.
 
 Для проверки статуса:
 
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\team-skills-status.ps1`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command`
+
+Если plugin установлен, но Codex не видит новые skills, выполните one-time repair:
+
+- Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\update-team-skills.ps1 -RepairInstall`
+- macOS: `~/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh --repair-install`
 
 Для удаления:
 

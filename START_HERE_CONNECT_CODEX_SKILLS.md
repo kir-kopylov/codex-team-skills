@@ -42,10 +42,10 @@ GitHub аккаунт не нужен для чтения и установки 
 Дай одну команду для PowerShell:
 
 ```powershell
-$u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $p; powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
 ```
 
-Ситуация успеха: установщик пишет, что поставил проверенную версию `team-skills`, включил автообновление через Windows Task Scheduler и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, включил автообновление через Windows Task Scheduler и просит перезапустить Codex.
 
 ## Если У Коллеги macOS
 
@@ -55,7 +55,7 @@ $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/in
 curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.command && chmod +x /tmp/install-team-skills.command && /tmp/install-team-skills.command
 ```
 
-Ситуация успеха: установщик пишет, что поставил проверенную версию `team-skills`, включил автообновление через LaunchAgent и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, включил автообновление через LaunchAgent и просит перезапустить Codex.
 
 ## Если Другая Система
 
@@ -80,7 +80,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 Объясни одной фразой:
 
 ```text
-Система сама раз в двое суток ставит последнюю проверенную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте.
+Система сама раз в двое суток ставит последнюю подписанную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте. После обновления нужен перезапуск Codex, чтобы новая runtime-версия стала видна.
 ```
 
 Если коллега хочет обновить вручную, попроси его написать:
@@ -96,7 +96,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: запусти `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`;
 - macOS: запусти `~/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command`.
 
-Удаление убирает plugin, автообновление, локальный cache и запись из marketplace.
+Удаление убирает plugin, автообновление, локальные support files и записи из marketplace/Codex registry.
 
 ## Режим Автора
 
