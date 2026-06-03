@@ -1,0 +1,24 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Анализирует приватные карточки сбоев skill и предлагает безопасный patch proposal без применения изменений."
+use_cases:
+  - "Разобрать exception-log.jsonl или очищенные карточки ошибок существующего skill."
+  - "Сгруппировать повторяющиеся или дорогие сбои и предложить known-exceptions правило."
+  - "Подготовить patch proposal к SKILL.md, known-exceptions.yaml, examples и tests без применения изменений."
+do_not_use_for:
+  - "Создание нового skill из общего диалога без привязки к сбоям существующего skill."
+  - "Автоматическое применение patch, commit или публикация PR без отдельного явного запроса."
+  - "Перенос raw private logs, PII, приватных путей, клиентских переписок или токенов в repo."
+natural_triggers:
+  - "разбери exception log skill"
+  - "сделай reviewer по сбоям skill"
+  - "преврати карточки ошибок в patch proposal"
+  - "что добавить в known-exceptions"
+  - "skill снова повторил ошибку"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-06-03"

@@ -23,6 +23,7 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "language-policy.md",
     ROOT / "docs" / "platform-overview.md",
     ROOT / "docs" / "seed-skill-example.md",
+    ROOT / "docs" / "skill-exception-learning.md",
     ROOT / ".github" / "pull_request_template.md",
 ]
 

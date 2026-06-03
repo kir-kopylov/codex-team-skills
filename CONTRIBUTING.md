@@ -12,7 +12,20 @@
 - Папка скилла и `name:` в `SKILL.md` пишутся в `kebab-case`.
 - Пользователь должен иметь возможность запускать skill обычной фразой, а не помнить `$skill-name`.
 - `SKILL.md` должен быть коротким, процедурным и применимым.
+- Новый или изменяемый skill должен иметь `known-exceptions.yaml`; пустой вариант допустим как `exceptions: []`.
 - Доказательства пользы кладём в `examples/`: хорошие примеры и анти-примеры.
-- Нельзя коммитить секреты, raw PII, абсолютные личные пути, приватный контекст из переписок, pasteboard/download paths и приватные изображения.
+- Нельзя коммитить секреты, raw PII, абсолютные личные пути, приватный контекст из переписок, pasteboard/download paths, raw exception logs и приватные изображения.
 - `agents/openai.yaml` необязателен. Добавляйте его только если скиллу нужны UI-имя, короткое описание или default prompt.
 
+## Цикл Разбора Сбоев
+
+Если skill ошибся, не переписывайте его сразу. Сначала сохраните приватную карточку ошибки в локальном `exception-log.jsonl` вне repo, затем используйте `skill-exception-reviewer`.
+
+Reviewer должен выдать proposal, а не применять patch. В proposal должны быть:
+
+- запись для `known-exceptions.yaml`;
+- точечная правка `SKILL.md`;
+- good/anti example или regression test idea;
+- gate: human approval, `python -m pytest`, git commit.
+
+В публичный repo переносите только очищенное правило, синтетический example и тест. Raw logs остаются приватными.

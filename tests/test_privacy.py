@@ -13,6 +13,7 @@ SCAN_PATHS = [
     ROOT / "CONTRIBUTING.md",
     ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
     ROOT / "admin-onboarding-guide.md",
+    ROOT / "docs",
     ROOT / "installer",
     ROOT / ".github",
     ROOT / "plugins",
@@ -47,3 +48,14 @@ def test_no_obvious_private_material_or_secrets() -> None:
         content = path.read_text(encoding="utf-8")
         for label, pattern in DENY_PATTERNS.items():
             assert not pattern.search(content), f"{path} appears to contain {label}"
+
+
+def test_no_raw_exception_logs_are_committed() -> None:
+    ignored_dirs = {".git", ".pytest_cache", "__pycache__", "dist"}
+    for path in ROOT.rglob("*"):
+        if any(part in ignored_dirs for part in path.parts):
+            continue
+        if not path.is_file():
+            continue
+        assert path.name != "exception-log.jsonl", f"{path} выглядит как сырой приватный exception log"
+        assert "skill-runs" not in path.parts, f"{path} выглядит как приватная директория skill-runs"

@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex читает существующую папку skill, `skill.yaml`, examples, `catalog.md` и тесты. Он исправляет frontmatter, description, registry-поля, добавляет недостающие good/anti examples, убирает шаблонные заглушки, добавляет строку в catalog и запускает `python3 -m pytest`. В финале Codex кратко перечисляет, что изменилось и прошли ли проверки.
+Codex читает существующую папку skill, `skill.yaml`, `known-exceptions.yaml`, examples, `catalog.md` и тесты. Он исправляет frontmatter, description, registry-поля, добавляет недостающие good/anti examples, создаёт пустой `known-exceptions.yaml`, если skill новый или изменяемый, убирает шаблонные заглушки, добавляет строку в catalog и запускает `python3 -m pytest`. В финале Codex кратко перечисляет, что изменилось и прошли ли проверки.
 
 ## Нельзя
 

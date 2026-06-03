@@ -35,6 +35,7 @@ plugins/team-skills/
   skills/<skill-name>/
     SKILL.md                      # инструкция, которую читает Codex
     skill.yaml                    # карточка скилла для команды
+    known-exceptions.yaml         # известные сбои и действия на следующий раз
     examples/                     # хорошие примеры и анти-примеры
 catalog.md                        # каталог для людей
 quickstart.md                     # короткий технический старт
@@ -59,7 +60,7 @@ tests/                            # проверки структуры, при�
    python scripts/new_skill.py <skill-name> --owner @github-login
    ```
 
-2. Автор заполняет `SKILL.md`, `skill.yaml` и `examples/`.
+2. Автор заполняет `SKILL.md`, `skill.yaml`, `known-exceptions.yaml` и `examples/`.
 3. Автор добавляет строку в `catalog.md`.
 4. Автор запускает проверки:
 
@@ -80,5 +81,20 @@ tests/                            # проверки структуры, при�
 - запускается обычной человеческой фразой, а не только `$skill-name`;
 - решает повторяемую задачу;
 - имеет понятные границы применения;
+- читает `known-exceptions.yaml` как список уже известных сбоев;
 - содержит хорошие примеры и анти-примеры;
 - не содержит токены, личные пути, приватные данные и сырой контекст клиентов.
+
+## Как Skill Учится На Сбоях
+
+Сырые карточки ошибок хранятся приватно вне repo:
+
+```text
+~/.codex/skill-runs/<skill-name>/exception-log.jsonl
+```
+
+Если пользователь поправил skill, tool упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, исполнитель записывает короткую карточку ошибки. Reviewer-skill `skill-exception-reviewer` читает такие карточки и предлагает patch proposal, но не применяет его сам.
+
+В repo попадает только очищенное знание: запись в `known-exceptions.yaml`, правка `SKILL.md`, example и test. Применение идёт через human approval, `python -m pytest` и git commit.
+
+Подробный формат описан в [docs/skill-exception-learning.md](docs/skill-exception-learning.md).
