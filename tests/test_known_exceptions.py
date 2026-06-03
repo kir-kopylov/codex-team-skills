@@ -36,10 +36,9 @@ def test_known_exceptions_yaml_schema_when_present() -> None:
                 assert isinstance(value, str) and value.strip(), f"{path}: exceptions[{index}].{key} пустой"
 
 
-def test_new_or_changed_exception_ready_skills_have_file() -> None:
-    for skill_name in ("add-team-skill", "skill-exception-reviewer"):
-        data = load_known_exceptions(skill_name)
-        assert data["exceptions"] == []
+def test_all_team_skills_have_known_exceptions_file() -> None:
+    for skill_dir in skill_dirs():
+        load_known_exceptions(skill_dir.name)
 
 
 def test_new_skill_generator_creates_known_exceptions_template() -> None:
@@ -51,12 +50,10 @@ def test_new_skill_generator_creates_known_exceptions_template() -> None:
     assert "exception-log.jsonl" in content
 
 
-def test_exception_enabled_skills_have_logging_contract() -> None:
+def test_all_team_skills_have_logging_contract() -> None:
     for skill_dir in skill_dirs():
-        if not (skill_dir / "known-exceptions.yaml").exists():
-            continue
-
         content = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
         assert "## Логирование Сбоев" in content, f"{skill_dir.name} должен описывать логирование сбоев"
+        assert "known-exceptions.yaml" in content, f"{skill_dir.name} должен читать known-exceptions.yaml"
         assert "exception-log.jsonl" in content, f"{skill_dir.name} должен указывать приватный exception log"
         assert "Raw logs не коммитить" in content, f"{skill_dir.name} должен запрещать commit raw logs"

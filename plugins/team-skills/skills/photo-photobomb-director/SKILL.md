@@ -182,6 +182,14 @@ Safety and tone: [bounds]. No extra text except: "[exact text]".
 - `placement`: один foreground или edge-of-frame element плюс один background element, если count 2+;
 - `safety_bounds`: funny, non-cruel, non-horror, no realistic injury.
 
+## Логирование Сбоев
+
+Перед выполнением прочитайте локальный `known-exceptions.yaml` как список уже известных случаев и применяйте подходящее `do_next_time` без нового поиска.
+
+Если пользователь поправил skill, tool/API/browser упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, запишите приватную карточку в `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`.
+
+Пишите факты: что skill хотел сделать, что сделал, где сломался, какая предпосылка была ложной и что сделать в следующий раз. Если поле неизвестно, пишите `unknown`. Raw logs не коммитить.
+
 ## Быстрые Примеры
 
 - "Сделай фотобомбинг, но не трогай людей и фон" -> Friends Chat, Level 2, 1-2 additions.
@@ -190,4 +198,3 @@ Safety and tone: [bounds]. No extra text except: "[exact text]".
 - "Пенсионный вайб, чуть-чуть" -> Pension/Retro, Level 1, small nostalgic easter egg.
 - "НЛО аварийно, но мультяшно-безопасно, с баннером" -> Dark-lite/Surreal-Meme, no explosion, exact banner text.
 - "Apply $photo-photobomb-director: 3 layers, child-safe, joy 8, grotesque 1" -> явный вызов тоже работает.
-
