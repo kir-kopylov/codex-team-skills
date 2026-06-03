@@ -69,6 +69,12 @@ TODO: Опишите минимальный процесс принятия ре
 ## Границы
 
 TODO: Укажите, когда skill нельзя использовать, что нужно сохранить и чего нужно избегать.
+
+## Логирование Сбоев
+
+Если пользователь поправил skill, tool/API/browser упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, запишите приватную карточку в `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`.
+
+Пишите факты: что skill хотел сделать, что сделал, где сломался, какая предпосылка была ложной и что сделать в следующий раз. Если поле неизвестно, пишите `unknown`. Raw logs не коммитить.
 """,
     )
 
@@ -92,6 +98,8 @@ example_files:
 last_reviewed: "{today}"
 """,
     )
+
+    write_new(skill_dir / "known-exceptions.yaml", "exceptions: []\n")
 
     for filename, kind in [
         ("good-01.md", "Хороший Пример"),
@@ -119,7 +127,7 @@ TODO: конкретное поведение, которого skill долже
         )
 
     print(f"Создан черновик skill: {skill_dir}")
-    print("Дальше заполните SKILL.md, skill.yaml, examples и catalog.md перед переводом в team-ready.")
+    print("Дальше заполните SKILL.md, skill.yaml, known-exceptions.yaml, examples и catalog.md перед переводом в team-ready.")
 
 
 if __name__ == "__main__":

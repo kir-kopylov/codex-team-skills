@@ -61,6 +61,7 @@ python3 scripts/new_skill.py <skill-name> --owner @github-login --summary "Ко�
 
 - `SKILL.md` — инструкция для Codex;
 - `skill.yaml` — registry-карточка для команды;
+- `known-exceptions.yaml` — список известных сбоев и готовых действий на следующий раз;
 - `examples/` — проверяемые хорошие примеры и анти-примеры;
 - строка в `catalog.md`, если статус `team-ready`;
 - `agents/openai.yaml` только если нужен UI-чип или полезный default prompt.
@@ -142,6 +143,34 @@ last_reviewed: "YYYY-MM-DD"
 
 Хороший example доказывает применимость skill на реалистичном запросе. Anti-example показывает границу, где skill должен отказаться, спросить уточнение или выбрать другой workflow.
 
+## Known Exceptions
+
+Для нового или изменяемого skill добавьте рядом с `SKILL.md` файл `known-exceptions.yaml`.
+
+Минимальный пустой файл:
+
+```yaml
+exceptions: []
+```
+
+Если у skill уже есть известные сбои, каждая запись должна содержать:
+
+```yaml
+exceptions:
+  - symptom: "Что наблюдает Codex или пользователь."
+    root_cause: "Почему skill ошибается."
+    do_next_time: "Что сделать сразу в следующий раз."
+    source_example: "Какой example, test или sanitized packet подтверждает правило."
+```
+
+Перед выполнением skill должен читать этот файл как список известных случаев. Сырые `exception-log.jsonl` хранятся только приватно вне repo, например в `~/.codex/skill-runs/<skill-name>/`.
+
+## Логирование Сбоев
+
+Если пользователь поправил skill, tool/API/browser упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, запишите приватную карточку в `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`.
+
+Пишите факты: что skill хотел сделать, что сделал, где сломался, какая предпосылка была ложной и что сделать в следующий раз. Если поле неизвестно, пишите `unknown`. Raw logs не коммитить.
+
 ## Catalog
 
 Если skill переводится в `team-ready`, добавьте строку в `catalog.md`.
@@ -205,6 +234,7 @@ Skill готов, если:
 - folder name, `SKILL.md` frontmatter `name` и registry согласованы;
 - `description` содержит естественные триггеры;
 - `skill.yaml` заполнен без пустых полей;
+- для новых или изменяемых skills есть `known-exceptions.yaml`;
 - для `team-ready` есть 3 good examples и 2 anti-examples;
 - все examples указаны в `example_files` и существуют;
 - `catalog.md` содержит строку для `team-ready`;

@@ -31,6 +31,7 @@ def test_markdown_links_resolve() -> None:
         ROOT / "language-policy.md",
         ROOT / "docs" / "platform-overview.md",
         ROOT / "docs" / "seed-skill-example.md",
+        ROOT / "docs" / "skill-exception-learning.md",
     ]
     for file in files:
         content = file.read_text(encoding="utf-8")
