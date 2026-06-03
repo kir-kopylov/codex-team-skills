@@ -167,6 +167,8 @@ exceptions:
 
 ## Логирование Сбоев
 
+Перед выполнением прочитайте локальный `known-exceptions.yaml` как список уже известных случаев и применяйте подходящее `do_next_time` без нового поиска.
+
 Если пользователь поправил skill, tool/API/browser упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, запишите приватную карточку в `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`.
 
 Пишите факты: что skill хотел сделать, что сделал, где сломался, какая предпосылка была ложной и что сделать в следующий раз. Если поле неизвестно, пишите `unknown`. Raw logs не коммитить.
@@ -234,7 +236,7 @@ Skill готов, если:
 - folder name, `SKILL.md` frontmatter `name` и registry согласованы;
 - `description` содержит естественные триггеры;
 - `skill.yaml` заполнен без пустых полей;
-- для новых или изменяемых skills есть `known-exceptions.yaml`;
+- каждый skill имеет `known-exceptions.yaml`;
 - для `team-ready` есть 3 good examples и 2 anti-examples;
 - все examples указаны в `example_files` и существуют;
 - `catalog.md` содержит строку для `team-ready`;
