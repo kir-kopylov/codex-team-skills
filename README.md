@@ -36,6 +36,7 @@ plugins/team-skills/
     SKILL.md                      # инструкция, которую читает Codex
     skill.yaml                    # карточка скилла для команды
     known-exceptions.yaml         # известные сбои и действия на следующий раз
+    references/domain-playbook.md # только для domain/interface-heavy skills
     examples/                     # хорошие примеры и анти-примеры
 catalog.md                        # каталог для людей
 quickstart.md                     # короткий технический старт
@@ -84,6 +85,8 @@ tests/                            # проверки структуры, при�
 - читает `known-exceptions.yaml` как список уже известных сбоев;
 - содержит хорошие примеры и анти-примеры;
 - не содержит токены, личные пути, приватные данные и сырой контекст клиентов.
+- сохраняет очищенную специфику реальных сервисов: UI-состояния, selectors, лимиты, recovery, локальные языковые ключи и known exceptions, если именно они делают workflow быстрым.
+- для domain/interface-heavy workflow хранит короткий `references/domain-playbook.md`, где механика сервиса отделена от личных значений.
 
 ## Как Skill Учится На Сбоях
 
@@ -95,6 +98,6 @@ tests/                            # проверки структуры, при�
 
 Если пользователь поправил skill, tool упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, исполнитель записывает короткую карточку ошибки. Reviewer-skill `skill-exception-reviewer` читает такие карточки и предлагает patch proposal, но не применяет его сам.
 
-В repo попадает только очищенное знание: запись в `known-exceptions.yaml`, правка `SKILL.md`, example и test. Применение идёт через human approval, `python -m pytest` и git commit.
+В repo попадает только очищенное знание: запись в `known-exceptions.yaml`, правка `SKILL.md`, `references/domain-playbook.md` для интерфейсной механики, example и test. Применение идёт через human approval, `python -m pytest` и git commit.
 
 Подробный формат описан в [docs/skill-exception-learning.md](docs/skill-exception-learning.md).

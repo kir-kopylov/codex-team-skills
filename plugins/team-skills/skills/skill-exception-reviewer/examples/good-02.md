@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex группирует карточки как повторяющийся tool failure. Он предлагает known exception: симптом - Chrome API заблокирован другим extension UI; root cause - browser extension control недоступен в текущем состоянии; do_next_time - не переходить автоматически к Computer Use, использовать наблюдение/один пользовательский шаг и вернуться к background API после закрытия блокера. Proposal включает правку к границам skill, anti-example про самовольный fallback и test idea на запрет foreground fallback без подтверждения.
+Codex группирует карточки как повторяющийся tool failure. Он предлагает known exception: симптом - Chrome API заблокирован другим extension UI; root cause - browser extension control недоступен в текущем состоянии; do_next_time - не переходить автоматически к Computer Use, использовать наблюдение/один пользовательский шаг и вернуться к background API после закрытия блокера. Так как сбой связан с интерфейсным recovery, proposal включает patch в `references/domain-playbook.md`, правку к границам skill, anti-example про самовольный fallback и test idea на запрет foreground fallback без подтверждения.
 
 ## Нельзя
 

@@ -1,0 +1,128 @@
+---
+name: marketplace-background-listing-assistant
+description: Используйте этот skill, когда пользователь просит подготовить, проверить или опубликовать объявления на OLX, Kaspi или похожих маркетплейсах, особенно "лоты даром самовывозом", "размести объявления", "не перехватывай клавиатуру", "работай через Chrome API", "сделай через Chronicle", "самовывоз, забрать сегодня". Skill удерживает background-only режим, приватность адреса, точный состав предметов, предпросмотр и gate перед публикацией.
+---
+
+# Marketplace Background Listing Assistant
+
+## Обзор
+
+Этот skill помогает готовить и публиковать объявления на маркетплейсах так, чтобы Codex работал в фоне и не мешал пользователю работать за компьютером.
+
+OLX Kazakhstan является first-class implementation target для v1. Для конкретной механики OLX читайте `references/domain-playbook.md` перед browser/API работой.
+
+Главный контракт: подготовка, проверка и заполнение идут через Chrome extension/browser API, connectors, filesystem и shell-only действия без foreground GUI. Не перехватывайте клавиатуру, мышь, видимое окно, file picker или desktop, пока пользователь явно не дал короткое окно foreground control.
+
+## Естественные Входы
+
+Запускайте skill по обычным фразам:
+
+- "размести объявления на OLX/Kaspi";
+- "лоты даром самовывозом";
+- "самовывоз, забрать сегодня";
+- "опубликуй через мои аккаунты";
+- "не перехватывай клавиатуру";
+- "я хочу параллельно работать";
+- "работай через Chrome API";
+- "сделай через Chronicle";
+- "подготовь объявления по папке с фото";
+- "добавь казахские ключевые слова";
+- "проверь, что размещены все предметы";
+- "обнови опубликованные объявления".
+
+## Background-Only Контракт
+
+Разрешено по умолчанию:
+
+- Chrome extension/browser API: DOM selectors, page evaluation, tab inspection, file chooser API;
+- connectors/MCP tools;
+- filesystem reads/writes для drafts, inventory, upload paths и локальных логов;
+- shell commands, которые не управляют foreground GUI.
+
+Запрещено без явного короткого разрешения:
+
+- Computer Use;
+- AppleScript/System Events;
+- coordinate clicks, foreground typing, scrolling, dragging;
+- `keystroke`, `type_text`, foreground `press_key`;
+- file picker automation через видимый desktop.
+
+Если background API заблокирован, остановитесь и скажите один background-safe следующий шаг. Не fallback-ить в foreground control из-за неудобства API.
+
+## Процесс
+
+1. Inventory:
+   - найдите папку с лотами и реальные фото;
+   - сгруппируйте фото по физическим предметам;
+   - не считайте всё видимое на фото предметом передачи;
+   - если scope неоднозначен, спросите один blocker question или явно пишите "отдаётся только X".
+
+2. Draft:
+   - создайте или обновите markdown draft;
+   - для каждого лота заполните title, description, category, price `Бесплатно`, condition, photo paths, public address без квартиры, pickup constraints, contact person, phone и quick reply;
+   - для срочного самовывоза укажите город/район, street/building без квартиры, этаж, подъезд если безопасно, отсутствие лифта и deadline.
+
+3. Preflight:
+   - проверьте публичный текст на `кв`, `квартира`, `apt` и известный номер квартиры;
+   - проверьте item scope: например, если отдаётся матрас, слова `кровать` или `bed` не появляются без подтверждения;
+   - разделите contact person, marketplace profile display name и account nickname;
+   - если пользователь сказал, что фото достаточно, остановите улучшение фото и переходите к preview/publish gate.
+
+4. Search keywords:
+   - для русских объявлений используйте сигналы `в дар`, `бесплатно`, `самовывоз`;
+   - для OLX Kazakhstan используйте казахские ключи из `references/domain-playbook.md`;
+   - title должен оставаться в лимите площадки, лучше сокращать item phrase, чем выбрасывать ключевой tail.
+
+5. Background browser:
+   - заполнение формы выполняйте только через Chrome extension/browser API;
+   - перед OLX работой прочитайте `references/domain-playbook.md`;
+   - при `another extension UI is open`, `Browser is not available: extension` или `Browser Use virtual clipboard is not installed` используйте recovery из playbook и не переходите к foreground typing.
+
+6. Preview:
+   - проверьте title, price, category, condition, address без квартиры, pickup constraints, contact person, photos, keyword paragraph и отсутствие лишних предметов;
+   - если profile display name отличается от contact person, маршрутизируйте это как отдельную profile-change проверку и не сохраняйте профиль без подтверждения.
+
+7. Publish gate:
+   - перед final public submit остановитесь;
+   - кратко покажите marketplace, title, price, public address, contact person, photo count и caveats;
+   - спросите: `Подтвердите: публикую это объявление сейчас?`
+
+8. After publish:
+   - запишите listing URL/статус, timestamp и source draft в локальный лог;
+   - проверьте coverage by physical item, not listing count;
+   - смотрите active, waiting, rejected, inactive и unpaid statuses, если площадка их показывает;
+   - не удаляйте и не деактивируйте дубли без явной команды.
+
+## Границы
+
+Нельзя:
+
+- публиковать номер квартиры в public listing;
+- считать contact person равным account/profile nickname без проверки;
+- покупать paid promotion, placement, wallet top-up или advertising package;
+- нажимать final publish, payment, profile-save, deletion или permission change без explicit confirmation;
+- говорить, что вкладка, popup или status видны, если они не наблюдались через tool;
+- продолжать улучшать фото после "фотографий достаточно";
+- считать количество объявлений достаточным без проверки coverage by physical item.
+
+Если OLX после публикации открывает paid promotion screen, это не означает, что объявление не создано. Используйте только no-promo path из playbook.
+
+## Логирование Сбоев
+
+Перед выполнением прочитайте локальный `known-exceptions.yaml` как список уже известных случаев и применяйте подходящее `do_next_time` без нового поиска.
+
+Если пользователь поправил skill, tool/API/browser упал, нарушен режим работы, пришлось искать workaround или skill сделал ложное предположение, запишите приватную карточку в `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`.
+
+Пишите факты: что skill хотел сделать, что сделал, где сломался, какая предпосылка была ложной и что сделать в следующий раз. Если поле неизвестно, пишите `unknown`. Raw logs не коммитить.
+
+## Definition Of Done
+
+Работа завершена, когда:
+
+- draft и browser state проверены по preflight;
+- публичный адрес не содержит квартиры;
+- item scope не расширен по фото;
+- OLX/domain mechanics применены из `references/domain-playbook.md`;
+- финальная публикация прошла только после подтверждения;
+- статусы после публикации или редактирования записаны локально;
+- сбои занесены в private `exception-log.jsonl`, а не в repo.

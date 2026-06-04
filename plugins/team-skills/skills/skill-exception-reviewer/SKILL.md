@@ -47,6 +47,7 @@ exception card -> grouped failure -> known exception -> example/test idea -> hum
 5. Выдайте patch proposal, но не применяйте его:
    - запись для `known-exceptions.yaml`;
    - короткую правку к `SKILL.md`;
+   - patch в `references/domain-playbook.md`, если сбой связан с интерфейсной механикой, selector, URL pattern, paid/no-payment path, локальным языковым ключом или повторяемым browser/API recovery;
    - good/anti example;
    - regression test idea;
    - human approval question.
@@ -111,6 +112,8 @@ severity
 
 ### SKILL.md
 
+### references/domain-playbook.md
+
 ### examples/
 
 ### tests/
@@ -126,6 +129,6 @@ Review завершён, если:
 
 - raw log не перенесён в repo;
 - повторяющиеся или дорогие сбои отделены от слабых единичных;
-- patch proposal содержит запись для `known-exceptions.yaml`, правку инструкции и идею example/test;
+- patch proposal содержит запись для `known-exceptions.yaml`, правку инструкции, playbook patch для интерфейсного сбоя и идею example/test;
 - явно сказано, что patch не применён;
 - следующий похожий сбой можно будет распознать без нового поиска решения.
