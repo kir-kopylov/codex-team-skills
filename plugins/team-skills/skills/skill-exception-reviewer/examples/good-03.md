@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex анализирует packets, выделяет один кандидат в правило и один слабый единичный сбой. Он выдаёт markdown proposal с секциями `known-exceptions.yaml`, `SKILL.md`, `examples/`, `tests/` и `Gate`. В конце явно пишет, что patch не применён, а следующий шаг - human approval, затем отдельное внесение изменений и `python3 -m pytest`.
+Codex анализирует packets, выделяет один кандидат в правило и один слабый единичный сбой. Он выдаёт markdown proposal с секциями `known-exceptions.yaml`, `SKILL.md`, `references/domain-playbook.md` при интерфейсном сбое, `examples/`, `tests/` и `Gate`. В конце явно пишет, что patch не применён, а следующий шаг - human approval, затем отдельное внесение изменений и `python3 -m pytest`.
 
 ## Нельзя
 

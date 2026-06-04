@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "На фото видны дополнительные предметы, и skill может ошибочно включить их в объявление."
+    root_cause: "Модель смешивает визуальный контекст фото с фактическим item scope пользователя."
+    do_next_time: "Сначала зафиксировать, что отдаётся, и писать 'отдаётся только X', если фото может ввести покупателя в заблуждение."
+    source_example: "examples/good-01-free-pickup.md"
+  - symptom: "Chrome API заблокирован сообщением another extension UI is open или Browser is not available: extension."
+    root_cause: "Background browser channel временно недоступен, но пользователь хочет продолжать работать с клавиатурой."
+    do_next_time: "Не переходить к Computer Use или foreground typing; применить recovery из references/domain-playbook.md и остановиться с одним background-safe шагом, если канал не восстановился."
+    source_example: "examples/good-02-background-blocker.md"
+  - symptom: "После бесплатной публикации OLX открывает экран платного продвижения."
+    root_cause: "Площадка переводит пользователя на paid upsell flow после создания объявления."
+    do_next_time: "Использовать только no-promo path: 'Не рекламировать' и подтверждать 'Да, создать' только если модалка говорит, что объявление уже создано и платная услуга не покупается."
+    source_example: "examples/good-03-olx-playbook.md"

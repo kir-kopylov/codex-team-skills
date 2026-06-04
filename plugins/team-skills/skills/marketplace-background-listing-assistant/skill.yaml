@@ -1,0 +1,25 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Готовит и публикует объявления на OLX/Kaspi в background-only режиме с проверкой приватности, предметов и предпросмотра."
+use_cases:
+  - "Разместить срочные лоты в дар или бесплатно самовывозом через аккаунт пользователя, не перехватывая клавиатуру."
+  - "Подготовить и проверить тексты, фото, адрес без квартиры, ключевые слова и условия самовывоза перед публикацией."
+  - "Разобрать OLX browser/API blockers, paid promotion screen, модерацию, дубли и coverage by physical item."
+do_not_use_for:
+  - "Foreground управление Chrome, клики, ввод с клавиатуры или file picker без явного короткого разрешения пользователя."
+  - "Платное продвижение, платежи, удаление объявлений, сохранение профиля или final publish без отдельного подтверждения."
+  - "Публикацию приватных адресов, квартир, телефонов, email, account nicknames, raw logs или private media в repo."
+natural_triggers:
+  - "размести объявления на OLX"
+  - "лоты даром самовывозом"
+  - "не перехватывай клавиатуру"
+  - "работай через Chrome API"
+  - "сделай через Chronicle"
+  - "самовывоз, забрать сегодня"
+example_files:
+  - "examples/good-01-free-pickup.md"
+  - "examples/good-02-background-blocker.md"
+  - "examples/good-03-olx-playbook.md"
+  - "examples/anti-01-foreground-control.md"
+  - "examples/anti-02-private-data.md"
+last_reviewed: "2026-06-04"

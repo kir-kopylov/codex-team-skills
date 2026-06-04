@@ -38,6 +38,19 @@ description: Используйте этот skill, когда пользова�
 
 Если пользователь не знает точных ответов, предложите разумный draft и отметьте спорные места в examples или `skill.yaml`.
 
+## Domain/Interface Check
+
+Перед созданием или переводом skill в `team-ready` проверьте, является ли workflow `domain/interface-heavy`.
+
+Считайте skill domain/interface-heavy, если его ценность зависит от внешнего сайта, кабинета, маркетплейса, локального рынка, модерации, paid screens, browser/API recovery, selectors, URL patterns, field limits или локальных поисковых слов.
+
+Для такого skill создайте или обновите `references/domain-playbook.md`. Всегда зафиксируйте два списка:
+
+- `Что нельзя потерять`: routes, selectors, поля, статусы, лимиты, recovery, no-payment paths, локальные поисковые слова;
+- `Что надо обезличить`: адреса, квартиры, телефоны, email, имена, реальные IDs, аккаунтные ники, личные пути, raw logs, screenshots/private media.
+
+Если workflow не зависит от конкретного интерфейса или рынка, не создавайте playbook ради формы.
+
 ## Создание Нового Skill
 
 Для нового skill используйте локальный генератор:
@@ -62,6 +75,7 @@ python3 scripts/new_skill.py <skill-name> --owner @github-login --summary "Ко�
 - `SKILL.md` — инструкция для Codex;
 - `skill.yaml` — registry-карточка для команды;
 - `known-exceptions.yaml` — список известных сбоев и готовых действий на следующий раз;
+- `references/domain-playbook.md` — только для domain/interface-heavy skills, где нужно сохранить очищенную механику сервиса;
 - `examples/` — проверяемые хорошие примеры и анти-примеры;
 - строка в `catalog.md`, если статус `team-ready`;
 - `agents/openai.yaml` только если нужен UI-чип или полезный default prompt.
@@ -210,6 +224,7 @@ python3 -m pytest
 - example не содержит нужные секции;
 - текст пользовательских файлов не на русском;
 - есть токены, приватные пути, pasteboard/download paths или raw PII.
+- domain/interface-heavy skill потерял selectors, URL patterns, статусы, лимиты или recovery вместо очищения частных значений.
 
 ## Pull Request
 
@@ -237,6 +252,7 @@ Skill готов, если:
 - `description` содержит естественные триггеры;
 - `skill.yaml` заполнен без пустых полей;
 - каждый skill имеет `known-exceptions.yaml`;
+- domain/interface-heavy skill имеет `references/domain-playbook.md` или явное объяснение, почему playbook не нужен;
 - для `team-ready` есть 3 good examples и 2 anti-examples;
 - все examples указаны в `example_files` и существуют;
 - `catalog.md` содержит строку для `team-ready`;
