@@ -83,11 +83,13 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 Система сама раз в двое суток ставит последнюю подписанную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте. После обновления нужен перезапуск Codex, чтобы новая runtime-версия стала видна.
 ```
 
-Если коллега хочет обновить вручную, попроси его написать:
+Если коллега хочет обновить вручную и сразу перечитать новые skills в desktop apps, попроси его написать:
 
 ```text
-Проверь статус командных skills и обнови их сейчас.
+Обнови локальные team-skills и перезапусти Codex/Claude.
 ```
+
+На macOS Codex должен использовать `~/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command`: команда обновляет локальный plugin, синхронизирует Claude skills folder и перезапускает Codex/Claude.
 
 ## Удаление
 

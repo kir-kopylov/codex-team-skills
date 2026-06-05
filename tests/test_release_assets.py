@@ -27,6 +27,7 @@ NON_POWERSHELL_ASSETS = (
     "update-team-skills.sh",
     "uninstall-team-skills.command",
     "team-skills-status.command",
+    "refresh-team-skills.command",
     "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",
@@ -98,6 +99,25 @@ def test_release_bundle_includes_claude_sync_script(tmp_path: Path) -> None:
     data = sync_script.read_bytes()
     assert support_files["pull-skills.sh"]["sha256"] == hashlib.sha256(data).hexdigest()
     assert support_files["pull-skills.sh"]["size"] == len(data)
+
+
+def test_release_bundle_includes_refresh_and_restart_automation(tmp_path: Path) -> None:
+    dist = build_dist(tmp_path)
+    refresh_script = dist / "refresh-team-skills.command"
+    assert refresh_script.exists()
+    content = refresh_script.read_text(encoding="utf-8")
+    assert "update-team-skills.sh" in content
+    assert "pull-skills.sh" in content
+    assert "CODEX_TEAM_SKILLS_RESTART_APPS" in content
+    assert "Codex,Claude" in content
+    assert "osascript" in content
+    assert "open -a" in content
+
+    manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
+    support_files = {entry["name"]: entry for entry in manifest["support_files"]}
+    data = refresh_script.read_bytes()
+    assert support_files["refresh-team-skills.command"]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert support_files["refresh-team-skills.command"]["size"] == len(data)
 
 
 def test_windows_docs_rewrite_downloaded_installer_as_utf8_with_bom() -> None:

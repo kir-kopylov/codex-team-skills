@@ -4,6 +4,7 @@ summary: "Помогает проверить, обновить или удал�
 use_cases:
   - "Проверить, установлен ли plugin team-skills и когда он последний раз успешно обновлялся."
   - "Запустить ручное обновление team-skills, если новые skills ещё не появились."
+  - "Запустить полный refresh: обновить team-skills, синхронизировать Claude skills folder и перезапустить Codex/Claude."
   - "Удалить пользовательскую установку team-skills вместе с автообновлением и marketplace entry."
 do_not_use_for:
   - "Создание или публикацию новых skills в repo; для этого нужен author workflow и skill add-team-skill."
@@ -12,6 +13,7 @@ do_not_use_for:
 natural_triggers:
   - "проверь статус командных skills"
   - "обнови team-skills сейчас"
+  - "обнови локальные team-skills и перезапусти Codex/Claude"
   - "удали командные skills"
   - "почему не появились новые скиллы"
   - "проверь автообновление team-skills"

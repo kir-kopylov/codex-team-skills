@@ -37,6 +37,10 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\team-skills-status.ps1`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command`
 
+Для полного refresh на macOS: обновить локальные team-skills, синхронизировать Claude skills folder и перезапустить Codex/Claude:
+
+- macOS: `~/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command`
+
 Если plugin установлен, но Codex не видит новые skills, выполните one-time repair:
 
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\update-team-skills.ps1 -RepairInstall`

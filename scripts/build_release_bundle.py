@@ -25,6 +25,7 @@ SUPPORT_NAMES = (
     "uninstall-team-skills.command",
     "team-skills-status.ps1",
     "team-skills-status.command",
+    "refresh-team-skills.command",
     "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",

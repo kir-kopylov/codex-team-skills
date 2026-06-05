@@ -1,6 +1,6 @@
 ---
 name: team-skills-maintenance
-description: Используйте этот skill, когда пользователь хочет проверить статус командных Codex skills, обновить team-skills вручную, удалить общие skills, понять автообновление или восстановить установку после сбоя. Skill должен срабатывать на обычные фразы вроде "проверь статус командных skills", "обнови team-skills сейчас", "удали командные skills", "почему не появились новые скиллы", "проверь автообновление team-skills".
+description: Используйте этот skill, когда пользователь хочет проверить статус командных Codex skills, обновить team-skills вручную, обновить локальные team-skills и перезапустить Codex/Claude, удалить общие skills, понять автообновление или восстановить установку после сбоя. Skill должен срабатывать на обычные фразы вроде "проверь статус командных skills", "обнови team-skills сейчас", "обнови локальные team-skills и перезапусти Codex/Claude", "удали командные skills", "почему не появились новые скиллы", "проверь автообновление team-skills".
 ---
 
 # Team Skills Maintenance
@@ -15,6 +15,7 @@ description: Используйте этот skill, когда пользова�
 
 - "проверь статус" -> определить ОС и запустить status script;
 - "обнови сейчас" -> определить ОС и запустить update script;
+- "обнови локальные team-skills и перезапусти Codex/Claude" -> на macOS запустить refresh script, который делает update, Claude sync и restart desktop apps;
 - "удали командные skills" -> определить ОС и запустить uninstall script после явного подтверждения пользователя;
 - "новые skills не появились" -> проверить status, last_success_at, перезапуск Codex и только потом обновлять вручную;
 - "хочу добавить свой skill" -> передать в author workflow через `add-team-skill`.
@@ -34,12 +35,13 @@ macOS:
 ```bash
 "$HOME/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command"
 "$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh"
+"$HOME/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command"
 "$HOME/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command"
 ```
 
 ## Границы
 
-Не обещайте, что новый skill появится без перезапуска Codex: после установки или обновления Codex может перечитать plugin только после restart.
+Не обещайте, что новый skill появится без перезапуска Codex: после установки или обновления Codex может перечитать plugin только после restart. Если пользователь прямо просит обновить локальные team-skills и перезапустить Codex/Claude, используйте `refresh-team-skills.command`, а не список ручных команд.
 
 Не чините author workflow через uninstall. Если пользователь хочет публиковать skills, нужен GitHub аккаунт, branch, tests и Pull Request.
 
@@ -53,4 +55,4 @@ macOS:
 
 ## Definition Of Done
 
-Пользователь понимает текущий статус установки, последнюю успешную версию, состояние автообновления и следующий безопасный шаг: restart Codex, update now, uninstall или author workflow.
+Пользователь понимает текущий статус установки, последнюю успешную версию, состояние автообновления и следующий безопасный шаг: refresh and restart, update now, restart Codex, uninstall или author workflow.
