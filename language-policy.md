@@ -22,7 +22,7 @@
 Эти элементы являются техническим контрактом и должны оставаться стабильными:
 
 - имена файлов: `SKILL.md`, `plugin.json`, `skill.yaml`, `catalog.md`;
-- YAML/JSON keys: `owner`, `status`, `summary`, `use_cases`, `example_files`;
+- YAML/JSON keys: `owner`, `authors`, `source_asset`, `status`, `summary`, `use_cases`, `example_files`;
 - статусы: `draft`, `team-ready`, `deprecated`, `internal-only`;
 - команды: `python -m pytest`, `./scripts/install_plugin.sh`;
 - пути, имена plugin/skill, branch names, repo names;

@@ -1,6 +1,7 @@
 ---
 name: add-team-skill
-description: Используйте этот skill, когда пользователь хочет добавить новый командный Codex skill в repo codex-team-skills, превратить повторяемый workflow в skill, довести draft skill до team-ready, обновить существующий skill под правила repo, подготовить examples, skill.yaml, catalog.md, tests, CI или Pull Request. Skill должен срабатывать на обычные фразы вроде "добавь новый skill", "сделай из этого skill", "оформи workflow как командный skill", "доведи skill до team-ready", "проверь skill перед PR", "почини skill под CI"; пользователь не должен помнить внутреннюю структуру repo.
+description: |
+  Используйте этот skill, когда пользователь хочет добавить новый командный Codex skill в repo codex-team-skills, превратить повторяемый workflow или чужой draft в skill, довести draft до team-ready, обновить существующий skill под правила repo, подготовить examples, skill.yaml, catalog.md, tests, CI или Pull Request. Перед созданием или крупной правкой применяйте discovery gate: проверьте задачу, входы, результат, примеры, инструменты, ограничения, проверки и ownership. Срабатывает на фразы "добавь новый skill", "сделай из этого skill", "оформи workflow как командный skill", "доведи skill до team-ready", "проверь skill перед PR", "почини skill под CI".
 ---
 
 # Add Team Skill
@@ -17,6 +18,7 @@ description: Используйте этот skill, когда пользова�
 
 - пользователь просит "добавь новый skill" -> создать draft через `scripts/new_skill.py`, затем заполнить до нужного статуса;
 - пользователь дал workflow из диалога -> извлечь повторяемую задачу, триггеры, границы, examples и оформить skill;
+- пользователь дал чужой `SKILL.md`, draft или методику -> сначала найти похожие skills, решить "интегрировать или создать новый", затем сохранить авторство через `authors` и `source_asset`;
 - пользователь просит "team-ready" -> требовать owner, catalog row, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек и зелёный `pytest`;
 - пользователь просит "проверь перед PR" -> провести review структуры, registry, examples, catalog, privacy и тестов;
 - пользователь просит "почини CI" -> сначала прочитать ошибку тестов/CI, затем править минимально.
@@ -27,6 +29,32 @@ description: Используйте этот skill, когда пользова�
 2. Проверьте рабочее дерево через `git status --short --branch`.
 3. Не перезаписывайте чужие изменения и не удаляйте существующие файлы без явной причины.
 4. Если задача требует push или PR, помните: это внешне видимое действие. Сначала покажите, что будет отправлено, если пользователь не просил явно сделать publish.
+
+## Discovery Gate
+
+Перед созданием нового skill или крупной правкой существующего skill проверьте, что задача достаточно определена для repo-grade реализации.
+
+Минимальный brief:
+
+- назначение skill и повторяемая боль;
+- естественные триггеры;
+- кто будет использовать skill;
+- обязательные и опциональные входы;
+- ожидаемый результат;
+- 2-3 реалистичных примера;
+- workflow, tools, connectors, references, scripts или assets;
+- ограничения, edge cases и failure modes;
+- tone, language и формат ответа;
+- validation criteria;
+- ownership: кто maintainer, кто автор исходного вклада, нужен ли `source_asset`.
+
+Если brief уже ясен из файлов, диалога или repo-контекста, не анкетируйте пользователя. Зафиксируйте недостающие предположения в `skill.yaml`, examples или финальном summary и продолжайте.
+
+Если следующий шаг зависит от отсутствующих данных, спросите только 1-3 blocker questions. Не задавайте длинную анкету, если один ответ разблокирует работу.
+
+Если пользователь явно просит rough draft при неполных данных, оставьте статус `draft`, укажите assumptions и не добавляйте catalog row как `team-ready`.
+
+Для подробного checklist используйте `references/discovery-gate.md`.
 
 ## Минимальные Вопросы
 
@@ -130,6 +158,16 @@ example_files:
   - "examples/anti-02.md"
 last_reviewed: "YYYY-MM-DD"
 ```
+
+Если был внешний вклад, добавьте:
+
+```yaml
+authors:
+  - "Имя автора исходной методики, если отличается от maintainer-а"
+source_asset: "Короткое описание исходного вклада без приватных путей и raw-контекста."
+```
+
+`owner` — подтвержденный GitHub-style maintainer, отвечающий за поддержку и review. Не придумывайте handle коллеги. Если исходный workflow, методику или draft дал другой человек, сохраните его имя в `authors`, а источник вклада опишите в `source_asset`.
 
 Статусы:
 
@@ -253,6 +291,7 @@ Skill готов, если:
 - `skill.yaml` заполнен без пустых полей;
 - каждый skill имеет `known-exceptions.yaml`;
 - domain/interface-heavy skill имеет `references/domain-playbook.md` или явное объяснение, почему playbook не нужен;
+- если был чужой draft или доменная методика, `authors` и `source_asset` сохраняют вклад без приватных путей и raw-контекста;
 - для `team-ready` есть 3 good examples и 2 anti-examples;
 - все examples указаны в `example_files` и существуют;
 - `catalog.md` содержит строку для `team-ready`;
