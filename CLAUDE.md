@@ -75,8 +75,9 @@ pyproject.toml                     # Python project (requires-python >=3.11, PyY
 
 The current team-ready skills are: `add-team-skill`,
 `conceptual-decomposition`, `team-skills-maintenance`, `mac-app-uninstaller`,
-and `photo-photobomb-director` (the seed/example skill that demonstrates the
-quality bar). See `catalog.md` for the authoritative list.
+`production-forensic-auditor`, and `photo-photobomb-director` (the
+seed/example skill that demonstrates the quality bar). See `catalog.md` for
+the authoritative list.
 
 ## Development Workflow
 
