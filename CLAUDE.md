@@ -73,11 +73,11 @@ tests/                             # pytest suite: structure, registry, examples
 pyproject.toml                     # Python project (requires-python >=3.11, PyYAML, pytest)
 ```
 
-The current team-ready skills are: `add-team-skill`,
-`conceptual-decomposition`, `team-skills-maintenance`, `mac-app-uninstaller`,
-`production-forensic-auditor`, and `photo-photobomb-director` (the
-seed/example skill that demonstrates the quality bar). See `catalog.md` for
-the authoritative list.
+The authoritative list of skills and their statuses lives in `catalog.md`
+(team-ready skills) and in each skill's `skill.yaml` (`status` field) — treat
+those as the single source of truth rather than hardcoding a list here. The
+`photo-photobomb-director` skill is the seed/example that demonstrates the
+quality bar.
 
 ## Development Workflow
 
