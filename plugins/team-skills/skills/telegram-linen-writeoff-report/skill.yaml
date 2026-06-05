@@ -1,0 +1,31 @@
+owner: "@kir-kopylov"
+authors:
+  - "Надежда Симарзина"
+status: "draft"
+summary: "Строит отчеты списания белья по Telegram Desktop export с честной проверкой ожидаемых scripts и references."
+use_cases:
+  - "Сделать отчет списания белья по объектам из Telegram Desktop export `messages.html` за заданный период."
+  - "Сделать отчет списания белья по фамилиям отправителей, если пользователь просит группировку по фамилиям."
+  - "Проверить спорные подписи к фото, дубли, итоговые сообщения и случаи, где объект нельзя восстановить."
+do_not_use_for:
+  - "Ручной пересчет по памяти, скриншотам, пересказам или фрагментам чата без Telegram Desktop export."
+  - "Изменение правил подсчета или aliases без доступа к доменным references и проверки владельцем skill."
+  - "Публикацию raw Telegram export, приватных сообщений, телефонов, аккаунтов, личных путей или ID в repo."
+natural_triggers:
+  - "сделай отчет списания белья"
+  - "посчитай белье по Telegram export"
+  - "разбери messages.html по белью"
+  - "сделай отчет по белью по фамилиям"
+  - "проверь спорные места в списании белья"
+example_files:
+  - "examples/good-01-object-report.md"
+  - "examples/good-02-surname-report.md"
+  - "examples/good-03-missing-package-gate.md"
+  - "examples/anti-01-no-telegram-export.md"
+  - "examples/anti-02-unapproved-rule-change.md"
+last_reviewed: "2026-06-05"
+source_asset: "Исходный SKILL.md передан Надеждой Симарзиной; repo package сохраняет авторство и добавляет проверяемую границу ожидаемых ресурсов."
+team_ready_blockers:
+  - "Подтвердить, кто будет постоянным maintainer после получения рабочего пакета."
+  - "Добавить или привязать ожидаемые scripts и references к repo package."
+  - "Добавить catalog row после перевода статуса в team-ready."

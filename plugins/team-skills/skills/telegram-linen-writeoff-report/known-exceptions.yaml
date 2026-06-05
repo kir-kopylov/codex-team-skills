@@ -1,0 +1,9 @@
+exceptions:
+  - symptom: "Skill запускается с `messages.html`, но ожидаемые scripts или references недоступны в текущей среде."
+    root_cause: "Исходный draft описывает пакет ресурсов, но текущий repo draft пока хранит только skill contract без рабочего report builder и доменных reference-файлов."
+    do_next_time: "Остановиться до построения отчета, назвать конкретные недостающие файлы и попросить пользователя приложить полный пакет или указать путь к нему."
+    source_example: "examples/good-03-missing-package-gate.md"
+  - symptom: "Пользователь просит построить отчет по скриншотам, пересказам или фрагментам чата без Telegram Desktop export."
+    root_cause: "Skill предназначен для воспроизводимого разбора `messages.html`, а не для ручного пересчета по неполному источнику."
+    do_next_time: "Попросить Telegram Desktop export с `messages.html` или явно перейти во вне-skill ручной режим с caveat о ненадежности."
+    source_example: "examples/anti-01-no-telegram-export.md"
