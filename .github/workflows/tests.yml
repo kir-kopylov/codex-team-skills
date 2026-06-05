@@ -89,12 +89,32 @@ jobs:
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly
           }
 
+  claude-sync-smoke:
+    name: Claude skills folder sync smoke
+    runs-on: ubuntu-latest
+    needs: pytest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync team skills into a temp Claude skills folder
+        run: |
+          set -euo pipefail
+          dest="$(mktemp -d -t 'claude skills test.XXXXXX')"
+          mkdir -p "$dest/local-only"
+          printf '%s\n' '---' 'name: local-only' 'description: local only' '---' '# Local Only' > "$dest/local-only/SKILL.md"
+          CLAUDE_SKILLS_DIR="$dest" ./scripts/pull-skills.sh
+          test -f "$dest/add-team-skill/SKILL.md"
+          test -f "$dest/local-only/SKILL.md"
+
   publish:
     name: Publish immutable validated bundle
     runs-on: ubuntu-latest
     needs:
       - pytest
       - windows-powershell-smoke
+      - claude-sync-smoke
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:

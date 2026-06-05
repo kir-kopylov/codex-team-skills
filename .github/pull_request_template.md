@@ -15,3 +15,4 @@
 - [ ] Технические ключи и команды не переведены: `owner`, `status`, `SKILL.md`, `plugin.json`, `pytest`, пути и команды сохранены.
 - [ ] Нет приватных данных, токенов, pasteboard/download paths или сырого клиентского контекста.
 - [ ] Для `team-ready` есть хорошие примеры и анти-примеры.
+- [ ] Claude sync smoke проходит: repo-managed skills копируются через `scripts/pull-skills.sh`, local-only skills не удаляются.

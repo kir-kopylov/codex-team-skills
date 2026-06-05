@@ -19,7 +19,7 @@ description: |
 - пользователь просит "добавь новый skill" -> создать draft через `scripts/new_skill.py`, затем заполнить до нужного статуса;
 - пользователь дал workflow из диалога -> извлечь повторяемую задачу, триггеры, границы, examples и оформить skill;
 - пользователь дал чужой `SKILL.md`, draft или методику -> сначала найти похожие skills, решить "интегрировать или создать новый", затем сохранить авторство через `authors` и `source_asset`;
-- пользователь просит "team-ready" -> требовать owner, catalog row, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек и зелёный `pytest`;
+- пользователь просит "team-ready" -> требовать owner, catalog row, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек, зелёный `pytest` и прохождение общего Claude sync gate;
 - пользователь просит "проверь перед PR" -> провести review структуры, registry, examples, catalog, privacy и тестов;
 - пользователь просит "почини CI" -> сначала прочитать ошибку тестов/CI, затем править минимально.
 
@@ -172,7 +172,7 @@ source_asset: "Короткое описание исходного вклада
 Статусы:
 
 - `draft` — можно merge как черновик после базовой структуры;
-- `team-ready` — нужен owner, catalog entry, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек и зелёные тесты;
+- `team-ready` — нужен owner, catalog entry, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек, зелёные тесты и успешный Claude folder-sync через `scripts/pull-skills.sh`;
 - `internal-only` — нужен внутренний контекст или особые ограничения;
 - `deprecated` — нужны `replacement` или `deprecation_reason`.
 
@@ -262,6 +262,7 @@ python3 -m pytest
 - example не содержит нужные секции;
 - текст пользовательских файлов не на русском;
 - есть токены, приватные пути, pasteboard/download paths или raw PII.
+- `scripts/pull-skills.sh` не попадает в release bundle или Claude sync smoke не копирует repo-managed skills.
 - domain/interface-heavy skill потерял selectors, URL patterns, статусы, лимиты или recovery вместо очищения частных значений.
 
 ## Pull Request
@@ -296,5 +297,6 @@ Skill готов, если:
 - все examples указаны в `example_files` и существуют;
 - `catalog.md` содержит строку для `team-ready`;
 - нет шаблонных заглушек, секретов, приватных путей и сырого приватного контекста;
+- Claude sync gate проходит: repo-managed skills копируются через `scripts/pull-skills.sh`, local-only skills не удаляются;
 - `python3 -m pytest` проходит локально;
 - при публикации PR создан и CI зелёный или явно ожидает выполнения.

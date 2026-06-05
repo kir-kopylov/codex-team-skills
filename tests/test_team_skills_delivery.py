@@ -86,6 +86,9 @@ def test_release_workflow_contains_signed_immutable_schema() -> None:
     for marker in ("runtime_version", "release_id", "minimum_bootstrap_version", "team-skills-v"):
         assert marker in build_script
     assert "windows-powershell-smoke" in content
+    assert "claude-sync-smoke" in content
+    assert "pull-skills.sh" in content
+    assert "CLAUDE_SKILLS_DIR" in content
 
 
 def test_public_key_is_valid_pem() -> None:
