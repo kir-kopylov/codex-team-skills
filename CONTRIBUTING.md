@@ -15,6 +15,7 @@
 - Каждый skill должен иметь `known-exceptions.yaml`; пустой вариант допустим как `exceptions: []`.
 - Перед созданием или крупной правкой skill проверьте discovery gate: назначение, triggers, пользователи, входы, результат, примеры, tools, ограничения, проверки и ownership.
 - Доказательства пользы кладём в `examples/`: хорошие примеры и анти-примеры.
+- Статус `team-ready` означает готовность для Codex release bundle и Claude folder sync: CI должен успешно скопировать repo-managed skills в Claude skills folder через `scripts/pull-skills.sh`.
 - Нельзя коммитить секреты, raw PII, абсолютные личные пути, приватный контекст из переписок, pasteboard/download paths, raw exception logs и приватные изображения.
 - `agents/openai.yaml` необязателен. Добавляйте его только если скиллу нужны UI-имя, короткое описание или default prompt.
 
