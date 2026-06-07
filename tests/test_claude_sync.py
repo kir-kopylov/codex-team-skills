@@ -14,6 +14,7 @@ SCRIPT = ROOT / "scripts" / "pull-skills.sh"
 def run_sync(destination: Path) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["CLAUDE_SKILLS_DIR"] = str(destination)
+    env["TEAM_SKILLS_PULL"] = "0"  # детерминизм: без сетевого git pull в тестах
     return subprocess.run(
         ["bash", str(SCRIPT)],
         cwd=ROOT,
@@ -74,6 +75,7 @@ def test_claude_sync_fails_when_repo_skill_source_is_missing(tmp_path: Path) -> 
 
     env = os.environ.copy()
     env["CLAUDE_SKILLS_DIR"] = str(tmp_path / "destination")
+    env["TEAM_SKILLS_PULL"] = "0"  # детерминизм: без сетевого git pull в тестах
     result = subprocess.run(
         ["bash", str(broken_script)],
         cwd=broken_root,
