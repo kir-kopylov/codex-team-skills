@@ -32,16 +32,17 @@ STATE_DIR="$INSTALL_ROOT/state"
 HEARTBEAT="$STATE_DIR/autoupdate-heartbeat.log"
 mkdir -p "$STATE_DIR"
 
+# ВНИМАНИЕ: в zsh `status` — read-only (алиас $?). Используем `rc`.
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-status=0
-"$UPDATE_SCRIPT" "$@" || status=$?
+rc=0
+"$UPDATE_SCRIPT" "$@" || rc=$?
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 printf '%s start=%s end=%s exit=%s bootstrap=%s\n' \
-  "$finished_at" "$started_at" "$finished_at" "$status" "$BOOTSTRAP_VERSION" >> "$HEARTBEAT"
+  "$finished_at" "$started_at" "$finished_at" "$rc" "$BOOTSTRAP_VERSION" >> "$HEARTBEAT"
 
-if [[ "$status" -ne 0 ]]; then
-  info "Updater завершился с ошибкой (exit=$status); см. $HEARTBEAT и ~/Library/Logs/codex-team-skills-autoupdate.err"
+if [[ "$rc" -ne 0 ]]; then
+  info "Updater завершился с ошибкой (exit=$rc); см. $HEARTBEAT и ~/Library/Logs/codex-team-skills-autoupdate.err"
 fi
 
-exit "$status"
+exit "$rc"
