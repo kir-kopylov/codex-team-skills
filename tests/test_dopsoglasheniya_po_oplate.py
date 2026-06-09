@@ -10,8 +10,8 @@ SKILL_DIR = ROOT / "plugins" / "team-skills" / "skills" / "dopsoglasheniya-po-op
 
 def test_dopsoglasheniya_asset_has_owner_and_team_ready_status() -> None:
     registry = load_registry(SKILL_DIR)
-    assert registry["owner"] == "@elizaveta"
-    assert "Елизавета" in registry.get("authors", [])
+    assert registry["owner"] == "@kir-kopylov"
+    assert "коллега по договорной работе" in registry.get("authors", [])
     assert registry["status"] == "team-ready"
 
 

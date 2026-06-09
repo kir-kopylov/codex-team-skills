@@ -21,13 +21,16 @@
 #  - CLAUDE_SKILLS_DIR : куда устанавливать (по умолчанию ~/.claude/skills)
 #  - TEAM_SKILLS_PULL  : "1" (по умолчанию) — делать git pull; "0" — пропустить
 #                        (тесты выставляют 0 для детерминизма без сети).
+#  - TEAM_SKILLS_SRC   : откуда брать скиллы (по умолчанию папка скиллов клона).
+#                        В user-mode скрипт лежит в bin, а plugin — отдельно,
+#                        поэтому путь к скиллам передаётся через эту переменную.
 #
 # Коды выхода: 0 — ок (в т.ч. с пропусками); 1 — нечего устанавливать.
 
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SRC="$ROOT/plugins/team-skills/skills"
+SRC="${TEAM_SKILLS_SRC:-$ROOT/plugins/team-skills/skills}"
 DEST="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 MARKER=".team-skill"
 

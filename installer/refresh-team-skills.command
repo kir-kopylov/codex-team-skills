@@ -6,6 +6,7 @@ BIN_DIR="$INSTALL_ROOT/bin"
 UPDATE_SCRIPT="$BIN_DIR/update-team-skills.sh"
 STATUS_SCRIPT="$BIN_DIR/team-skills-status.command"
 SYNC_SCRIPT="$BIN_DIR/pull-skills.sh"
+PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
 CLAUDE_SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 CHECK_SKILL="${CODEX_TEAM_SKILLS_REFRESH_CHECK_SKILL:-dopsoglasheniya-po-oplate}"
 RESTART_APPS="${CODEX_TEAM_SKILLS_RESTART_APPS:-Codex,Claude}"
@@ -185,7 +186,7 @@ info "1/4 Обновляю локальный plugin team-skills до latest rel
 require_executable "$SYNC_SCRIPT" "pull-skills.sh"
 
 info "2/4 Синхронизирую repo-managed skills в Claude skills folder."
-CLAUDE_SKILLS_DIR="$CLAUDE_SKILLS_DIR" "$SYNC_SCRIPT"
+TEAM_SKILLS_SRC="$PLUGIN_DEST/skills" CLAUDE_SKILLS_DIR="$CLAUDE_SKILLS_DIR" "$SYNC_SCRIPT"
 
 if [[ -n "$CHECK_SKILL" ]]; then
   if [[ ! -f "$CLAUDE_SKILLS_DIR/$CHECK_SKILL/SKILL.md" ]]; then

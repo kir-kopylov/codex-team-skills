@@ -1,6 +1,6 @@
-owner: "@elizaveta"
+owner: "@kir-kopylov"
 authors:
-  - "Елизавета"
+  - "коллега по договорной работе"
 status: "team-ready"
 summary: "Помогает готовить допсоглашения к договорам аренды по постоплате, вычету или разовому изменению суммы."
 use_cases:
@@ -24,4 +24,4 @@ example_files:
   - "examples/anti-01-no-contract.md"
   - "examples/anti-02-public-ready.md"
 last_reviewed: "2026-06-05"
-source_asset: "Исходный пакет передан Елизаветой; опубликован как доменный asset после repo-contract обвязки."
+source_asset: "Исходный пакет передан коллегой по договорной работе; опубликован как доменный asset после repo-contract обвязки."

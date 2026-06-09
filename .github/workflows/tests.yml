@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   pytest:
@@ -116,6 +116,8 @@ jobs:
       - windows-powershell-smoke
       - claude-sync-smoke
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
 
     steps:
       - name: Download installable bundle artifact

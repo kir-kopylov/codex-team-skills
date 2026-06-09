@@ -86,3 +86,34 @@ def test_claude_sync_fails_when_repo_skill_source_is_missing(tmp_path: Path) -> 
 
     assert result.returncode != 0
     assert "Не найдена папка скиллов репозитория" in result.stderr
+
+
+def test_claude_sync_uses_team_skills_src_in_installed_layout(tmp_path: Path) -> None:
+    # user-mode топология: скрипт скопирован в bin, plugin лежит отдельно,
+    # дефолтный SRC ($bin/../plugins/...) не существует — путь к скиллам
+    # приходит через TEAM_SKILLS_SRC.
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    installed_script = bin_dir / "pull-skills.sh"
+    shutil.copy2(SCRIPT, installed_script)
+
+    plugin_skills = tmp_path / "plugins" / "team-skills" / "skills"
+    write_skill(plugin_skills / "demo-skill", "demo-skill", "Скилл из установленного plugin.")
+
+    destination = tmp_path / "claude skills with space"
+
+    env = os.environ.copy()
+    env["CLAUDE_SKILLS_DIR"] = str(destination)
+    env["TEAM_SKILLS_SRC"] = str(plugin_skills)
+    env["TEAM_SKILLS_PULL"] = "0"  # детерминизм: без сетевого git pull в тестах
+    result = subprocess.run(
+        ["bash", str(installed_script)],
+        cwd=bin_dir,
+        env=env,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert "Готово: установлено скиллов" in result.stdout
+    assert (destination / "demo-skill" / "SKILL.md").exists()
