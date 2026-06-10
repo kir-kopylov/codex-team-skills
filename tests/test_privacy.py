@@ -6,6 +6,26 @@ from pathlib import Path
 from conftest import ROOT
 
 
+# What this privacy gate DOES catch (regex-only, in the scanned docs/installer/
+# plugin trees, and — for the reference-only patterns — under */references/**):
+#   - OpenAI/GitHub-style tokens (sk-..., gh[opsu]_...);
+#   - PEM "BEGIN ... PRIVATE KEY" blocks;
+#   - secret env assignments (OPENAI_API_KEY=, GITHUB_TOKEN=, GH_TOKEN=,
+#     SLACK_TOKEN=, GOOGLE_API_KEY= at start of line);
+#   - personal macOS absolute paths under
+#     /Users/<name>/(Downloads|Library|Desktop|Documents)/...;
+#   - pasteboard / user-activity item paths;
+#   - and, ONLY under reference dirs: email addresses, +7/8 phone numbers,
+#     raw exception-log.jsonl mentions, private media file references
+#     (.png/.jpg/.heic/.mov/.mp4/.webp), and OLX/Avito/Kaspi numeric ids.
+#
+# What this gate does NOT catch (a green run here is NOT a privacy clearance —
+# human review is still required before publishing):
+#   - real personal NAMES (there is intentionally no NER / name detector here);
+#   - relative or ~/ home-anchored paths (only absolute /Users/<name>/... is matched);
+#   - any private context that does not match one of the literal patterns above.
+
+
 SCAN_PATHS = [
     ROOT / "README.md",
     ROOT / "catalog.md",

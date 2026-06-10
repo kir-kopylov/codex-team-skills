@@ -1,6 +1,6 @@
 owner: "@kir-kopylov"
 authors:
-  - "Оксана Праслова"
+  - "коллега, ведущий ежедневные операционные сводки"
 status: "team-ready"
 summary: "Переводит ежедневные операционные сводки и сменные отчеты на один или несколько языков без потери фактов."
 use_cases:
@@ -24,4 +24,4 @@ example_files:
   - "examples/anti-01-summary-request.md"
   - "examples/anti-02-live-state-claim.md"
 last_reviewed: "2026-06-05"
-source_asset: "Исходный skill передан Оксаной Прасловой; опубликован как командный asset после repo-contract обвязки."
+source_asset: "Исходный skill передан коллегой, ведущим ежедневные операционные сводки; опубликован как командный asset после repo-contract обвязки."

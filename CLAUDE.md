@@ -155,6 +155,9 @@ release bundle that CI signs and publishes.
   env-var assignments for secrets, personal absolute paths
   (`/Users/<name>/Downloads|Library|Desktop|Documents/...`), pasteboard/download
   paths, raw PII, or private client context. This repo is publicly readable.
+  Caveat: the privacy test is regex-only — it does NOT catch real personal
+  names (no NER detector) or relative `~/` paths, so a green `pytest` is not a
+  privacy clearance; a human must still review before publishing.
 - **`mac-app-uninstaller` scanner is scan-only**: its script must never contain
   deletion primitives (`rm -`, `.unlink(`, `rmtree`, `send2trash`, etc.) —
   enforced by `tests/test_mac_app_uninstaller.py`.

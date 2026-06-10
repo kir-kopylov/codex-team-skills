@@ -21,6 +21,9 @@ $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEA
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
 $CodexConfigPath = if ($env:CODEX_TEAM_SKILLS_CODEX_CONFIG) { $env:CODEX_TEAM_SKILLS_CODEX_CONFIG } else { Join-Path $HOME ".codex\config.toml" }
 $PublicKeyPath = if ($env:CODEX_TEAM_SKILLS_PUBLIC_KEY) { $env:CODEX_TEAM_SKILLS_PUBLIC_KEY } else { Join-Path $BinDir "team-skills-public-key.pem" }
+# Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
+# Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
+$ExpectedPublicKeySha256 = "6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 $StatePath = Join-Path $StateDir "state.json"
 $LogPath = Join-Path $LogDir "team-skills-update.log"
 $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
@@ -58,14 +61,22 @@ function Verify-Sha256($Path, $Expected) {
     }
 }
 
-function Verify-Signature($PayloadPath, $SignaturePath) {
-    if ($AllowUnsigned) {
-        Write-Log "Signature verification skipped: CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1."
-        return
-    }
+function Verify-PublicKeyPin() {
     if (-not (Test-Path $PublicKeyPath)) {
         throw "Public key не найден: $PublicKeyPath"
     }
+    $actual = (Get-FileHash -Algorithm SHA256 $PublicKeyPath).Hash.ToLowerInvariant()
+    if ($actual -ne $ExpectedPublicKeySha256) {
+        throw "Public key не совпадает с закреплённым якорем доверия (sha256 mismatch). Возможна подмена ключа подписи. Оставляю текущий рабочий plugin без изменений."
+    }
+}
+
+function Verify-Signature($PayloadPath, $SignaturePath) {
+    if ($AllowUnsigned) {
+        Write-Log "ВНИМАНИЕ: проверка подписи ОТКЛЮЧЕНА (CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1). Это небезопасный режим только для разработки: устанавливается НЕпроверенный код. В обычной работе не используйте."
+        return
+    }
+    Verify-PublicKeyPin
 
     $rsa = [System.Security.Cryptography.RSA]::Create()
     $pem = Get-Content $PublicKeyPath -Raw

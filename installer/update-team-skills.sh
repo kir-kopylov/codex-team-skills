@@ -17,6 +17,9 @@ MARKETPLACE_ROOT="${CODEX_TEAM_SKILLS_MARKETPLACE_ROOT:-$HOME}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$MARKETPLACE_ROOT/.agents/plugins/marketplace.json}"
 CODEX_CONFIG_PATH="${CODEX_TEAM_SKILLS_CODEX_CONFIG:-$HOME/.codex/config.toml}"
 PUBLIC_KEY_PATH="${CODEX_TEAM_SKILLS_PUBLIC_KEY:-$BIN_DIR/team-skills-public-key.pem}"
+# Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
+# Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
+EXPECTED_PUBLIC_KEY_SHA256="6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 REGISTRY_HELPER="${CODEX_TEAM_SKILLS_REGISTRY_HELPER:-$BIN_DIR/team-skills-registry.py}"
 STATE_PATH="$STATE_DIR/state.json"
 LOG_PATH="$LOG_DIR/team-skills-update.log"
@@ -61,17 +64,44 @@ require_python3() {
   fi
 }
 
-verify_signature() {
-  local payload="$1"
-  local signature="$2"
-  if [[ "$ALLOW_UNSIGNED" == "1" ]]; then
-    log "Signature verification skipped: CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1."
-    return 0
+file_sha256() {
+  local file_path="$1"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file_path" | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file_path" | awk '{print $1}'
+  elif command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 "$file_path" | awk '{print $NF}'
+  else
+    return 1
   fi
+}
+
+verify_public_key_pin() {
   if [[ ! -f "$PUBLIC_KEY_PATH" ]]; then
     log "Обновление не применено: public key не найден: $PUBLIC_KEY_PATH"
     exit 1
   fi
+  local actual
+  if ! actual="$(file_sha256 "$PUBLIC_KEY_PATH")"; then
+    log "Обновление не применено: нет shasum/sha256sum/openssl для проверки public key."
+    exit 1
+  fi
+  actual="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$actual" != "$EXPECTED_PUBLIC_KEY_SHA256" ]]; then
+    log "Обновление не применено: public key не совпадает с закреплённым якорем доверия (sha256 mismatch). Возможна подмена ключа подписи. Оставляю текущий рабочий plugin без изменений."
+    exit 1
+  fi
+}
+
+verify_signature() {
+  local payload="$1"
+  local signature="$2"
+  if [[ "$ALLOW_UNSIGNED" == "1" ]]; then
+    log "ВНИМАНИЕ: проверка подписи ОТКЛЮЧЕНА (CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1). Это небезопасный режим только для разработки: устанавливается НЕпроверенный код. В обычной работе не используйте."
+    return 0
+  fi
+  verify_public_key_pin
   if ! command -v openssl >/dev/null 2>&1; then
     log "Обновление не применено: нужен openssl для проверки подписи."
     exit 1

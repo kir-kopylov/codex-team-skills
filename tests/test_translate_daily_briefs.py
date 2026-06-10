@@ -12,8 +12,8 @@ def test_translate_daily_briefs_preserves_oksana_authorship() -> None:
     registry = load_registry(SKILL_DIR)
 
     assert registry["owner"] == "@kir-kopylov"
-    assert "Оксана Праслова" in registry.get("authors", [])
-    assert "Оксаной Прасловой" in registry["source_asset"]
+    assert "коллега, ведущий ежедневные операционные сводки" in registry.get("authors", [])
+    assert "коллегой, ведущим ежедневные операционные сводки" in registry["source_asset"]
 
 
 def test_translate_daily_briefs_routes_translation_not_summary_or_live_state() -> None:
