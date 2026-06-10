@@ -21,14 +21,15 @@ def _phrase_column_index(catalog_lines: list[str]) -> int:
     raise AssertionError("catalog.md must have a 'Первая фраза для Codex' column")
 
 
-def test_team_ready_skills_are_in_catalog() -> None:
+def test_team_ready_and_experimental_skills_are_in_catalog() -> None:
+    # experimental skill раздаётся команде, поэтому должен быть находим в каталоге
     catalog = (ROOT / "catalog.md").read_text(encoding="utf-8")
     catalog_lines = catalog.splitlines()
     phrase_col = _phrase_column_index(catalog_lines)
 
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
-        if registry.get("status") != "team-ready":
+        if registry.get("status") not in {"team-ready", "experimental"}:
             continue
         assert skill_dir.name in catalog
         skill_link = f"plugins/team-skills/skills/{skill_dir.name}/SKILL.md"

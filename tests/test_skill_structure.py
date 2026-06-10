@@ -42,10 +42,12 @@ def test_optional_openai_yaml_is_parseable() -> None:
         assert skill_dir.name in prompt or "сделай" in prompt.lower() or "use " in prompt.lower()
 
 
-def test_team_ready_skills_have_no_template_todos() -> None:
+def test_team_ready_and_experimental_skills_have_no_template_todos() -> None:
+    # experimental skill раздаётся команде и предлагается через consent-gate,
+    # поэтому TODO в нём так же недопустимы, как в team-ready
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
-        if registry.get("status") != "team-ready":
+        if registry.get("status") not in {"team-ready", "experimental"}:
             continue
         assert "TODO" not in (skill_dir / "SKILL.md").read_text(encoding="utf-8")
         for key in ("use_cases", "do_not_use_for", "natural_triggers"):

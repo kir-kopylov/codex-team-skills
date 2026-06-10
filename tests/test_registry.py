@@ -6,7 +6,7 @@ from datetime import date
 from conftest import assert_nonempty_list, load_registry, skill_dirs
 
 
-ALLOWED_STATUSES = {"draft", "team-ready", "deprecated", "internal-only"}
+ALLOWED_STATUSES = {"draft", "experimental", "team-ready", "deprecated", "internal-only"}
 
 
 def test_skill_yaml_schema() -> None:
