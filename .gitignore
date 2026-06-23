@@ -7,6 +7,12 @@ dist/
 build/
 *.egg-info/
 
+# Артефакты покрытия (pytest-cov) — генерируются на каждом прогоне.
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
 # Опциональный локальный список приватных терминов для test_privacy.py.
 # Содержит реальные имена/клиентов — НИКОГДА не коммитить.
 tests/private-denylist.txt
