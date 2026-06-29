@@ -34,6 +34,22 @@ jobs:
       - name: Check protected installer/release paths
         run: python3 scripts/check_pr_governance.py protected-paths
 
+  release-scope:
+    name: Release/installer scope
+    runs-on: ubuntu-latest
+    outputs:
+      run_release_checks: ${{ steps.detect.outputs.run_release_checks }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release/installer scope
+        id: detect
+        run: python3 scripts/check_pr_governance.py release-scope | tee -a "$GITHUB_OUTPUT"
+
   pytest:
     name: pytest, language policy и privacy gates
     runs-on: ubuntu-latest
@@ -57,9 +73,11 @@ jobs:
   build-release-bundle:
     name: Build installable team-skills bundle
     runs-on: ubuntu-latest
+    if: needs.release-scope.outputs.run_release_checks == 'true'
     needs:
       - pr-governance
       - installer-release-gate
+      - release-scope
       - pytest
       - claude-sync-smoke
 
@@ -85,6 +103,7 @@ jobs:
   windows-powershell-smoke:
     name: Windows PowerShell 5.1 release asset smoke
     runs-on: windows-latest
+    if: needs.build-release-bundle.result == 'success'
     needs: build-release-bundle
 
     steps:

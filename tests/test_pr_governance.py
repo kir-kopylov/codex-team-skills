@@ -83,7 +83,44 @@ def test_protected_paths_pass_with_hard_check_section() -> None:
     assert errors == []
 
 
+def test_dot_github_workflow_path_is_protected() -> None:
+    protected = check_pr_governance.protected_changed_paths([".github/workflows/tests.yml"])
+    assert protected == [".github/workflows/tests.yml"]
+
+
 def test_unprotected_paths_do_not_need_hard_check_section() -> None:
     event = pr_event(title="Обновить skill examples", body=valid_body())
     errors = check_pr_governance.check_protected_paths(event, ["plugins/team-skills/skills/verify/SKILL.md"])
     assert errors == []
+
+
+def test_release_checks_required_for_protected_pr_paths() -> None:
+    event = pr_event(title="Усилить release gate", body=hard_check_body())
+    required = check_pr_governance.release_checks_required(
+        event,
+        event_name="pull_request",
+        ref="refs/pull/1/merge",
+        changed_paths=["scripts/build_release_bundle.py"],
+    )
+    assert required is True
+
+
+def test_release_checks_not_required_for_regular_skill_pr() -> None:
+    event = pr_event(title="Обновить skill examples", body=valid_body())
+    required = check_pr_governance.release_checks_required(
+        event,
+        event_name="pull_request",
+        ref="refs/pull/1/merge",
+        changed_paths=["plugins/team-skills/skills/verify/SKILL.md"],
+    )
+    assert required is False
+
+
+def test_release_checks_required_on_main_push() -> None:
+    required = check_pr_governance.release_checks_required(
+        {},
+        event_name="push",
+        ref="refs/heads/main",
+        changed_paths=[],
+    )
+    assert required is True

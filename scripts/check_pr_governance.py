@@ -187,7 +187,10 @@ def check_pr_metadata(event: dict) -> list[str]:
 
 
 def normalize_path(path: str) -> str:
-    return path.strip().replace("\\", "/").lstrip("./")
+    normalized = path.strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
 
 
 def protected_changed_paths(paths: Iterable[str]) -> list[str]:
@@ -199,19 +202,33 @@ def protected_changed_paths(paths: Iterable[str]) -> list[str]:
     return sorted(set(changed))
 
 
-def changed_paths_from_git(event: dict) -> list[str]:
-    if "pull_request" not in event:
-        return []
-    pr = event["pull_request"]
-    base_sha = pr["base"]["sha"]
-    head_sha = pr["head"]["sha"]
+def git_changed_paths(revspec: str) -> list[str]:
     result = subprocess.run(
-        ["git", "diff", "--name-only", f"{base_sha}...{head_sha}"],
+        ["git", "diff", "--name-only", revspec],
         check=True,
         text=True,
         stdout=subprocess.PIPE,
     )
     return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def changed_paths_from_git(event: dict) -> list[str]:
+    if "pull_request" not in event:
+        return []
+
+    base_ref = os.environ.get("GITHUB_BASE_REF")
+    head_ref = os.environ.get("GITHUB_HEAD_REF")
+    if base_ref and head_ref:
+        for revspec in (f"origin/{base_ref}...origin/{head_ref}", f"{base_ref}...{head_ref}"):
+            try:
+                return git_changed_paths(revspec)
+            except subprocess.CalledProcessError:
+                continue
+
+    pr = event["pull_request"]
+    base_sha = pr["base"]["sha"]
+    head_sha = pr["head"]["sha"]
+    return git_changed_paths(f"{base_sha}...{head_sha}")
 
 
 def extract_hard_check_section(body: str) -> str:
@@ -266,6 +283,27 @@ def check_protected_paths(event: dict, changed_paths: list[str] | None = None) -
     return []
 
 
+def release_checks_required(
+    event: dict,
+    *,
+    event_name: str | None = None,
+    ref: str | None = None,
+    changed_paths: list[str] | None = None,
+) -> bool:
+    if event_name == "push" and ref == "refs/heads/main":
+        return True
+    if "pull_request" not in event:
+        return False
+
+    changed_paths = changed_paths if changed_paths is not None else changed_paths_from_git(event)
+    return bool(protected_changed_paths(changed_paths))
+
+
+def print_release_scope(required: bool) -> int:
+    print(f"run_release_checks={'true' if required else 'false'}")
+    return 0
+
+
 def load_event(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -281,7 +319,7 @@ def print_result(errors: list[str], success_message: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("metadata", "protected-paths"))
+    parser.add_argument("mode", choices=("metadata", "protected-paths", "release-scope"))
     parser.add_argument("--event-path", type=Path, default=Path(os.environ.get("GITHUB_EVENT_PATH", "")))
     args = parser.parse_args(argv)
 
@@ -291,7 +329,15 @@ def main(argv: list[str] | None = None) -> int:
     event = load_event(args.event_path)
     if args.mode == "metadata":
         return print_result(check_pr_metadata(event), "PR title/body governance passed")
-    return print_result(check_protected_paths(event), "Installer/release protected paths gate passed")
+    if args.mode == "protected-paths":
+        return print_result(check_protected_paths(event), "Installer/release protected paths gate passed")
+    return print_release_scope(
+        release_checks_required(
+            event,
+            event_name=os.environ.get("GITHUB_EVENT_NAME"),
+            ref=os.environ.get("GITHUB_REF"),
+        )
+    )
 
 
 if __name__ == "__main__":
