@@ -1,0 +1,29 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Проверяет реальное состояние git repo перед commit, PR, cleanup и другими изменяющими действиями."
+use_cases:
+  - "Перед commit, staging, push или PR отделить рабочее дерево от веточного и remote-состояния."
+  - "Перед удалением локальных или remote веток доказать, что ветки merged или что уникальная работа сохранена."
+  - "Разобрать git-ошибки вроде fatal: not a git repository, ahead/behind, upstream gone и грязное дерево без мутаций первым шагом."
+do_not_use_for:
+  - "Чисто учебные вопросы о git без намерения действовать в repo."
+  - "Разбор уже полного git-вывода, если не нужно принимать решение о следующем действии."
+  - "Специализированный debug GitHub Actions, когда проблема уже локализована в логах CI."
+natural_triggers:
+  - "что в рабочем дереве?"
+  - "можно коммитить?"
+  - "дерево грязное"
+  - "что с ветками?"
+  - "можно удалить ветку?"
+  - "почему fatal: not a git repository?"
+  - "перед следующим commit"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-06-29"
+authors:
+  - "Пользователь Codex"
+source_asset: "Санитизированный workflow из диалога о проверке git worktree, переносе локального WIP в PR и уборке веток."

@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Git-команда падает с fatal: not a git repository, хотя команда сама по себе корректная."
+    root_cause: "Команда была запущена из projectless или другой папки, где нет нужного `.git`."
+    do_next_time: "Сначала проверить cwd и target repo, затем использовать `git -C <repo> ...` вместо короткой команды."
+    source_example: "examples/good-02.md"
+  - symptom: "Ветка выглядит как старый шум, но содержит единственный локальный commit."
+    root_cause: "Cleanup начался до проверки `ahead/behind`, reachability commit и PR/remote state."
+    do_next_time: "Перед удалением ветки проверить `branch -vv`, diff/log относительно `origin/main` и PR state; уникальную работу сначала вынести или явно признать superseded."
+    source_example: "examples/good-03.md"
+  - symptom: "Пользователь считает repo полностью чистым, потому что `git diff` пустой."
+    root_cause: "Рабочее дерево смешано с веточным состоянием: активная branch, upstream, remote refs или PR state не проверены."
+    do_next_time: "Разделить ответ на Worktree, Branch и Remote/PR; не говорить 'всё чисто', если чист только файловый слой."
+    source_example: "examples/good-01.md"
