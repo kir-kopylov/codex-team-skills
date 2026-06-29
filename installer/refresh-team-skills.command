@@ -5,6 +5,8 @@ INSTALL_ROOT="${CODEX_TEAM_SKILLS_HOME:-$HOME/Library/Application Support/CodexT
 BIN_DIR="$INSTALL_ROOT/bin"
 UPDATE_SCRIPT="$BIN_DIR/update-team-skills.sh"
 NEXT_UPDATE_SCRIPT="$UPDATE_SCRIPT.next"
+REFRESH_SCRIPT="$BIN_DIR/refresh-team-skills.command"
+NEXT_REFRESH_SCRIPT="$REFRESH_SCRIPT.next"
 STATUS_SCRIPT="$BIN_DIR/team-skills-status.command"
 SYNC_SCRIPT="$BIN_DIR/pull-skills.sh"
 PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
@@ -80,6 +82,14 @@ promote_staged_updater() {
     mv "$NEXT_UPDATE_SCRIPT" "$UPDATE_SCRIPT"
     chmod +x "$UPDATE_SCRIPT"
     info "Updater обновлён из staged .next версии."
+  fi
+}
+
+promote_staged_refresh() {
+  if [[ -f "$NEXT_REFRESH_SCRIPT" ]]; then
+    mv "$NEXT_REFRESH_SCRIPT" "$REFRESH_SCRIPT"
+    chmod +x "$REFRESH_SCRIPT"
+    info "Refresh command обновлена из staged .next версии."
   fi
 }
 
@@ -221,3 +231,4 @@ else
 fi
 
 info "Готово: локальные team-skills обновлены, Claude skills folder синхронизирован, runtime restart запущен или явно пропущен."
+promote_staged_refresh

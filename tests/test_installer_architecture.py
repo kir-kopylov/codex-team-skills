@@ -85,6 +85,8 @@ def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
     assert "team-skills-registry.py" in update
     assert ".codex/plugins/cache/$MARKETPLACE_NAME" in update
     assert "invalidate_codex_plugin_cache" in update
+    assert '"refresh-team-skills.command"' in update
+    assert "$support_dest.next" in update
 
     assert "launchctl unload" in uninstall
     assert "marketplace.json" in uninstall
