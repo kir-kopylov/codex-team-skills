@@ -147,16 +147,21 @@ def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     assert jobs["pr-governance"]["name"] == "PR title/body governance"
     assert "installer-release-gate" in jobs
     assert jobs["installer-release-gate"]["name"] == "Installer/release protected paths gate"
+    assert "release-scope" in jobs
+    assert jobs["release-scope"]["name"] == "Release/installer scope"
     assert "build-release-bundle" in jobs
     assert jobs["build-release-bundle"]["name"] == "Build installable team-skills bundle"
+    assert jobs["build-release-bundle"]["if"] == "needs.release-scope.outputs.run_release_checks == 'true'"
     assert jobs["build-release-bundle"]["needs"] == [
         "pr-governance",
         "installer-release-gate",
+        "release-scope",
         "pytest",
         "claude-sync-smoke",
     ]
     assert "windows-powershell-smoke" in jobs
     assert jobs["windows-powershell-smoke"]["runs-on"] == "windows-latest"
+    assert jobs["windows-powershell-smoke"]["if"] == "needs.build-release-bundle.result == 'success'"
     assert jobs["windows-powershell-smoke"]["needs"] == "build-release-bundle"
     assert "claude-sync-smoke" in jobs
     assert jobs["claude-sync-smoke"]["runs-on"] == "ubuntu-latest"
@@ -165,6 +170,7 @@ def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     workflow_text = json.dumps(workflow, ensure_ascii=False)
     assert "python3 scripts/check_pr_governance.py metadata" in workflow_text
     assert "python3 scripts/check_pr_governance.py protected-paths" in workflow_text
+    assert "python3 scripts/check_pr_governance.py release-scope" in workflow_text
     assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly" in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "0xEF" in workflow_text

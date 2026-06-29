@@ -111,7 +111,14 @@ def test_ci_builds_validated_release_bundle() -> None:
     assert "python -m pytest" in pytest_step_text
     assert "scripts/build_release_bundle.py" in bundle_step_text
     assert "actions/upload-artifact" in bundle_step_text
-    assert bundle_job["needs"] == ["pr-governance", "installer-release-gate", "pytest", "claude-sync-smoke"]
+    assert bundle_job["if"] == "needs.release-scope.outputs.run_release_checks == 'true'"
+    assert bundle_job["needs"] == [
+        "pr-governance",
+        "installer-release-gate",
+        "release-scope",
+        "pytest",
+        "claude-sync-smoke",
+    ]
 
     build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
     assert "team-skills-bundle.zip" in build_script

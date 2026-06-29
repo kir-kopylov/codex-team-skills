@@ -217,11 +217,10 @@ def test_pr_language_checker_rejects_english_text() -> None:
     assert "должен быть на русском" in result.stderr or "выглядит англоязычным" in result.stderr
 
 
-def test_pr_language_workflow_checks_pr_text_and_comments() -> None:
+def test_pr_language_workflow_checks_pr_comments_only() -> None:
     workflow = (ROOT / ".github" / "workflows" / "pr-language.yml").read_text(encoding="utf-8")
 
     for event_name in (
-        "pull_request",
         "issue_comment",
         "pull_request_review_comment",
         "pull_request_review",
@@ -229,7 +228,6 @@ def test_pr_language_workflow_checks_pr_text_and_comments() -> None:
         assert event_name in workflow
 
     assert "scripts/check_pr_language.py" in workflow
-    assert "PR title/body" in workflow
     assert "PR comment" in workflow
     assert "PR review comment" in workflow
     assert "PR review" in workflow
