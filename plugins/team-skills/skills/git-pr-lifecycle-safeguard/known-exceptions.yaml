@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Команды git не срабатывают с ошибкой not a git repository."
+    root_cause: "Skill дал короткую команду без git -C, хотя текущий терминал стоял не в target repo."
+    do_next_time: "Перед любой командой доказать target repo и использовать git -C <repo>, пока cwd не подтверждён."
+    source_example: "examples/anti-01.md"
+  - symptom: "Старый локальный commit cherry-pick'ится на свежий main и ломает тесты."
+    root_cause: "Commit был создан до текущего repo contract и не содержит новых обязательных файлов или секций."
+    do_next_time: "После cherry-pick прогнать tests, довести пакет до текущего контракта repo и amend/rebase перед push."
+    source_example: "examples/good-01.md"
+  - symptom: "Remote branch выглядит как clutter, но не merged в origin/main."
+    root_cause: "Skill принял наличие remote branch за достаточное доказательство для удаления."
+    do_next_time: "Сначала проверить commit, diff, PR state и reachability; unmerged ветку удалить только после явного discard решения."
+    source_example: "examples/good-03.md"
