@@ -30,7 +30,7 @@
 - `team-skills-bundle.zip` — plugin `team-skills`;
 - служебные scripts для bootstrap, обновления, repair, статуса и удаления.
 
-Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. `~/.codex/plugins/cache` не является контрактом updater и не изменяется вручную.
+Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. После успешной замены updater инвалидирует snapshot `~/.codex/plugins/cache/codex-team-skills`, потому что перезапуск Codex должен перечитывать свежий plugin, а не старый persistent cache.
 
 ## Auto Update
 

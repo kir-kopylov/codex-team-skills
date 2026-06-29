@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -208,12 +210,73 @@ def test_status_reports_managed_state_before_and_after(tmp_path: Path) -> None:
     assert after_remove["toml_valid"] is True
 
 
-def test_updater_declares_no_codex_cache_contract() -> None:
+def test_updater_declares_codex_cache_invalidation_contract() -> None:
     content = UPDATE_SH.read_text(encoding="utf-8")
-    assert ".codex/plugins/cache" not in content
+    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in content
+    assert "invalidate_codex_plugin_cache" in content
+    assert "codex_plugin_cache_invalidated_path" in content
     assert "CODEX_TEAM_SKILLS_ALLOW_UNSIGNED" in content
     assert "--repair-install" in content
     assert "runtime_visibility" in content
+
+
+def test_macos_repair_install_invalidates_codex_plugin_cache(tmp_path: Path) -> None:
+    if not shutil.which("zsh"):
+        return
+
+    plugin_dest = tmp_path / "plugins" / "team-skills"
+    manifest_path = plugin_dest / ".codex-plugin" / "plugin.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "name": "team-skills",
+                "version": "0.1.0-r.test",
+                "product_version": "0.1.0",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    stale_cache = tmp_path / ".codex" / "plugins" / "cache" / "codex-team-skills"
+    stale_skill = stale_cache / "team-skills" / "0.1.0" / "skills" / "old" / "SKILL.md"
+    stale_skill.parent.mkdir(parents=True)
+    stale_skill.write_text("# stale\n", encoding="utf-8")
+
+    install_root = tmp_path / "Application Support" / "CodexTeamSkills"
+    codex_config = tmp_path / ".codex" / "config.toml"
+    marketplace = tmp_path / ".agents" / "plugins" / "marketplace.json"
+
+    result = subprocess.run(
+        ["zsh", str(UPDATE_SH), "--repair-install"],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+        env={
+            "HOME": str(tmp_path),
+            "PATH": f"{Path(sys.executable).parent}:{os.environ.get('PATH', '')}",
+            "CODEX_TEAM_SKILLS_HOME": str(install_root),
+            "CODEX_TEAM_SKILLS_PLUGIN_DIR": str(plugin_dest),
+            "CODEX_TEAM_SKILLS_MARKETPLACE_ROOT": str(tmp_path),
+            "CODEX_TEAM_SKILLS_MARKETPLACE": str(marketplace),
+            "CODEX_TEAM_SKILLS_CODEX_CONFIG": str(codex_config),
+            "CODEX_TEAM_SKILLS_REGISTRY_HELPER": str(REGISTRY_HELPER),
+            "CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR": str(stale_cache),
+        },
+    )
+
+    assert "Codex plugin cache invalidated" in result.stdout
+    assert not stale_cache.exists()
+    stale_dirs = list(stale_cache.parent.glob("codex-team-skills.stale.*"))
+    assert len(stale_dirs) == 1
+    assert (stale_dirs[0] / "team-skills" / "0.1.0" / "skills" / "old" / "SKILL.md").exists()
+
+    state = json.loads((install_root / "state" / "state.json").read_text(encoding="utf-8"))
+    assert state["codex_plugin_cache_path"] == str(stale_cache)
+    assert state["codex_plugin_cache_invalidated_path"] == str(stale_dirs[0])
+    assert "cache invalidation" in state["runtime_visibility"]
 
 
 def test_release_workflow_contains_signed_immutable_schema() -> None:

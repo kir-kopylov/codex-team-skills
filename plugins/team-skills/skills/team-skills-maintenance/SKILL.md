@@ -21,7 +21,7 @@ description: Используйте этот skill, когда пользова�
 - "обнови сейчас" -> определить ОС и запустить update script;
 - "обнови локальные team-skills и перезапусти Codex/Claude" -> на macOS запустить refresh script, который делает update, Claude sync и restart desktop apps;
 - "удали командные skills" -> определить ОС и запустить uninstall script после явного подтверждения пользователя;
-- "новые skills не появились" -> проверить status, last_success_at, перезапуск Codex и только потом обновлять вручную;
+- "новые skills не появились" -> проверить status, last_success_at, `codex_plugin_cache_invalidated_path`, перезапуск Codex и только потом обновлять вручную;
 - "хочу добавить свой skill" -> передать в author workflow через `add-team-skill`.
 
 ## Команды
@@ -45,7 +45,9 @@ macOS:
 
 ## Границы
 
-Не обещайте, что новый skill появится без перезапуска Codex: после установки или обновления Codex может перечитать plugin только после restart. Если пользователь прямо просит обновить локальные team-skills и перезапустить Codex/Claude, используйте `refresh-team-skills.command`, а не список ручных команд.
+Не обещайте, что новый skill появится без перезапуска Codex: после установки или обновления Codex может перечитать plugin только после restart. Но restart сам по себе не является достаточным contract, если stale snapshot остался в `~/.codex/plugins/cache/codex-team-skills`; штатный updater должен инвалидировать этот cache и записать путь в `state.json`.
+
+Если пользователь прямо просит обновить локальные team-skills и перезапустить Codex/Claude, используйте `refresh-team-skills.command`, а не список ручных команд.
 
 Не чините author workflow через uninstall. Если пользователь хочет публиковать skills, нужен GitHub аккаунт, branch, tests и Pull Request.
 

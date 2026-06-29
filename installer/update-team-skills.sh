@@ -16,6 +16,7 @@ PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
 MARKETPLACE_ROOT="${CODEX_TEAM_SKILLS_MARKETPLACE_ROOT:-$HOME}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$MARKETPLACE_ROOT/.agents/plugins/marketplace.json}"
 CODEX_CONFIG_PATH="${CODEX_TEAM_SKILLS_CODEX_CONFIG:-$HOME/.codex/config.toml}"
+CODEX_PLUGIN_CACHE_DIR="${CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR:-$HOME/.codex/plugins/cache/$MARKETPLACE_NAME}"
 PUBLIC_KEY_PATH="${CODEX_TEAM_SKILLS_PUBLIC_KEY:-$BIN_DIR/team-skills-public-key.pem}"
 # Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
 # Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
@@ -25,6 +26,7 @@ STATE_PATH="$STATE_DIR/state.json"
 LOG_PATH="$LOG_DIR/team-skills-update.log"
 ALLOW_UNSIGNED="${CODEX_TEAM_SKILLS_ALLOW_UNSIGNED:-0}"
 MODE="update"
+INVALIDATED_CODEX_PLUGIN_CACHE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -183,6 +185,32 @@ update_codex_registry() {
     --marketplace-root "$MARKETPLACE_ROOT" >/dev/null
 }
 
+invalidate_codex_plugin_cache() {
+  local cache_dir="$CODEX_PLUGIN_CACHE_DIR"
+  if [[ -z "$cache_dir" || "$cache_dir" == "/" || "$cache_dir" == "$HOME" || "$cache_dir" == "$HOME/" ]]; then
+    log "Codex plugin cache invalidation skipped: unsafe cache path: $cache_dir"
+    return 0
+  fi
+
+  if [[ ! -d "$cache_dir" ]]; then
+    log "Codex plugin cache already absent: $cache_dir"
+    return 0
+  fi
+
+  local stamp stale_dir
+  stamp="$(date -u +"%Y%m%dT%H%M%SZ")"
+  stale_dir="$cache_dir.stale.$stamp.$$"
+  if mv "$cache_dir" "$stale_dir"; then
+    INVALIDATED_CODEX_PLUGIN_CACHE="$stale_dir"
+    log "Codex plugin cache invalidated: moved $cache_dir -> $stale_dir"
+    return 0
+  fi
+
+  rm -rf "$cache_dir"
+  INVALIDATED_CODEX_PLUGIN_CACHE="$cache_dir"
+  log "Codex plugin cache invalidated: removed $cache_dir"
+}
+
 find_plugin_root() {
   local expanded="$1"
   for candidate in "$expanded/team-skills" "$expanded/plugins/team-skills" "$expanded"; do
@@ -259,7 +287,7 @@ write_state() {
   local channel="$5"
   local bundle_url="$6"
   local signature_state="$7"
-  python3 - "$STATE_PATH" "$product_version" "$runtime_version" "$release_id" "$commit" "$channel" "$bundle_url" "$PLUGIN_DEST" "$MARKETPLACE_PATH" "$CODEX_CONFIG_PATH" "$UPDATER_VERSION" "$signature_state" <<'PY'
+  python3 - "$STATE_PATH" "$product_version" "$runtime_version" "$release_id" "$commit" "$channel" "$bundle_url" "$PLUGIN_DEST" "$MARKETPLACE_PATH" "$CODEX_CONFIG_PATH" "$UPDATER_VERSION" "$signature_state" "$CODEX_PLUGIN_CACHE_DIR" "$INVALIDATED_CODEX_PLUGIN_CACHE" <<'PY'
 import json
 import sys
 from datetime import datetime, timezone
@@ -280,7 +308,9 @@ data = {
     "codex_config_path": sys.argv[10],
     "updater_version": sys.argv[11],
     "signature_verification": sys.argv[12],
-    "runtime_visibility": "requires Codex restart; cannot be proven from shell",
+    "codex_plugin_cache_path": sys.argv[13],
+    "codex_plugin_cache_invalidated_path": sys.argv[14],
+    "runtime_visibility": "requires Codex restart after plugin swap and Codex cache invalidation; cannot be proven from shell",
 }
 path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
@@ -294,6 +324,7 @@ repair_install() {
   fi
   update_marketplace
   update_codex_registry
+  invalidate_codex_plugin_cache
   read -r PRODUCT_VERSION RUNTIME_VERSION < <(python3 - "$PLUGIN_DEST/.codex-plugin/plugin.json" <<'PY'
 import json, sys
 from pathlib import Path
@@ -400,7 +431,8 @@ update_marketplace
 update_codex_registry
 swap_plugin "$PLUGIN_ROOT"
 install_support_files "$SUPPORT_DIR" "$SUPPORT_BACKUP_DIR" >/dev/null
+invalidate_codex_plugin_cache
 write_state "$PRODUCT_VERSION" "$RUNTIME_VERSION" "$RELEASE_ID" "$COMMIT" "$CHANNEL" "$BUNDLE_URL" "signed"
 
 log "Установлена проверенная версия team-skills: product=$PRODUCT_VERSION runtime=$RUNTIME_VERSION release=$RELEASE_ID."
-log "Перезапустите Codex, чтобы он перечитал plugin; runtime visibility cannot be proven from shell."
+log "Перезапустите Codex, чтобы он перечитал plugin после cache invalidation; runtime visibility cannot be proven from shell."

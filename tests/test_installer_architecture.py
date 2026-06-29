@@ -55,6 +55,8 @@ def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
     assert "Verify-Signature" in update
     assert "runtime_version" in update
     assert "codex-team-skills" in update
+    assert ".codex\\plugins\\cache\\codex-team-skills" in update
+    assert "Invalidate-CodexPluginCache" in update
 
     assert "Unregister-ScheduledTask" in uninstall
     assert "marketplace.json" in uninstall
@@ -81,7 +83,8 @@ def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
     assert "verify_signature" in update
     assert "runtime_version" in update
     assert "team-skills-registry.py" in update
-    assert ".codex/plugins/cache" not in update
+    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in update
+    assert "invalidate_codex_plugin_cache" in update
 
     assert "launchctl unload" in uninstall
     assert "marketplace.json" in uninstall
