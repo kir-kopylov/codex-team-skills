@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "codex-team-skills",
+  "description": "Командный реестр переиспользуемых скилов для Claude Code. Те же папки скилов используются и в Codex.",
+  "owner": {
+    "name": "Команда codex-team-skills",
+    "url": "https://github.com/kir-kopylov/codex-team-skills"
+  },
+  "plugins": [
+    {
+      "name": "team-skills",
+      "source": "./plugins/team-skills",
+      "description": "Командные скилы: договорные документы, ревью и runtime для крупных задач, верификация live-state и доменные рабочие процессы.",
+      "category": "productivity",
+      "author": {
+        "name": "Команда codex-team-skills"
+      },
+      "homepage": "https://github.com/kir-kopylov/codex-team-skills"
+    }
+  ]
+}
