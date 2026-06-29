@@ -9,6 +9,7 @@
 
 ## Проверки
 
+- [ ] Заголовок, описание и комментарии PR написаны на русском; технические имена, пути и команды оставлены как есть.
 - [ ] `python -m pytest` проходит.
 - [ ] `catalog.md` обновлён, если skill имеет статус `team-ready`.
 - [ ] Пользовательский слой на русском: README/catalog/quickstart/onboarding/contribution guide/PR template/plugin descriptions/skill descriptions/examples/script messages.
