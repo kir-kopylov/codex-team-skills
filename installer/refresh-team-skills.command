@@ -4,6 +4,9 @@ set -euo pipefail
 INSTALL_ROOT="${CODEX_TEAM_SKILLS_HOME:-$HOME/Library/Application Support/CodexTeamSkills}"
 BIN_DIR="$INSTALL_ROOT/bin"
 UPDATE_SCRIPT="$BIN_DIR/update-team-skills.sh"
+NEXT_UPDATE_SCRIPT="$UPDATE_SCRIPT.next"
+REFRESH_SCRIPT="$BIN_DIR/refresh-team-skills.command"
+NEXT_REFRESH_SCRIPT="$REFRESH_SCRIPT.next"
 STATUS_SCRIPT="$BIN_DIR/team-skills-status.command"
 SYNC_SCRIPT="$BIN_DIR/pull-skills.sh"
 PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
@@ -71,6 +74,22 @@ require_executable() {
     info "$label недоступен: $path"
     info "Сначала установите или восстановите team-skills installer."
     exit 1
+  fi
+}
+
+promote_staged_updater() {
+  if [[ -f "$NEXT_UPDATE_SCRIPT" ]]; then
+    mv "$NEXT_UPDATE_SCRIPT" "$UPDATE_SCRIPT"
+    chmod +x "$UPDATE_SCRIPT"
+    info "Updater обновлён из staged .next версии."
+  fi
+}
+
+promote_staged_refresh() {
+  if [[ -f "$NEXT_REFRESH_SCRIPT" ]]; then
+    mv "$NEXT_REFRESH_SCRIPT" "$REFRESH_SCRIPT"
+    chmod +x "$REFRESH_SCRIPT"
+    info "Refresh command обновлена из staged .next версии."
   fi
 }
 
@@ -178,6 +197,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
+promote_staged_updater
 require_executable "$UPDATE_SCRIPT" "update-team-skills.sh"
 
 info "1/4 Обновляю локальный plugin team-skills до latest release."
@@ -211,3 +231,4 @@ else
 fi
 
 info "Готово: локальные team-skills обновлены, Claude skills folder синхронизирован, runtime restart запущен или явно пропущен."
+promote_staged_refresh
