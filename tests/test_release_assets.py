@@ -143,14 +143,28 @@ def test_windows_docs_rewrite_downloaded_installer_as_utf8_with_bom() -> None:
 def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
+    assert "pr-governance" in jobs
+    assert jobs["pr-governance"]["name"] == "PR title/body governance"
+    assert "installer-release-gate" in jobs
+    assert jobs["installer-release-gate"]["name"] == "Installer/release protected paths gate"
+    assert "build-release-bundle" in jobs
+    assert jobs["build-release-bundle"]["name"] == "Build installable team-skills bundle"
+    assert jobs["build-release-bundle"]["needs"] == [
+        "pr-governance",
+        "installer-release-gate",
+        "pytest",
+        "claude-sync-smoke",
+    ]
     assert "windows-powershell-smoke" in jobs
     assert jobs["windows-powershell-smoke"]["runs-on"] == "windows-latest"
-    assert jobs["windows-powershell-smoke"]["needs"] == "pytest"
+    assert jobs["windows-powershell-smoke"]["needs"] == "build-release-bundle"
     assert "claude-sync-smoke" in jobs
     assert jobs["claude-sync-smoke"]["runs-on"] == "ubuntu-latest"
     assert jobs["claude-sync-smoke"]["needs"] == "pytest"
 
     workflow_text = json.dumps(workflow, ensure_ascii=False)
+    assert "python3 scripts/check_pr_governance.py metadata" in workflow_text
+    assert "python3 scripts/check_pr_governance.py protected-paths" in workflow_text
     assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly" in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "0xEF" in workflow_text
@@ -160,5 +174,5 @@ def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     assert "pull-skills.sh" in workflow_text
 
     publish = jobs["publish"]
-    assert publish["needs"] == ["pytest", "windows-powershell-smoke", "claude-sync-smoke"]
+    assert publish["needs"] == ["windows-powershell-smoke"]
     assert "gh release create" in workflow_text

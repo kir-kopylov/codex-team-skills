@@ -103,12 +103,15 @@ def test_user_docs_do_not_require_github_desktop() -> None:
 
 def test_ci_builds_validated_release_bundle() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
-    job = workflow["jobs"]["pytest"]
-    step_text = "\n".join(str(step) for step in job["steps"])
+    pytest_job = workflow["jobs"]["pytest"]
+    pytest_step_text = "\n".join(str(step) for step in pytest_job["steps"])
+    bundle_job = workflow["jobs"]["build-release-bundle"]
+    bundle_step_text = "\n".join(str(step) for step in bundle_job["steps"])
 
-    assert "python -m pytest" in step_text
-    assert "scripts/build_release_bundle.py" in step_text
-    assert "actions/upload-artifact" in step_text
+    assert "python -m pytest" in pytest_step_text
+    assert "scripts/build_release_bundle.py" in bundle_step_text
+    assert "actions/upload-artifact" in bundle_step_text
+    assert bundle_job["needs"] == ["pr-governance", "installer-release-gate", "pytest", "claude-sync-smoke"]
 
     build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
     assert "team-skills-bundle.zip" in build_script

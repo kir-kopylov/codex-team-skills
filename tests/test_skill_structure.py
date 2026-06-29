@@ -53,3 +53,28 @@ def test_team_ready_and_experimental_skills_have_no_template_todos() -> None:
         for key in ("use_cases", "do_not_use_for", "natural_triggers"):
             assert_nonempty_list(registry, key, skill_dir / "skill.yaml")
 
+
+def test_team_ready_skills_have_complete_publish_package() -> None:
+    required_files = ("SKILL.md", "skill.yaml", "known-exceptions.yaml")
+
+    for skill_dir in skill_dirs():
+        registry = load_registry(skill_dir)
+        if registry.get("status") != "team-ready":
+            continue
+
+        for name in required_files:
+            assert (skill_dir / name).exists(), f"{skill_dir.name} team-ready missing {name}"
+
+        examples_dir = skill_dir / "examples"
+        assert examples_dir.is_dir(), f"{skill_dir.name} team-ready missing examples/"
+        assert_nonempty_list(registry, "example_files", skill_dir / "skill.yaml")
+
+        listed_examples = set(registry["example_files"])
+        actual_examples = {str(path.relative_to(skill_dir)) for path in examples_dir.glob("*.md")}
+        assert listed_examples == actual_examples, (
+            f"{skill_dir.name} team-ready example_files must match examples/*.md exactly: "
+            f"listed={sorted(listed_examples)}, actual={sorted(actual_examples)}"
+        )
+        assert all(path.startswith("examples/") for path in listed_examples), (
+            f"{skill_dir.name} team-ready examples must live under examples/"
+        )
