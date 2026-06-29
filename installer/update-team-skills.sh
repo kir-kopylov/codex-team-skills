@@ -262,7 +262,7 @@ install_support_files() {
     local support_name support_dest
     support_name="$(basename "$file")"
     support_dest="$BIN_DIR/$support_name"
-    if [[ "$support_name" == "update-team-skills.sh" ]]; then
+    if [[ "$support_name" == "update-team-skills.sh" || "$support_name" == "refresh-team-skills.command" ]]; then
       cp "$file" "$support_dest.next"
       chmod +x "$support_dest.next"
       continue
