@@ -51,7 +51,10 @@ Claude Code автоматически читает папку `skills/`.
   отключить плагин. Путь файла зависит от ОС:
   - macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`
   - Linux: `/etc/claude-code/managed-settings.json`
-  - Windows: `C:\ProgramData\ClaudeCode\managed-settings.json`
+  - Windows: в новых версиях Claude Code —
+    `C:\Program Files\ClaudeCode\managed-settings.json`; в старых сборках путь
+    был `C:\ProgramData\ClaudeCode\managed-settings.json`. Перед раскаткой
+    сверьтесь с актуальной докой Claude Code для вашей версии.
 
 В managed-файл кладётся тот же JSON-блок, что и выше.
 
