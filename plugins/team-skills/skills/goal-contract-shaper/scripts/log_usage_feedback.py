@@ -5,14 +5,69 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 
-def compact(value: str) -> str:
+MAX_FIELD_LEN = 1200
+
+REDACTION_PATTERNS = [
+    (
+        "private_key",
+        re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL),
+        "[REDACTED_SECRET]",
+    ),
+    (
+        "secret",
+        re.compile(r"\b(?:sk-[A-Za-z0-9_-]{20,}|gh[opsu]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b"),
+        "[REDACTED_SECRET]",
+    ),
+    (
+        "url_secret",
+        re.compile(r"(?i)\b(token|api_key|key|password|secret)=([^&\s]+)"),
+        lambda match: f"{match.group(1)}=[REDACTED_SECRET]",
+    ),
+    (
+        "email",
+        re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
+        "[REDACTED_EMAIL]",
+    ),
+    (
+        "phone",
+        re.compile(r"(?:\+7|8)[\s()-]*\d{3}[\s()-]*\d{3}[\s()-]*\d{2}[\s()-]*\d{2}"),
+        "[REDACTED_PHONE]",
+    ),
+    (
+        "path",
+        re.compile(
+            r"(?:/Users/[^\s'\"`)\]]+|/private/var/folders/[^\s'\"`)\]]+|"
+            r"/var/folders/[^\s'\"`)\]]+|~/(?:\.codex|Downloads|Desktop|Documents|Library)[^\s'\"`)\]]*|"
+            r"[A-Za-z]:\\(?:Users|Documents and Settings)\\[^\s'\"`)\]]+)"
+        ),
+        "[REDACTED_PATH]",
+    ),
+]
+
+
+def normalize(value: str) -> str:
     value = " ".join((value or "unknown").split())
-    return value[:1200] if value else "unknown"
+    return value if value else "unknown"
+
+
+def sanitize(value: str) -> tuple[str, list[str]]:
+    value = normalize(value)
+    redaction_types: set[str] = set()
+
+    for label, pattern, replacement in REDACTION_PATTERNS:
+        def replace(match: re.Match[str]) -> str:
+            redaction_types.add(label)
+            return replacement(match) if callable(replacement) else replacement
+
+        value = pattern.sub(replace, value)
+
+    value = value[:MAX_FIELD_LEN] if value else "unknown"
+    return value, sorted(redaction_types)
 
 
 def main() -> None:
@@ -28,13 +83,22 @@ def main() -> None:
     log_path = Path(args.log).expanduser() if args.log else default_log
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
+    fields = {}
+    redaction_types: set[str] = set()
+    for field in ("liked", "improve", "outcome", "context"):
+        sanitized, field_redactions = sanitize(getattr(args, field))
+        fields[field] = sanitized
+        redaction_types.update(field_redactions)
+
     record = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "skill": "goal-contract-shaper",
-        "liked": compact(args.liked),
-        "improve": compact(args.improve),
-        "outcome": compact(args.outcome),
-        "context": compact(args.context),
+        "liked": fields["liked"],
+        "improve": fields["improve"],
+        "outcome": fields["outcome"],
+        "context": fields["context"],
+        "redaction_applied": bool(redaction_types),
+        "redaction_types": sorted(redaction_types),
         "source": "post-use-survey",
     }
     with log_path.open("a", encoding="utf-8") as handle:
