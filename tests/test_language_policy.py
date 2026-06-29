@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -171,6 +173,66 @@ def test_old_english_interface_phrases_do_not_return() -> None:
         content = path.read_text(encoding="utf-8")
         for phrase in FORBIDDEN_OLD_ENGLISH_PHRASES:
             assert phrase not in content, f"{path} содержит старую англоязычную фразу: {phrase}"
+
+
+def test_pr_language_checker_accepts_russian_text() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "check_pr_language.py"),
+            "--kind",
+            "PR title/body",
+            "--title",
+            "[codex] Усилить goal-contract-shaper",
+            "--body",
+            (
+                "Что изменилось\n\n"
+                "- Добавлен workflow `.github/workflows/pr-language.yml`.\n"
+                "- Проверка запускается для PR body и комментариев.\n\n"
+                "Проверка: `python -m pytest`."
+            ),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_pr_language_checker_rejects_english_text() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "check_pr_language.py"),
+            "--kind",
+            "PR title/body",
+            "--title",
+            "[codex] Strengthen policy",
+            "--body",
+            "What changed\n\n- Added a policy check.\n\nWhy\n\nThe repository needs clear rules.",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "должен быть на русском" in result.stderr or "выглядит англоязычным" in result.stderr
+
+
+def test_pr_language_workflow_checks_pr_text_and_comments() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "pr-language.yml").read_text(encoding="utf-8")
+
+    for event_name in (
+        "pull_request",
+        "issue_comment",
+        "pull_request_review_comment",
+        "pull_request_review",
+    ):
+        assert event_name in workflow
+
+    assert "scripts/check_pr_language.py" in workflow
+    assert "PR title/body" in workflow
+    assert "PR comment" in workflow
+    assert "PR review comment" in workflow
+    assert "PR review" in workflow
 
 
 def test_technical_contract_terms_are_preserved() -> None:

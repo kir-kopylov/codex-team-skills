@@ -11,11 +11,18 @@
 - `admin-onboarding-guide.md`
 - `CONTRIBUTING.md`
 - `.github/pull_request_template.md`
+- заголовок, описание и комментарии Pull Request
 - человекочитаемые описания в `plugin.json`
 - человекочитаемые описания в `skill.yaml`
 - body и `description` в `SKILL.md`
 - `examples/*.md`
 - сообщения скриптов, которые видит пользователь
+
+## Pull Request
+
+Описание PR, первый комментарий PR, review comments и review body пишутся на русском языке. Технические имена, пути, команды, branch names, commit hashes, статусы CI и названия файлов остаются как есть.
+
+Запрещено оставлять человекочитаемое описание PR на английском вроде `What changed`, `Why`, `Validation`, `Notes`. Если нужен такой каркас, используйте русские заголовки: `Что изменилось`, `Зачем`, `Проверка`, `Примечания`.
 
 ## Что Не Переводить
 
@@ -31,3 +38,5 @@
 ## Как Это Защищено
 
 CI запускает `pytest` на каждом Pull Request. Тест `test_language_policy.py` проверяет, что пользовательский слой проекта остаётся русскоязычным, а технические ключи и команды не переводятся.
+
+Отдельный workflow `.github/workflows/pr-language.yml` проверяет PR title/body и PR comments через `scripts/check_pr_language.py`. Он должен падать, если человекочитаемый текст PR выглядит англоязычным или не содержит русского текста.
