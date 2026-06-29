@@ -1,0 +1,11 @@
+{
+  "name": "team-skills",
+  "description": "Командные скилы для Claude Code: договорные документы, ревью и runtime для крупных задач, верификация live-state и доменные рабочие процессы. Скилы автоматически подхватываются из папки skills/. Те же папки используются и в Codex. Поле version намеренно опущено: Claude Code определяет обновление по version раньше, чем по git SHA, поэтому при фиксированной версии правки в skills/ не доходят до установленных пользователей.",
+  "author": {
+    "name": "Команда codex-team-skills",
+    "url": "https://github.com/kir-kopylov/codex-team-skills"
+  },
+  "homepage": "https://github.com/kir-kopylov/codex-team-skills",
+  "license": "UNLICENSED",
+  "keywords": ["team", "skills", "claude-code", "codex"]
+}
