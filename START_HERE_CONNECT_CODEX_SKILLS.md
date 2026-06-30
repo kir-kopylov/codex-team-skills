@@ -4,6 +4,8 @@
 
 Коллеге нужно загрузить этот `.md` файл в Codex Desktop, нажать отправить и дальше следовать инструкциям Codex.
 
+> Если ты работаешь в `Claude Code`, а не в Codex — путь другой: подключайся через нативный маркетплейс. Две команды и детали — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
+
 Публичная ссылка на repo:
 
 ```text
