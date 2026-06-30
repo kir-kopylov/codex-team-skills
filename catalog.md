@@ -4,7 +4,7 @@
 
 Это каталог всех командных скиллов. Среди них есть seed-skill: `photo-photobomb-director`, то есть первый пример, на котором показан стандарт качества и структура repo.
 
-Эти скиллы работают и в `Codex`, и в `Claude`. На `Windows` установщик синхронизирует только plugin для `Codex`; синхронизация папки `Claude` идёт по пути обновления на `macOS`.
+Эти скиллы работают и в `Codex`, и в `Claude Code`. В `Codex` они ставятся подписанным установщиком, а в `Claude Code` — нативным маркетплейсом: команды `/plugin marketplace add kir-kopylov/codex-team-skills` и `/plugin install team-skills@codex-team-skills`, подробности в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md). Прежний путь — синхронизация папки `~/.claude/skills/` скриптом `pull-skills.sh` — остаётся как устаревший.
 
 | Задача | Skill | Статус | Первая фраза для Codex | Когда использовать | Когда не использовать |
 | --- | --- | --- | --- | --- | --- |

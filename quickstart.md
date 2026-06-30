@@ -55,6 +55,19 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command`
 
+## Claude Code: Подключить Через Маркетплейс
+
+Если вы работаете в `Claude Code`, а не в Codex, подключите скилы нативным маркетплейсом — без установщика и клона repo:
+
+```text
+/plugin marketplace add kir-kopylov/codex-team-skills
+/plugin install team-skills@codex-team-skills
+```
+
+Подробности и авто-раздача на всю команду — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
+
+Когда что выбирать: Codex → подписанный установщик (выше); `Claude Code` → нативный маркетплейс.
+
 ## Author Mode: Добавить Новый Skill
 
 Если вы хотите добавлять свои skills в общее repo, нужен GitHub workflow:
