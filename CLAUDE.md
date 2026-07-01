@@ -59,6 +59,7 @@ intentionally written in English for AI assistants.
 ```text
 plugins/team-skills/
   .codex-plugin/plugin.json        # plugin manifest read by Codex
+  .claude-plugin/plugin.json       # plugin manifest read by Claude Code (no version field)
   skills/<skill-name>/
     SKILL.md                       # instructions the model reads (YAML frontmatter + body)
     skill.yaml                     # team registry card (owner, status, triggers, examples)
@@ -73,13 +74,14 @@ START_HERE_CONNECT_CODEX_SKILLS.md # the file a colleague sends to Codex to onbo
 admin-onboarding-guide.md          # internal guide for whoever runs onboarding
 language-policy.md                 # the language contract (enforced by tests)
 docs/                              # platform-overview.md, seed-skill-example.md,
-                                   #   skill-exception-learning.md
+                                   #   skill-exception-learning.md, claude-code-marketplace.md
 installer/                         # signed user-mode install / update / status / uninstall
                                    #   + bootstrap-*, refresh-team-skills.command
 scripts/                           # install_plugin.sh, new_skill.py,
                                    #   build_release_bundle.py, pull-skills.sh
 tests/                             # pytest suite (see Testing & CI)
-.agents/plugins/marketplace.json   # local marketplace entry pointing at the plugin
+.agents/plugins/marketplace.json   # local marketplace entry pointing at the plugin (Codex)
+.claude-plugin/marketplace.json    # native Claude Code marketplace entry (codex-team-skills)
 .github/workflows/tests.yml        # CI: pytest + smoke tests + signed publish on main
 pyproject.toml                     # Python project (requires-python >=3.11)
 ```
@@ -228,9 +230,15 @@ language keys); a generic, interface-independent failure does not need one.
 - **`mac-app-uninstaller` scanner is scan-only**: its script must never contain
   deletion primitives (`rm -`, `.unlink(`, `rmtree`, `send2trash`, etc.) —
   enforced by `tests/test_mac_app_uninstaller.py`.
-- **Plugin manifest** (`tests/test_plugin_manifest.py`): `name` is
-  `team-skills`, `version` is semver, `skills` is `./skills/`, and the
-  `interface.defaultPrompt` list has 1–3 entries each ≤128 chars.
+- **Plugin manifest**: two manifests, two rules. The Codex manifest
+  (`.codex-plugin/plugin.json`, checked by `tests/test_plugin_manifest.py`) has
+  `name` = `team-skills`, a semver `version`, `skills` = `./skills/`, and an
+  `interface.defaultPrompt` list of 1–3 entries each ≤128 chars. The native
+  Claude Code plugin manifest (`.claude-plugin/plugin.json`, checked by
+  `tests/test_claude_manifest.py`) intentionally has **no** `version` field —
+  Claude Code decides a plugin updated by `version` before git SHA, so a pinned
+  version would stop `skills/` edits from reaching already-installed users.
+  Don't "fix" the Claude manifest by adding a semver version.
 - A skill should be triggerable by a normal human phrase, not just by
   `$skill-name`.
 
