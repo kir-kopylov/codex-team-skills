@@ -299,6 +299,7 @@ changes here must keep the tests and the Russian user-facing messages intact.
 - Commit only when asked; write clear, descriptive commit messages.
 - Push with `git push -u origin <branch-name>`; retry transient network
   failures with exponential backoff.
-- **Do not open a Pull Request unless explicitly requested.**
-- For any push or PR (an externally visible action), first show the scope of
-  what will be sent unless the user has explicitly asked you to publish.
+- Push and opening a Pull Request are the normal completion of a change, not a
+  step that waits for a separate publish request each time.
+- Always show the scope of what will be sent before push - that is about
+  transparency, not about asking permission.
