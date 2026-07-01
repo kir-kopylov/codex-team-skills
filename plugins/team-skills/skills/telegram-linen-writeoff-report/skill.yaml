@@ -23,7 +23,7 @@ example_files:
   - "examples/good-03-missing-package-gate.md"
   - "examples/anti-01-no-telegram-export.md"
   - "examples/anti-02-unapproved-rule-change.md"
-last_reviewed: "2026-06-05"
+last_reviewed: "2026-07-01"
 source_asset: "Исходный SKILL.md передан Надеждой Симарзиной; repo package сохраняет авторство и добавляет проверяемую границу ожидаемых ресурсов."
 team_ready_blockers:
   - "Подтвердить, кто будет постоянным maintainer после получения рабочего пакета."
