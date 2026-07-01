@@ -46,16 +46,37 @@ def backup(path: Path) -> Path | None:
 
 
 def strip_managed_content(text: str) -> str:
+    """Remove ONLY codex-team-skills-owned content.
+
+    Foreign plugin/marketplace stanzas that an earlier buggy version trapped
+    INSIDE the managed block (e.g. ``browser@``/``chrome@openai-bundled``) are
+    rescued and re-emitted OUTSIDE the block instead of being deleted. Without
+    this, every ``ensure`` silently disabled those third-party Codex plugins.
+    """
     lines = text.splitlines()
     kept: list[str] = []
+    rescued: list[str] = []
     index = 0
     while index < len(lines):
         stripped = lines[index].strip()
         if stripped == BEGIN_MARKER:
             index += 1
             while index < len(lines) and lines[index].strip() != END_MARKER:
-                index += 1
-            index += 1
+                header = lines[index].strip()
+                if header.startswith("[") and header not in TARGET_HEADERS:
+                    # foreign stanza trapped inside our block — rescue it
+                    rescued.append(lines[index])
+                    index += 1
+                    while (
+                        index < len(lines)
+                        and lines[index].strip() != END_MARKER
+                        and not lines[index].lstrip().startswith("[")
+                    ):
+                        rescued.append(lines[index])
+                        index += 1
+                else:
+                    index += 1
+            index += 1  # skip END_MARKER
             continue
         if stripped in TARGET_HEADERS:
             index += 1
@@ -64,6 +85,12 @@ def strip_managed_content(text: str) -> str:
             continue
         kept.append(lines[index])
         index += 1
+    while rescued and not rescued[-1].strip():
+        rescued.pop()
+    if rescued:
+        if kept and kept[-1].strip():
+            kept.append("")
+        kept.extend(rescued)
     return "\n".join(kept).rstrip() + "\n"
 
 

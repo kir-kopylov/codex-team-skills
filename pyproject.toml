@@ -10,11 +10,32 @@ dependencies = [
 [project.optional-dependencies]
 test = [
   "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "openpyxl>=3.1",
+  "python-docx>=1.1",
 ]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --cov --cov-report=term-missing:skip-covered"
 testpaths = ["tests"]
+
+# Покрытие включено, но НЕ гейтит (нет fail_under) — это карта пробелов, а не
+# блокер. Меряем только исполняемый Python (генераторы, registry-хелпер,
+# скрипты скилов). Оговорка: скрипты, которые тесты запускают через subprocess
+# (build_release_bundle.py, часть registry-хелпера), внутрипроцессным покрытием
+# не учитываются и будут выглядеть недопокрытыми — это ожидаемо для v1.
+[tool.coverage.run]
+branch = true
+source = ["scripts", "installer", "plugins/team-skills/skills"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "raise SystemExit",
+]
 
 [tool.setuptools]
 packages = []

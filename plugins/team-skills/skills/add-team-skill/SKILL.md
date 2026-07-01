@@ -6,6 +6,10 @@ description: |
 
 # Add Team Skill
 
+## Согласие На Запуск
+
+Явный вызов — slash-команда, имя skill или первая фраза из каталога — выполняйте сразу, без вопроса. При автосрабатывании на смысловое сходство сначала спросите одной строкой: «Задача похожа на team skill `add-team-skill` — добавляет командный skill в repo и доводит его до team-ready. Применить или решить без него?» — и ждите ответа. При отказе выйдите из skill молча: решите задачу с нуля и больше не упоминайте skill.
+
 ## Обзор
 
 Этот skill ведёт автора через создание или доработку командного skill внутри `codex-team-skills`.
@@ -19,7 +23,7 @@ description: |
 - пользователь просит "добавь новый skill" -> создать draft через `scripts/new_skill.py`, затем заполнить до нужного статуса;
 - пользователь дал workflow из диалога -> извлечь повторяемую задачу, триггеры, границы, examples и оформить skill;
 - пользователь дал чужой `SKILL.md`, draft или методику -> сначала найти похожие skills, решить "интегрировать или создать новый", затем сохранить авторство через `authors` и `source_asset`;
-- пользователь просит "team-ready" -> требовать owner, catalog row, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек и зелёный `pytest`;
+- пользователь просит "team-ready" -> требовать owner, catalog row, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек, зелёный `pytest` и прохождение общего Claude sync gate;
 - пользователь просит "проверь перед PR" -> провести review структуры, registry, examples, catalog, privacy и тестов;
 - пользователь просит "почини CI" -> сначала прочитать ошибку тестов/CI, затем править минимально.
 
@@ -105,7 +109,7 @@ python3 scripts/new_skill.py <skill-name> --owner @github-login --summary "Ко�
 - `known-exceptions.yaml` — список известных сбоев и готовых действий на следующий раз;
 - `references/domain-playbook.md` — только для domain/interface-heavy skills, где нужно сохранить очищенную механику сервиса;
 - `examples/` — проверяемые хорошие примеры и анти-примеры;
-- строка в `catalog.md`, если статус `team-ready`;
+- строка в `catalog.md`, если статус `team-ready` или `experimental`;
 - `agents/openai.yaml` только если нужен UI-чип или полезный default prompt.
 
 ## SKILL.md
@@ -128,6 +132,7 @@ description: ...
 
 В body держите только полезную процедуру:
 
+- секция `## Согласие На Запуск` — первый H2, канонический текст из CONTRIBUTING (для `experimental` — с пометкой и owner-ом);
 - обзор;
 - роутинг запросов;
 - процесс выполнения;
@@ -172,7 +177,8 @@ source_asset: "Короткое описание исходного вклада
 Статусы:
 
 - `draft` — можно merge как черновик после базовой структуры;
-- `team-ready` — нужен owner, catalog entry, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек и зелёные тесты;
+- `experimental` — рабочий рецепт без гарантий: нужен owner, catalog entry, отсутствие шаблонных заглушек и гейт с пометкой «экспериментальный» и owner-ом; полный набор examples ещё не обязателен;
+- `team-ready` — нужен owner, catalog entry, 3 good examples, 2 anti-examples, отсутствие шаблонных заглушек, зелёные тесты и успешный Claude folder-sync через `scripts/pull-skills.sh`; при повышении из `experimental` уберите пометку из гейта;
 - `internal-only` — нужен внутренний контекст или особые ограничения;
 - `deprecated` — нужны `replacement` или `deprecation_reason`.
 
@@ -262,6 +268,7 @@ python3 -m pytest
 - example не содержит нужные секции;
 - текст пользовательских файлов не на русском;
 - есть токены, приватные пути, pasteboard/download paths или raw PII.
+- `scripts/pull-skills.sh` не попадает в release bundle или Claude sync smoke не копирует repo-managed skills.
 - domain/interface-heavy skill потерял selectors, URL patterns, статусы, лимиты или recovery вместо очищения частных значений.
 
 ## Pull Request
@@ -287,6 +294,7 @@ PR должен отвечать на четыре вопроса:
 Skill готов, если:
 
 - folder name, `SKILL.md` frontmatter `name` и registry согласованы;
+- первый H2 в `SKILL.md` — `## Согласие На Запуск` с каноническим текстом; для `experimental` — с пометкой и owner-ом, для остальных статусов — без неё;
 - `description` содержит естественные триггеры;
 - `skill.yaml` заполнен без пустых полей;
 - каждый skill имеет `known-exceptions.yaml`;
@@ -294,7 +302,8 @@ Skill готов, если:
 - если был чужой draft или доменная методика, `authors` и `source_asset` сохраняют вклад без приватных путей и raw-контекста;
 - для `team-ready` есть 3 good examples и 2 anti-examples;
 - все examples указаны в `example_files` и существуют;
-- `catalog.md` содержит строку для `team-ready`;
+- `catalog.md` содержит строку для `team-ready` и `experimental`;
 - нет шаблонных заглушек, секретов, приватных путей и сырого приватного контекста;
+- Claude sync gate проходит: repo-managed skills копируются через `scripts/pull-skills.sh`, local-only skills не удаляются;
 - `python3 -m pytest` проходит локально;
 - при публикации PR создан и CI зелёный или явно ожидает выполнения.

@@ -25,6 +25,8 @@ SUPPORT_NAMES = (
     "uninstall-team-skills.command",
     "team-skills-status.ps1",
     "team-skills-status.command",
+    "refresh-team-skills.command",
+    "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",
 )
@@ -54,6 +56,12 @@ def copy_support_file(source: Path, destination: Path) -> None:
         return
 
     shutil.copy2(source, destination)
+
+
+def support_source_path(root: Path, name: str) -> Path:
+    if name == "pull-skills.sh":
+        return root / "scripts" / name
+    return root / "installer" / name
 
 
 def build_release_bundle(
@@ -98,7 +106,7 @@ def build_release_bundle(
     shutil.rmtree(dist / "bundle-root", ignore_errors=True)
 
     for name in SUPPORT_NAMES:
-        copy_support_file(root / "installer" / name, dist / name)
+        copy_support_file(support_source_path(root, name), dist / name)
 
     plugin_bundle = asset_metadata("team-skills-bundle.zip", bundle_path, release_base)
     support_files = [asset_metadata(name, dist / name, release_base) for name in SUPPORT_NAMES]

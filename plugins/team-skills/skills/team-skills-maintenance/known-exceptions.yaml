@@ -1,1 +1,5 @@
-exceptions: []
+exceptions:
+  - symptom: "Repo/plugin bundle обновлены, Codex перезапущен, но session-visible team-skills остаются старым списком."
+    root_cause: "Updater заменил local plugin, но не инвалидировал persistent snapshot ~/.codex/plugins/cache/codex-team-skills, поэтому restart мог перечитать старый cache."
+    do_next_time: "Сравнить local plugin, Codex plugin cache и state.json; ручной cache reset считать обходом, а не штатным решением. Штатный updater должен записать codex_plugin_cache_invalidated_path."
+    source_example: "Пользователь видит 12 session-visible skills после многократного restart, хотя ~/plugins/team-skills уже содержит 24 skills."

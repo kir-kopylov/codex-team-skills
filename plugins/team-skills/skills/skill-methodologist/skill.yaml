@@ -1,0 +1,28 @@
+owner: "@kir-kopylov"
+authors:
+  - "Дмитрий Гвоздецкий"
+status: "team-ready"
+summary: "Проектирует контракт будущего skill из повторяемой работы, чата, процесса или шаблона по методологии Дмитрия Гвоздецкого."
+use_cases:
+  - "Спроектировать контракт будущего skill из длинного чата, повторяемого рабочего процесса, отчета, шаблона или набора правил."
+  - "Понять, нужен ли отдельный skill, или достаточно обычного ответа, prompt, шаблона либо разового разбора."
+  - "Выделить входы, результат, предметные правила, правила качества, анти-правила, алгоритм, проверки и решение про scripts, references или assets."
+do_not_use_for:
+  - "Создание файлов skill в repo, заполнение catalog, запуск проверок или подготовку Pull Request; для этого используйте add-team-skill."
+  - "Простой концептуальный разбор идеи без намерения получить повторяемый контракт skill."
+  - "Разовые, сильно творческие или каждый раз меняющиеся задачи без стабильных входов и результата."
+natural_triggers:
+  - "спроектируй контракт skill"
+  - "сделай skill contract из этого workflow"
+  - "из этого чата сделать skill"
+  - "нужен ли тут отдельный skill"
+  - "вытащи правила и анти-правила для skill"
+  - "опиши будущий skill перед упаковкой в repo"
+example_files:
+  - "examples/good-01-chat-to-skill-contract.md"
+  - "examples/good-02-report-workflow-contract.md"
+  - "examples/good-03-template-process-contract.md"
+  - "examples/anti-01-repo-publication.md"
+  - "examples/anti-02-one-off-or-conceptual.md"
+last_reviewed: "2026-06-05"
+source_asset: "Исходный skill_methodologist.md передан Дмитрием Гвоздецким; repo-пакет сохраняет авторство и адаптирует материал в короткий процесс, reference и проверяемые examples."

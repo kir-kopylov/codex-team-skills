@@ -27,6 +27,8 @@ NON_POWERSHELL_ASSETS = (
     "update-team-skills.sh",
     "uninstall-team-skills.command",
     "team-skills-status.command",
+    "refresh-team-skills.command",
+    "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",
 )
@@ -86,6 +88,38 @@ def test_release_manifest_hashes_final_bom_assets(tmp_path: Path) -> None:
         assert support_files[name]["size"] == len(data)
 
 
+def test_release_bundle_includes_claude_sync_script(tmp_path: Path) -> None:
+    dist = build_dist(tmp_path)
+    sync_script = dist / "pull-skills.sh"
+    assert sync_script.exists()
+    assert "CLAUDE_SKILLS_DIR" in sync_script.read_text(encoding="utf-8")
+
+    manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
+    support_files = {entry["name"]: entry for entry in manifest["support_files"]}
+    data = sync_script.read_bytes()
+    assert support_files["pull-skills.sh"]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert support_files["pull-skills.sh"]["size"] == len(data)
+
+
+def test_release_bundle_includes_refresh_and_restart_automation(tmp_path: Path) -> None:
+    dist = build_dist(tmp_path)
+    refresh_script = dist / "refresh-team-skills.command"
+    assert refresh_script.exists()
+    content = refresh_script.read_text(encoding="utf-8")
+    assert "update-team-skills.sh" in content
+    assert "pull-skills.sh" in content
+    assert "CODEX_TEAM_SKILLS_RESTART_APPS" in content
+    assert "Codex,Claude" in content
+    assert "osascript" in content
+    assert "open -a" in content
+
+    manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
+    support_files = {entry["name"]: entry for entry in manifest["support_files"]}
+    data = refresh_script.read_bytes()
+    assert support_files["refresh-team-skills.command"]["sha256"] == hashlib.sha256(data).hexdigest()
+    assert support_files["refresh-team-skills.command"]["size"] == len(data)
+
+
 def test_windows_docs_rewrite_downloaded_installer_as_utf8_with_bom() -> None:
     docs = [
         ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
@@ -109,17 +143,42 @@ def test_windows_docs_rewrite_downloaded_installer_as_utf8_with_bom() -> None:
 def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
     jobs = workflow["jobs"]
+    assert "pr-governance" in jobs
+    assert jobs["pr-governance"]["name"] == "PR title/body governance"
+    assert "installer-release-gate" in jobs
+    assert jobs["installer-release-gate"]["name"] == "Installer/release protected paths gate"
+    assert "release-scope" in jobs
+    assert jobs["release-scope"]["name"] == "Release/installer scope"
+    assert "build-release-bundle" in jobs
+    assert jobs["build-release-bundle"]["name"] == "Build installable team-skills bundle"
+    assert jobs["build-release-bundle"]["if"] == "needs.release-scope.outputs.run_release_checks == 'true'"
+    assert jobs["build-release-bundle"]["needs"] == [
+        "pr-governance",
+        "installer-release-gate",
+        "release-scope",
+        "pytest",
+        "claude-sync-smoke",
+    ]
     assert "windows-powershell-smoke" in jobs
     assert jobs["windows-powershell-smoke"]["runs-on"] == "windows-latest"
-    assert jobs["windows-powershell-smoke"]["needs"] == "pytest"
+    assert jobs["windows-powershell-smoke"]["if"] == "needs.build-release-bundle.result == 'success'"
+    assert jobs["windows-powershell-smoke"]["needs"] == "build-release-bundle"
+    assert "claude-sync-smoke" in jobs
+    assert jobs["claude-sync-smoke"]["runs-on"] == "ubuntu-latest"
+    assert jobs["claude-sync-smoke"]["needs"] == "pytest"
 
     workflow_text = json.dumps(workflow, ensure_ascii=False)
+    assert "python3 scripts/check_pr_governance.py metadata" in workflow_text
+    assert "python3 scripts/check_pr_governance.py protected-paths" in workflow_text
+    assert "python3 scripts/check_pr_governance.py release-scope" in workflow_text
     assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly" in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "0xEF" in workflow_text
     assert "0xBB" in workflow_text
     assert "0xBF" in workflow_text
+    assert "CLAUDE_SKILLS_DIR" in workflow_text
+    assert "pull-skills.sh" in workflow_text
 
     publish = jobs["publish"]
-    assert publish["needs"] == ["pytest", "windows-powershell-smoke"]
+    assert publish["needs"] == ["windows-powershell-smoke"]
     assert "gh release create" in workflow_text

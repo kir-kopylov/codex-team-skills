@@ -6,11 +6,15 @@
 
 Windows:
 
+Эта команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
+
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
 ```
 
 macOS:
+
+Эта команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
 
 ```bash
 curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.command && chmod +x /tmp/install-team-skills.command && /tmp/install-team-skills.command
@@ -37,6 +41,10 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\team-skills-status.ps1`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command`
 
+Для полного refresh на macOS: обновить локальные team-skills, синхронизировать Claude skills folder и перезапустить Codex/Claude:
+
+- macOS: `~/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command`
+
 Если plugin установлен, но Codex не видит новые skills, выполните one-time repair:
 
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\update-team-skills.ps1 -RepairInstall`
@@ -46,6 +54,19 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command`
+
+## Claude Code: Подключить Через Маркетплейс
+
+Если вы работаете в `Claude Code`, а не в Codex, подключите скилы нативным маркетплейсом — без установщика и клона repo:
+
+```text
+/plugin marketplace add kir-kopylov/codex-team-skills
+/plugin install team-skills@codex-team-skills
+```
+
+Подробности и авто-раздача на всю команду — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
+
+Когда что выбирать: Codex → подписанный установщик (выше); `Claude Code` → нативный маркетплейс.
 
 ## Author Mode: Добавить Новый Skill
 

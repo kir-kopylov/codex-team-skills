@@ -1,0 +1,4 @@
+interface:
+  display_name: "Goal Contract Shaper"
+  short_description: "Собирает /goal-контракт через грамматику деятельности"
+  default_prompt: "Используй $goal-contract-shaper, чтобы разложить сырую цель как процесс создания ценности и довести ее до проверяемого /goal-контракта."

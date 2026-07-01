@@ -20,10 +20,15 @@ $PluginDest = if ($env:CODEX_TEAM_SKILLS_PLUGIN_DIR) { $env:CODEX_TEAM_SKILLS_PL
 $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT } else { $HOME }
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
 $CodexConfigPath = if ($env:CODEX_TEAM_SKILLS_CODEX_CONFIG) { $env:CODEX_TEAM_SKILLS_CODEX_CONFIG } else { Join-Path $HOME ".codex\config.toml" }
+$CodexPluginCacheDir = if ($env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR) { $env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR } else { Join-Path $HOME ".codex\plugins\cache\codex-team-skills" }
 $PublicKeyPath = if ($env:CODEX_TEAM_SKILLS_PUBLIC_KEY) { $env:CODEX_TEAM_SKILLS_PUBLIC_KEY } else { Join-Path $BinDir "team-skills-public-key.pem" }
+# Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
+# Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
+$ExpectedPublicKeySha256 = "6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 $StatePath = Join-Path $StateDir "state.json"
 $LogPath = Join-Path $LogDir "team-skills-update.log"
 $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
+$Script:InvalidatedCodexPluginCache = ""
 
 if (-not $LatestUrl) {
     $LatestUrl = "$RepoReleaseBase/latest.json"
@@ -58,14 +63,22 @@ function Verify-Sha256($Path, $Expected) {
     }
 }
 
-function Verify-Signature($PayloadPath, $SignaturePath) {
-    if ($AllowUnsigned) {
-        Write-Log "Signature verification skipped: CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1."
-        return
-    }
+function Verify-PublicKeyPin() {
     if (-not (Test-Path $PublicKeyPath)) {
         throw "Public key не найден: $PublicKeyPath"
     }
+    $actual = (Get-FileHash -Algorithm SHA256 $PublicKeyPath).Hash.ToLowerInvariant()
+    if ($actual -ne $ExpectedPublicKeySha256) {
+        throw "Public key не совпадает с закреплённым якорем доверия (sha256 mismatch). Возможна подмена ключа подписи. Оставляю текущий рабочий plugin без изменений."
+    }
+}
+
+function Verify-Signature($PayloadPath, $SignaturePath) {
+    if ($AllowUnsigned) {
+        Write-Log "ВНИМАНИЕ: проверка подписи ОТКЛЮЧЕНА (CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1). Это небезопасный режим только для разработки: устанавливается НЕпроверенный код. В обычной работе не используйте."
+        return
+    }
+    Verify-PublicKeyPin
 
     $rsa = [System.Security.Cryptography.RSA]::Create()
     $pem = Get-Content $PublicKeyPath -Raw
@@ -194,6 +207,36 @@ enabled = true
     }
 }
 
+function Invalidate-CodexPluginCache() {
+    if ([string]::IsNullOrWhiteSpace($CodexPluginCacheDir)) {
+        Write-Log "Codex plugin cache invalidation skipped: empty cache path."
+        return
+    }
+    $fullCachePath = [System.IO.Path]::GetFullPath($CodexPluginCacheDir)
+    $pathRoot = [System.IO.Path]::GetPathRoot($fullCachePath)
+    if ($fullCachePath -eq $pathRoot -or $fullCachePath -eq [System.IO.Path]::GetFullPath($HOME)) {
+        Write-Log "Codex plugin cache invalidation skipped: unsafe cache path: $CodexPluginCacheDir"
+        return
+    }
+
+    if (-not (Test-Path $CodexPluginCacheDir)) {
+        Write-Log "Codex plugin cache already absent: $CodexPluginCacheDir"
+        return
+    }
+
+    $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+    $staleDir = "$CodexPluginCacheDir.stale.$stamp.$PID"
+    try {
+        Move-Item $CodexPluginCacheDir $staleDir -Force
+        $Script:InvalidatedCodexPluginCache = $staleDir
+        Write-Log "Codex plugin cache invalidated: moved $CodexPluginCacheDir -> $staleDir"
+    } catch {
+        Remove-Item $CodexPluginCacheDir -Recurse -Force
+        $Script:InvalidatedCodexPluginCache = $CodexPluginCacheDir
+        Write-Log "Codex plugin cache invalidated: removed $CodexPluginCacheDir"
+    }
+}
+
 function Find-PluginRoot($ExpandedDir) {
     $candidates = @(
         (Join-Path $ExpandedDir "team-skills"),
@@ -259,7 +302,9 @@ function Write-State($Manifest, $BundleUrl, $SignatureState) {
         codex_config_path = $CodexConfigPath
         updater_version = $UpdaterVersion
         signature_verification = $SignatureState
-        runtime_visibility = "requires Codex restart; cannot be proven from shell"
+        codex_plugin_cache_path = $CodexPluginCacheDir
+        codex_plugin_cache_invalidated_path = $Script:InvalidatedCodexPluginCache
+        runtime_visibility = "requires Codex restart after plugin swap and Codex cache invalidation; cannot be proven from shell"
     }
     Ensure-Directory $StateDir
     $state | ConvertTo-Json -Depth 8 | Set-Content -Path $StatePath -Encoding UTF8
@@ -271,6 +316,7 @@ function Repair-Install() {
     }
     Update-Marketplace $PluginDest
     Update-CodexRegistry
+    Invalidate-CodexPluginCache
     $pluginManifest = Get-Content (Join-Path $PluginDest ".codex-plugin\plugin.json") -Raw | ConvertFrom-Json
     $manifest = [pscustomobject]@{
         product_version = if ($pluginManifest.product_version) { $pluginManifest.product_version } else { $pluginManifest.version }
@@ -336,9 +382,10 @@ try {
     Update-CodexRegistry
     Swap-Plugin $pluginRoot
     Install-SupportFiles $supportDir
+    Invalidate-CodexPluginCache
     Write-State $manifest $bundleUrl "signed"
     Write-Log "Установлена проверенная версия team-skills: product=$($manifest.product_version) runtime=$($manifest.runtime_version) release=$($manifest.release_id)."
-    Write-Log "Перезапустите Codex, чтобы он перечитал plugin; runtime visibility cannot be proven from shell."
+    Write-Log "Перезапустите Codex, чтобы он перечитал plugin после cache invalidation; runtime visibility cannot be proven from shell."
 } catch {
     Write-Log "Обновление не применено: $($_.Exception.Message)"
     throw

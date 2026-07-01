@@ -25,12 +25,12 @@
 
 Установщик скачивает не сырой `main`, а последний подписанный release:
 
-- `latest.json` — подписанный pointer на последний stable immutable release;
+- `latest.json` — подписанный pointer на последний проверенный подписанный release (неизменяемый тег не гарантируется платформой);
 - `manifest.json` — подписанная schema с `product_version`, `runtime_version`, `release_id`, commit, channel и checksum assets;
 - `team-skills-bundle.zip` — plugin `team-skills`;
 - служебные scripts для bootstrap, обновления, repair, статуса и удаления.
 
-Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. `~/.codex/plugins/cache` не является контрактом updater и не изменяется вручную.
+Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. После успешной замены updater инвалидирует snapshot `~/.codex/plugins/cache/codex-team-skills`, потому что перезапуск Codex должен перечитывать свежий plugin, а не старый persistent cache.
 
 ## Auto Update
 
@@ -45,6 +45,8 @@
 ## Release Signing
 
 Публикация release после merge требует GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`. Он должен содержать приватный ключ, соответствующий публичному ключу `installer/team-skills-public-key.pem`. Без этого CI должен падать на publish-step, потому что unsigned release не должен становиться источником автообновления.
+
+Честно про bus-factor: приватный ключ хранится только офлайн и как GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, и сейчас до него дотягивается только владелец repo. Это единая точка отказа: если ключ потерян или скомпрометирован, новые подписанные release выпускать некем. Восстановление — это смена доверенного якоря, а не починка старого ключа. Порядок такой: сгенерировать новую пару ключей, заменить значение secret `TEAM_SKILLS_SIGNING_KEY_PEM` в настройках repo, закоммитить новый публичный ключ `installer/team-skills-public-key.pem`, обновить закреплённый отпечаток `EXPECTED_PUBLIC_KEY_SHA256` в `installer/update-team-skills.sh` и `installer/update-team-skills.ps1` на sha256 нового ключа (иначе после переустановки обновления упрут в проверку якоря доверия) и опубликовать свежий подписанный release. Коллеги подхватят новый якорь доверия, заново запустив установщик; до этого их клиент остаётся на старой подписи. Деградация при этом штатная: как уже описано выше, если подпись невалидна, старый рабочий plugin остаётся на месте, так что подмена ключа не ломает текущие установки, а лишь откладывает новые обновления до повторного запуска установщика.
 
 ## Команды Поддержки
 

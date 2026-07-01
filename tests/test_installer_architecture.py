@@ -55,6 +55,8 @@ def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
     assert "Verify-Signature" in update
     assert "runtime_version" in update
     assert "codex-team-skills" in update
+    assert ".codex\\plugins\\cache\\codex-team-skills" in update
+    assert "Invalidate-CodexPluginCache" in update
 
     assert "Unregister-ScheduledTask" in uninstall
     assert "marketplace.json" in uninstall
@@ -81,7 +83,10 @@ def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
     assert "verify_signature" in update
     assert "runtime_version" in update
     assert "team-skills-registry.py" in update
-    assert ".codex/plugins/cache" not in update
+    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in update
+    assert "invalidate_codex_plugin_cache" in update
+    assert '"refresh-team-skills.command"' in update
+    assert "$support_dest.next" in update
 
     assert "launchctl unload" in uninstall
     assert "marketplace.json" in uninstall
@@ -103,12 +108,22 @@ def test_user_docs_do_not_require_github_desktop() -> None:
 
 def test_ci_builds_validated_release_bundle() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
-    job = workflow["jobs"]["pytest"]
-    step_text = "\n".join(str(step) for step in job["steps"])
+    pytest_job = workflow["jobs"]["pytest"]
+    pytest_step_text = "\n".join(str(step) for step in pytest_job["steps"])
+    bundle_job = workflow["jobs"]["build-release-bundle"]
+    bundle_step_text = "\n".join(str(step) for step in bundle_job["steps"])
 
-    assert "python -m pytest" in step_text
-    assert "scripts/build_release_bundle.py" in step_text
-    assert "actions/upload-artifact" in step_text
+    assert "python -m pytest" in pytest_step_text
+    assert "scripts/build_release_bundle.py" in bundle_step_text
+    assert "actions/upload-artifact" in bundle_step_text
+    assert bundle_job["if"] == "needs.release-scope.outputs.run_release_checks == 'true'"
+    assert bundle_job["needs"] == [
+        "pr-governance",
+        "installer-release-gate",
+        "release-scope",
+        "pytest",
+        "claude-sync-smoke",
+    ]
 
     build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
     assert "team-skills-bundle.zip" in build_script

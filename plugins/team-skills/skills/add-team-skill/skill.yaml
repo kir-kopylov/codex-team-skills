@@ -1,6 +1,6 @@
 owner: "@kir-kopylov"
 authors:
-  - "Марина Вострикова"
+  - "коллега из команды"
 status: "team-ready"
 summary: "Ведёт автора через discovery, создание, проверку и публикацию нового командного skill по правилам repo."
 use_cases:
@@ -29,4 +29,4 @@ example_files:
   - "examples/anti-01-one-off-prompt.md"
   - "examples/anti-02-private-data.md"
 last_reviewed: "2026-06-05"
-source_asset: "Discovery Gate draft передан Мариной Востриковой; интегрирован как repo-grade discovery и ownership gate."
+source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."

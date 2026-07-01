@@ -1,0 +1,29 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Безопасно проводит локальный WIP или старый commit через clean PR, merge и branch cleanup без смешения чужих изменений."
+use_cases:
+  - "Вынести локальный WIP или старый commit в отдельную ветку от актуального origin/main, прогнать проверки и открыть draft PR."
+  - "После merge вернуть repo в чистое состояние: обновить main, удалить merged local branches и безопасно убрать remote branch clutter."
+  - "Классифицировать stale remote branches без PR и решить, что удалить, сохранить или пересобрать как новый PR."
+do_not_use_for:
+  - "Обычный учебный вопрос про git без действия в repo."
+  - "Глубокий debug GitHub Actions логов; для этого нужен отдельный статус-интерпретатор CI."
+  - "Destructive cleanup, reset --hard, массовое удаление веток или force-push без доказанного scope."
+natural_triggers:
+  - "вынеси это в отдельную ветку"
+  - "сохрани старый commit"
+  - "сделай PR, но не смешивай"
+  - "PR смержен, что теперь?"
+  - "убери branch clutter"
+  - "почисти remote branches"
+  - "можно архивировать после PR?"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-06-29"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Workflow извлечён из сессии с переносом marketplace/verify WIP в clean PR и последующей уборкой local/remote branches."

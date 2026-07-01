@@ -7,11 +7,51 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  pr-governance:
+    name: PR title/body governance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check PR title/body policy
+        run: python3 scripts/check_pr_governance.py metadata
+
+  installer-release-gate:
+    name: Installer/release protected paths gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check protected installer/release paths
+        run: python3 scripts/check_pr_governance.py protected-paths
+
+  release-scope:
+    name: Release/installer scope
+    runs-on: ubuntu-latest
+    outputs:
+      run_release_checks: ${{ steps.detect.outputs.run_release_checks }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release/installer scope
+        id: detect
+        run: python3 scripts/check_pr_governance.py release-scope | tee -a "$GITHUB_OUTPUT"
+
   pytest:
-    name: pytest, language policy и release-bundle
+    name: pytest, language policy и privacy gates
     runs-on: ubuntu-latest
 
     steps:
@@ -30,6 +70,27 @@ jobs:
       - name: Run tests and language policy checks
         run: python -m pytest
 
+  build-release-bundle:
+    name: Build installable team-skills bundle
+    runs-on: ubuntu-latest
+    if: needs.release-scope.outputs.run_release_checks == 'true'
+    needs:
+      - pr-governance
+      - installer-release-gate
+      - release-scope
+      - pytest
+      - claude-sync-smoke
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
       - name: Build installable team-skills bundle
         run: python scripts/build_release_bundle.py
 
@@ -42,7 +103,8 @@ jobs:
   windows-powershell-smoke:
     name: Windows PowerShell 5.1 release asset smoke
     runs-on: windows-latest
-    needs: pytest
+    if: needs.build-release-bundle.result == 'success'
+    needs: build-release-bundle
 
     steps:
       - name: Download installable bundle artifact
@@ -89,13 +151,33 @@ jobs:
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly
           }
 
+  claude-sync-smoke:
+    name: Claude skills folder sync smoke
+    runs-on: ubuntu-latest
+    needs: pytest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync team skills into a temp Claude skills folder
+        run: |
+          set -euo pipefail
+          dest="$(mktemp -d -t 'claude skills test.XXXXXX')"
+          mkdir -p "$dest/local-only"
+          printf '%s\n' '---' 'name: local-only' 'description: local only' '---' '# Local Only' > "$dest/local-only/SKILL.md"
+          CLAUDE_SKILLS_DIR="$dest" ./scripts/pull-skills.sh
+          test -f "$dest/add-team-skill/SKILL.md"
+          test -f "$dest/local-only/SKILL.md"
+
   publish:
     name: Publish immutable validated bundle
     runs-on: ubuntu-latest
     needs:
-      - pytest
       - windows-powershell-smoke
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
 
     steps:
       - name: Download installable bundle artifact

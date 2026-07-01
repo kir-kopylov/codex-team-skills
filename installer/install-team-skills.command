@@ -29,6 +29,7 @@ install_support_file "bootstrap-team-skills.sh"
 install_support_file "update-team-skills.sh"
 install_support_file "uninstall-team-skills.command"
 install_support_file "team-skills-status.command"
+install_support_file "refresh-team-skills.command"
 install_support_file "team-skills-registry.py"
 install_support_file "team-skills-public-key.pem"
 
