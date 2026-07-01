@@ -303,3 +303,13 @@ changes here must keep the tests and the Russian user-facing messages intact.
   step that waits for a separate publish request each time.
 - Always show the scope of what will be sent before push - that is about
   transparency, not about asking permission.
+- This repo has an automated `chatgpt-codex-connector[bot]` reviewer that
+  comments on pull requests. Treat its comments as required triage, not
+  optional noise: after opening or updating a PR, read what it posted. If you
+  agree with a finding, fix it and push the fix. If you disagree, or you have
+  a different read of the tradeoff, reply to the comment and explain your
+  reasoning instead of silently ignoring it - do not just let it sit
+  unanswered either way. The bot's own comments are exempt from the
+  Russian-language PR-comment gate (`pr-language.yml`, sender-type check), but
+  your replies are not: write them in Russian like any other human-facing PR
+  comment, per `language-policy.md`.
