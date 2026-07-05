@@ -29,5 +29,7 @@ example_files:
   - "examples/anti-01-execute-task.md"
   - "examples/anti-02-one-shot-rewrite.md"
   - "examples/anti-03-declarative-memory.md"
+  - "examples/anti-04-authority-as-flag.md"
+  - "examples/anti-05-unsatisfiable-final.md"
 last_reviewed: "2026-07-04"
 source_asset: "Сформирован из обезличенного рабочего чата о shaping /goal-контракта; raw transcript, личные пути и приватные данные в repo не переносились."
