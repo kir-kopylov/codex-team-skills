@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Пишет sanitized feedback по использованию goal-contract-shaper в локальный JSONL."""
+"""Пишет sanitized feedback по использованию skill в локальный JSONL.
+
+Имя skill выводится из имени папки skill: скрипт лежит в
+`plugins/team-skills/skills/<skill-name>/scripts/log_usage_feedback.py`,
+поэтому копия одинакова для всех skills и не требует правок при копировании.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+SKILL_NAME = Path(__file__).resolve().parents[1].name
 MAX_FIELD_LEN = 1200
 
 REDACTION_PATTERNS = [
@@ -76,10 +82,10 @@ def main() -> None:
     parser.add_argument("--improve", default="unknown", help="Что стоит доработать")
     parser.add_argument("--outcome", default="unknown", help="Итог использования: ready, stopped, not-applicable, unknown")
     parser.add_argument("--context", default="unknown", help="Короткий обезличенный контекст без raw transcript")
-    parser.add_argument("--log", default="", help="Путь к JSONL; по умолчанию ~/.codex/skill-runs/goal-contract-shaper/usage-feedback.jsonl")
+    parser.add_argument("--log", default="", help="Путь к JSONL; по умолчанию ~/.codex/skill-runs/<skill-name>/usage-feedback.jsonl")
     args = parser.parse_args()
 
-    default_log = Path.home() / ".codex" / "skill-runs" / "goal-contract-shaper" / "usage-feedback.jsonl"
+    default_log = Path.home() / ".codex" / "skill-runs" / SKILL_NAME / "usage-feedback.jsonl"
     log_path = Path(args.log).expanduser() if args.log else default_log
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -92,7 +98,7 @@ def main() -> None:
 
     record = {
         "ts": datetime.now(timezone.utc).isoformat(),
-        "skill": "goal-contract-shaper",
+        "skill": SKILL_NAME,
         "liked": fields["liked"],
         "improve": fields["improve"],
         "outcome": fields["outcome"],

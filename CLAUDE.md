@@ -67,7 +67,8 @@ plugins/team-skills/
     examples/                      # good-*.md and anti-*.md evidence files
     references/                    # OPTIONAL: domain-playbook.md / heavier reference docs
     agents/openai.yaml             # OPTIONAL: UI name / short description / default prompt
-    scripts/                       # OPTIONAL: skill-specific helper scripts
+    scripts/                       # skill-specific helper scripts; log_usage_feedback.py is
+                                   #   REQUIRED (byte-identical copy of scripts/templates/)
 catalog.md                         # human catalog of team-ready skills
 README.md / quickstart.md          # entry docs (Russian)
 START_HERE_CONNECT_CODEX_SKILLS.md # the file a colleague sends to Codex to onboard
@@ -78,7 +79,8 @@ docs/                              # platform-overview.md, seed-skill-example.md
 installer/                         # signed user-mode install / update / status / uninstall
                                    #   + bootstrap-*, refresh-team-skills.command
 scripts/                           # install_plugin.sh, new_skill.py,
-                                   #   build_release_bundle.py, pull-skills.sh
+                                   #   build_release_bundle.py, pull-skills.sh,
+                                   #   templates/log_usage_feedback.py (canonical copy)
 tests/                             # pytest suite (see Testing & CI)
 .agents/plugins/marketplace.json   # local marketplace entry pointing at the plugin (Codex)
 .claude-plugin/marketplace.json    # native Claude Code marketplace entry (codex-team-skills)
@@ -113,10 +115,12 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 
    The name is normalized to `kebab-case` and must match the folder name. Avoid
    generic names like `helper`, `workflow`, `assistant`. The generator scaffolds
-   `SKILL.md` (including the `## Логирование Сбоев` section),
-   `skill.yaml`, an empty `known-exceptions.yaml` (`exceptions: []`), and five
-   example stubs. If the skill already exists, edit it in place — do not re-run
-   the generator (it refuses to overwrite).
+   `SKILL.md` (including the `## Опрос После Использования` and
+   `## Логирование Сбоев` sections), `skill.yaml`, an empty
+   `known-exceptions.yaml` (`exceptions: []`), a copy of
+   `scripts/templates/log_usage_feedback.py`, and five example stubs. If the
+   skill already exists, edit it in place — do not re-run the generator (it
+   refuses to overwrite).
 
 2. **Fill in** `SKILL.md`, `skill.yaml`, and `examples/`. The `description` in
    `SKILL.md` frontmatter is the routing mechanism: it must include the natural
@@ -158,13 +162,16 @@ End users instead use the signed installers in `installer/` (documented in
 `quickstart.md`). `scripts/build_release_bundle.py` builds the validated
 release bundle that CI signs and publishes.
 
-## Failure-Learning System (known-exceptions)
+## Feedback-Learning System (known-exceptions + usage feedback)
 
 This repo ships a lightweight v1 loop for teaching skills from their own
-mistakes. The full design is in `docs/skill-exception-learning.md`; the
-honest maturity note there matters — the automated half of the loop has not
-been run end-to-end, so today's real value is the pre-filled
-`known-exceptions.yaml` entries.
+mistakes and from user feedback. The full design is in
+`docs/skill-exception-learning.md`; the honest maturity note there matters —
+the automated half of the loop has not been run end-to-end, so today's real
+value is the pre-filled `known-exceptions.yaml` entries and the mandatory
+feedback-collection contracts below. There are two private channels:
+model-observed failures (`exception-log.jsonl`) and an explicit post-use user
+survey (`usage-feedback.jsonl`).
 
 - **Every skill must have `known-exceptions.yaml`** next to `SKILL.md`
   (enforced by `tests/test_known_exceptions.py`). Minimal content is
@@ -176,14 +183,29 @@ been run end-to-end, so today's real value is the pre-filled
   cards at the private local log
   `~/.codex/skill-runs/<skill-name>/exception-log.jsonl`, and states
   `Raw logs не коммитить`. The generator emits this; do not delete it.
+- **Every `SKILL.md` must carry a `## Опрос После Использования` section
+  BEFORE `## Логирование Сбоев`** (enforced by `tests/test_usage_feedback.py`).
+  It asks the user, once per run after the final deliverable or an explicit
+  stop, what was useful and what to improve (with a "пропустить" opt-out), and
+  saves the sanitized answer to
+  `~/.codex/skill-runs/<skill-name>/usage-feedback.jsonl` via the bundled
+  `scripts/log_usage_feedback.py`. The honesty phrase
+  «не делайте вид, что лог сохранён» and a "не коммитить" privacy clause are
+  required strings. The timing sentence is per-skill; the rest is canonical.
+- **Every skill must ship `scripts/log_usage_feedback.py`** as a byte-identical
+  copy of `scripts/templates/log_usage_feedback.py` (enforced by
+  `tests/test_usage_feedback.py`). The script derives the skill name from its
+  folder — edit the template and re-copy it to all skills, never patch one copy.
 - **Raw failure logs stay private** (outside the repo). Only sanitized
   knowledge is promoted into the repo: a cleaned `known-exceptions.yaml` entry,
   a `SKILL.md` edit, a `references/domain-playbook.md` patch, a synthetic
   good/anti example, or a regression test. Never commit raw logs, PII, private
   paths, tokens, client transcripts, or screenshots.
 - Two skills operate this loop: `skill-exception-reviewer` (turns sanitized
-  cards into a patch *proposal* without applying it) and `skill-methodologist`
-  (designs the skill contract up front).
+  failure cards AND usage-feedback cards into a patch *proposal* without
+  applying it) and `skill-methodologist` (designs the skill contract up front).
+  Survey wishes become `SKILL.md`/example edits in the proposal;
+  `known-exceptions.yaml` entries are reserved for failures.
 
 ## references/ and domain playbooks
 
@@ -206,8 +228,8 @@ language keys); a generic, interface-independent failure does not need one.
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
   `tests/test_skill_structure.py`). `name` must equal the folder name and be
   `kebab-case`. Keep the body short and procedural (overview, natural inputs,
-  process, boundaries/safety, `## Логирование Сбоев`) — push long reference
-  material into `references/`.
+  process, boundaries/safety, `## Опрос После Использования`,
+  `## Логирование Сбоев`) — push long reference material into `references/`.
 - **`skill.yaml` schema** requires: `owner` (starts with `@`, not a placeholder
   like `@owner`/`@github-login`), `status` (one of the allowed values),
   `summary`, `use_cases`, `do_not_use_for`, `natural_triggers`, `example_files`,
@@ -280,7 +302,8 @@ changes here must keep the tests and the Russian user-facing messages intact.
 - The suite is organized by concern:
   - structure & registry: `test_skill_structure.py`, `test_registry.py`,
     `test_catalog.py`, `test_examples.py`, `test_known_exceptions.py`,
-    `test_domain_playbook.py`, `test_plugin_manifest.py`
+    `test_usage_feedback.py`, `test_domain_playbook.py`,
+    `test_plugin_manifest.py`
   - safety & policy: `test_privacy.py`, `test_language_policy.py`,
     `test_mac_app_uninstaller.py`
   - per-skill behavior: `test_dopsoglasheniya_po_oplate.py`,
