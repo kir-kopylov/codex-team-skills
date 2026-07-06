@@ -28,21 +28,25 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
     email = "ivan.petrov" + "@" + "example.com"
     phone = "+" + "7 (999) 123-45-67"
     token = "sk-" + ("a" * 24)
+    fine_grained_pat = "github_pat_" + ("a" * 24)
     mac_path = "/Users" + "/alice/Documents/private/SKILL.md"
+    linux_path = "/home" + "/alice/project/private.txt"
     windows_path = "C:" + "\\Users\\Bob\\Desktop\\note.txt"
     record = run_feedback_logger(
         tmp_path,
         "--liked",
-        f"нашел проблему в {mac_path} и {windows_path}",
+        f"нашел проблему в {mac_path}, {linux_path} и {windows_path}",
         "--improve",
         f"ответить на {email} или {phone}",
         "--context",
-        f"url https://example.test/callback?token=secret-value&ok=1 key=plain-secret {token}",
+        f"url https://example.test/callback?token=secret-value&ok=1 key=plain-secret {token} {fine_grained_pat}",
     )
 
     combined = json.dumps(record, ensure_ascii=False)
     assert mac_path not in combined
+    assert linux_path not in combined
     assert windows_path not in combined
+    assert fine_grained_pat not in combined
     assert email not in combined
     assert phone not in combined
     assert "secret-value" not in combined

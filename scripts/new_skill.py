@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = ROOT / "plugins" / "team-skills" / "skills"
+TEMPLATES_DIR = ROOT / "scripts" / "templates"
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -74,6 +75,25 @@ TODO: Опишите минимальный процесс принятия ре
 
 TODO: Укажите, когда skill нельзя использовать, что нужно сохранить и чего нужно избегать.
 
+## Опрос После Использования
+
+TODO: укажите момент опроса под процесс этого skill. Опрос задаётся один раз — после сдачи финального результата или явного стопа, не посреди рабочего цикла. Если пользователь уже ответил «пропустить» в этой сессии, не переспрашивайте.
+
+```text
+Опрос по skill:
+1. Что в этом использовании {skill_name} было полезно?
+2. Что стоит доработать в skill или его формате?
+Можно ответить коротко или написать "пропустить".
+```
+
+Если пользователь ответил, сохраните санированную карточку в `~/.codex/skill-runs/{skill_name}/usage-feedback.jsonl` — лучше через bundled script:
+
+```bash
+python3 scripts/log_usage_feedback.py --liked "..." --improve "..." --outcome "..."
+```
+
+Script перед записью редактирует приватные пути, контакты и token-like строки и сохраняет в JSONL `redaction_applied` и `redaction_types`. Если запись невозможна из-за sandbox, прав или отсутствия tools, не делайте вид, что лог сохранён: скажите об этом и покажите короткую JSONL-карточку для ручного сохранения. Raw-ответы, контакты, пути и секреты не коммитить.
+
 ## Логирование Сбоев
 
 Перед выполнением прочитайте локальный `known-exceptions.yaml` как список уже известных случаев и применяйте подходящее `do_next_time` без нового поиска.
@@ -106,6 +126,11 @@ last_reviewed: "{today}"
     )
 
     write_new(skill_dir / "known-exceptions.yaml", "exceptions: []\n")
+
+    write_new(
+        skill_dir / "scripts" / "log_usage_feedback.py",
+        (TEMPLATES_DIR / "log_usage_feedback.py").read_text(encoding="utf-8"),
+    )
 
     for filename, kind in [
         ("good-01.md", "Хороший Пример"),
