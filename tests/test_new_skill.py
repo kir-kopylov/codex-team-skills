@@ -96,6 +96,7 @@ def test_generator_creates_expected_files(monkeypatch, tmp_path) -> None:
         "SKILL.md",
         "skill.yaml",
         "known-exceptions.yaml",
+        "scripts/log_usage_feedback.py",
         "examples/good-01.md",
         "examples/good-02.md",
         "examples/good-03.md",
@@ -128,6 +129,25 @@ def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     assert "known-exceptions.yaml" in body
     assert "exception-log.jsonl" in body
     assert "Raw logs не коммитить" in body
+
+    # контракт опроса после использования (как требует test_usage_feedback)
+    assert body.index("## Опрос После Использования") < body.index("## Логирование Сбоев")
+    survey = body.split("## Опрос После Использования", 1)[1].split("\n## ", 1)[0]
+    for phrase in (
+        "1. Что в этом использовании shape-check было полезно?",
+        "2. Что стоит доработать в skill или его формате?",
+        '"пропустить"',
+        "~/.codex/skill-runs/shape-check/usage-feedback.jsonl",
+        "scripts/log_usage_feedback.py",
+        "не делайте вид, что лог сохранён",
+        "не коммитить",
+    ):
+        assert phrase in survey, f"в сгенерированном блоке опроса нет строки {phrase!r}"
+
+    # копия скрипта фидбека байт-идентична шаблону
+    template = (ROOT / "scripts" / "templates" / "log_usage_feedback.py").read_text(encoding="utf-8")
+    generated = (skill_dir / "scripts" / "log_usage_feedback.py").read_text(encoding="utf-8")
+    assert generated == template
 
 
 def test_generated_known_exceptions_is_empty_template(monkeypatch, tmp_path) -> None:
