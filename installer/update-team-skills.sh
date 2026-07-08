@@ -20,7 +20,7 @@ CODEX_PLUGIN_CACHE_DIR="${CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR:-$HOME/.codex
 PUBLIC_KEY_PATH="${CODEX_TEAM_SKILLS_PUBLIC_KEY:-$BIN_DIR/team-skills-public-key.pem}"
 # Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
 # Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
-EXPECTED_PUBLIC_KEY_SHA256="aae77791f909a42f5f04198ce7418112cb86864c5440f351e27bc6c39fe6e6b2"
+EXPECTED_PUBLIC_KEY_SHA256="6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 REGISTRY_HELPER="${CODEX_TEAM_SKILLS_REGISTRY_HELPER:-$BIN_DIR/team-skills-registry.py}"
 STATE_PATH="$STATE_DIR/state.json"
 LOG_PATH="$LOG_DIR/team-skills-update.log"

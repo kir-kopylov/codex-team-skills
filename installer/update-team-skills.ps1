@@ -24,7 +24,7 @@ $CodexPluginCacheDir = if ($env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR) { $env
 $PublicKeyPath = if ($env:CODEX_TEAM_SKILLS_PUBLIC_KEY) { $env:CODEX_TEAM_SKILLS_PUBLIC_KEY } else { Join-Path $BinDir "team-skills-public-key.pem" }
 # Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
 # Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
-$ExpectedPublicKeySha256 = "aae77791f909a42f5f04198ce7418112cb86864c5440f351e27bc6c39fe6e6b2"
+$ExpectedPublicKeySha256 = "6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 $StatePath = Join-Path $StateDir "state.json"
 $LogPath = Join-Path $LogDir "team-skills-update.log"
 $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
