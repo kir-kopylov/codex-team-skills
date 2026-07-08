@@ -1,0 +1,4 @@
+interface:
+  display_name: "Goal Contract Shaper v3"
+  short_description: "Собирает экспериментальный /goal-контракт с усиленным completion gate"
+  default_prompt: "Используй $goal-contract-shaper-v3, чтобы разложить сырую цель как процесс создания ценности и довести ее до проверяемого /goal-контракта с completion gate."

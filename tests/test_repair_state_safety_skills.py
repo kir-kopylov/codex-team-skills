@@ -5,6 +5,7 @@ from conftest import ROOT, load_registry
 
 SPLIT_BRAIN = ROOT / "plugins" / "team-skills" / "skills" / "windows-app-connectivity-split-brain"
 GOAL_SHAPER = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper"
+GOAL_SHAPER_V3 = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper-v3"
 SKILL_METHODOLOGIST = ROOT / "plugins" / "team-skills" / "skills" / "skill-methodologist"
 
 
@@ -39,6 +40,26 @@ def test_goal_contract_shaper_requires_completion_gate_for_false_completion_risk
         "forbidden false positives",
         "close allowed: yes/no",
         "процесс, форма входа, spinner, старый скрин или CLI-тест",
+    ):
+        assert fragment in body
+
+
+def test_goal_contract_shaper_v3_is_explicit_experimental_completion_gate_variant() -> None:
+    body = (GOAL_SHAPER_V3 / "SKILL.md").read_text(encoding="utf-8")
+    registry = load_registry(GOAL_SHAPER_V3)
+
+    assert registry["status"] == "experimental"
+    for fragment in (
+        "экспериментальный team skill `goal-contract-shaper-v3`",
+        "@kir-kopylov",
+        "## Completion Gate",
+        "user-visible success",
+        "direct evidence",
+        "forbidden false positives",
+        "close allowed: yes/no",
+        "CLI/PowerShell/Codex sandbox",
+        "Эпистемический гейт",
+        "Грант = след, а не жест",
     ):
         assert fragment in body
 
