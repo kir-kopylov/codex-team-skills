@@ -70,7 +70,7 @@ def test_team_ready_skills_have_complete_publish_package() -> None:
         assert_nonempty_list(registry, "example_files", skill_dir / "skill.yaml")
 
         listed_examples = set(registry["example_files"])
-        actual_examples = {str(path.relative_to(skill_dir)) for path in examples_dir.glob("*.md")}
+        actual_examples = {path.relative_to(skill_dir).as_posix() for path in examples_dir.glob("*.md")}
         assert listed_examples == actual_examples, (
             f"{skill_dir.name} team-ready example_files must match examples/*.md exactly: "
             f"listed={sorted(listed_examples)}, actual={sorted(actual_examples)}"

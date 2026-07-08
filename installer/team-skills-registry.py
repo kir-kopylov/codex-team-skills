@@ -96,7 +96,7 @@ def strip_managed_content(text: str) -> str:
 
 def managed_block(marketplace_root: Path) -> str:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    source = str(marketplace_root.expanduser()).replace("\\", "/")
+    source = str(marketplace_root.expanduser())
     return (
         f"{BEGIN_MARKER}\n"
         f"{MARKETPLACE_HEADER}\n"

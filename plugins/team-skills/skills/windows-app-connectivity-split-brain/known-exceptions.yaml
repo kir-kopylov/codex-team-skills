@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Терминальный тест успешен, но целевое GUI-приложение всё равно показывает offline."
+    root_cause: "CLI/Codex sandbox, браузер и GUI-приложение могут использовать разные proxy, DNS, маршруты, долгоживущие соединения и профиль приложения."
+    do_next_time: "Не закрывать диагностику по терминальному тесту; разложить наблюдения по layer matrix и требовать прямое свежее evidence из целевого приложения."
+    source_example: "examples/anti-01.md"
+  - symptom: "Экран входа, spinner или форма телефона засчитаны как доказательство, что приложение работает."
+    root_cause: "Косвенный UI-признак подменяет user-visible success condition, хотя сеть, авторизация или протокол ещё не доказаны."
+    do_next_time: "Сформировать completion gate: direct evidence, forbidden false positives, freshness, human gate и contradiction check; не закрывать цель без прямого финального признака."
+    source_example: "examples/good-01.md"
+  - symptom: "Один и тот же шаг повторяется несколько раз, хотя состояние VPN/proxy/DNS/UI не изменилось."
+    root_cause: "Журнал фиксирует действие, но не связывает запрет повтора с state fingerprint."
+    do_next_time: "Записывать fingerprint и запрещать same-state repeat; разрешать повтор только после изменения слоя, который мог повлиять на результат."
+    source_example: "examples/good-03.md"

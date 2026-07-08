@@ -5,10 +5,13 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from conftest import ROOT, skill_dirs
 
 
 SCRIPT = ROOT / "scripts" / "pull-skills.sh"
+pytestmark = pytest.mark.skipif(shutil.which("bash") is None, reason="нужен bash для Claude folder-sync smoke")
 
 
 def run_sync(destination: Path) -> subprocess.CompletedProcess[str]:

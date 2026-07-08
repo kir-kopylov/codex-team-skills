@@ -112,6 +112,22 @@ Skill со script нужен, если задача включает повто�
 
 Практическое правило: если неправильный parsing, arithmetic или reconciliation materially повредит результат, нужен script.
 
+## Incident-To-Library Decision
+
+После длинного провального чата или repair-инцидента не начинайте с вопроса "какой новый skill создать". Сначала выберите форму переноса урока:
+
+```text
+new skill
+patch existing skill
+shared reference
+script
+no library change
+```
+
+Отдельный skill нужен только если есть повторяемая задача с похожими входами, стабильным результатом, естественными триггерами и собственным workflow. Если урок является стопором перед завершением, форматом журнала, списком типовых провалов или проверкой evidence, чаще нужен patch существующего skill или shared reference. Если ошибка связана с парсингом журнала, сборкой state bundle или сверкой повторов, нужен script или schema-format.
+
+Анти-правило: не превращайте каждый болезненный чат в новый catalog row. Библиотека становится сильнее, когда общий стопор стоит в точке ошибки, а не когда одна и та же защита размножена под разными именами.
+
 ## Что Куда Класть
 
 В `SKILL.md` кладите trigger conditions, workflow, rules, anti-rules, output format, script decision и validation requirements.
