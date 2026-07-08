@@ -6,7 +6,26 @@
 
 ## Ожидаемое Поведение
 
-Агент применяет skill, выписывает старую рамку: "чинить app-level proxy". Затем отделяет false-positive признаки: listener доказал только локальный порт, TCP доказал только соединение, welcome screen не доказал рабочий UI. Агент ищет несколько похожих кейсов, выделяет общий паттерн "приложение должно идти через system-level VPN/TUN, а не через встроенный proxy", и возвращает один локальный gate: проверить наличие TUN interface/routes и процесс VPN core. После gate агент делает только действие, которое проверяет новую ветку.
+Агент не продолжает app-level proxy ветку. Он заполняет поля:
+
+```text
+outcome: видны чаты/обновления или сканируемый QR
+current_state: proxy selected, connecting..., QR не отрисован
+old_layer: app-config / local-env-proxy
+same_state_count: 2
+false_positive_signals: listener, TCP established, VPN UI connected, welcome screen
+```
+
+Затем агент строит `state_fingerprint`, `layer_ledger` и `external_case_matrix`. Похожие кейсы принимаются только если дают `local_observable`, например TUN interface, маршруты, VPN core process, DNS path. Новый `Pivot gate`:
+
+```text
+gate: проверить system-level route-interface/vpn-core вместо app-level proxy
+action_owner: assistant
+expected_observation: активный TUN/interface и route для приложения или их отсутствие
+falsifier: TUN/routes есть, но приложение всё равно не достигает outcome при свежем UI check
+rollback: не менять настройки приложения; только read-only проверка routes/processes
+stop_after: один no-outcome с тем же fingerprint закрывает эту ветку
+```
 
 ## Нельзя
 

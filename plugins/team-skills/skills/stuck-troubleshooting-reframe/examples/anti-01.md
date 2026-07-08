@@ -6,7 +6,16 @@
 
 ## Ожидаемое Поведение
 
-Skill не должен сразу делать external-case reframe. Агент сначала просит один критический факт: скрин, текст ошибки или команду для проверки процесса. Без базового outcome и текущего факта reframe будет фантазией.
+Skill не должен сразу делать external-case reframe. Агент останавливается:
+
+```text
+stop_condition: нет outcome/current_state
+missing_field: current_state
+next_step: попросить один скрин, текст ошибки или команду проверки процесса
+check: после факта можно заполнить state_fingerprint
+```
+
+Без базового outcome и текущего факта reframe будет фантазией.
 
 ## Нельзя
 

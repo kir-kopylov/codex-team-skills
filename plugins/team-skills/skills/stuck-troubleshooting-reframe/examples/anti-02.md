@@ -6,7 +6,15 @@ Unit test падает с точной assertion: expected `404`, got `200`. К�
 
 ## Ожидаемое Поведение
 
-Skill не нужен. Агент должен исправить код или тест по обычному engineering workflow. Здесь нет затяжного repair-loop, ложных промежуточных признаков или необходимости external-case pivot.
+Skill не нужен:
+
+```text
+stop_condition: нет repair-loop
+gate: failing assertion напрямую проверяет bug
+next_step: исправить handler или тест обычным engineering workflow
+```
+
+Здесь нет затяжного loop, ложных промежуточных признаков или необходимости external-case pivot.
 
 ## Нельзя
 
