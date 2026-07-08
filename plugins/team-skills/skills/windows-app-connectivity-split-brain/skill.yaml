@@ -1,0 +1,26 @@
+owner: "@kir-kopylov"
+status: "experimental"
+summary: "Диагностирует split-brain-ситуации, когда конкретное Windows GUI-приложение не видит сеть при спорных VPN/proxy/DNS слоях."
+use_cases:
+  - "Конкретное Windows GUI-приложение показывает offline, хотя браузер, терминал, VPN UI или Windows могут выглядеть рабочими."
+  - "Нужно развести user-visible UI, процесс/сокеты, app proxy config, Windows proxy, DNS, routes/interfaces, VPN core и внешнюю доступность."
+  - "Нужно выбрать следующий эксперимент без повторения уже проверенных гипотез при том же state fingerprint."
+do_not_use_for:
+  - "Полностью мертвая сеть, где браузер, Windows и целевое приложение одновременно offline."
+  - "Терминальный случай `git`/`curl`/`pip` при живом браузере без конкретного GUI-приложения; для этого используйте vpn-terminal-doctor."
+  - "Microsoft Store или winget msstore install triage, если проблема уже сведена к Store-слою."
+  - "Обход блокировок, настройка VPN-провайдера или правка firewall/registry без отдельного решения пользователя."
+natural_triggers:
+  - "Telegram не видит интернет, хотя VPN включен"
+  - "браузер работает, а приложение не подключается"
+  - "Happ/VPN показывает connected, но app offline"
+  - "Windows-приложение не видит proxy"
+  - "приложение не работает через VPN, а терминал показывает другое"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-07-09"
+source_asset: "Сформирован из очищенных архитектурных уроков Telegram/Happ repair-чата: raw transcript, личные пути, приватные скрины, аккаунты и токены в repo не переносились."
