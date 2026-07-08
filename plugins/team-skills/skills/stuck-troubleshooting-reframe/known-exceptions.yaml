@@ -1,0 +1,5 @@
+exceptions:
+  - symptom: "Локальные признаки выглядят зелёными: listener, TCP established, connected UI, welcome screen или raw probe, но пользовательский outcome не достигнут, и агент предлагает повторить ту же ветку."
+    root_cause: "Агент перепутал промежуточный proxy-признак с причинным успехом и не сменил слой гипотезы после повторного no-outcome."
+    do_next_time: "До нового действия выписать false-positive признаки, закрыть старую ветку, найти 3 похожих кейса или явно отметить невозможность external check, затем вернуть один pivot-gate в другом слое."
+    source_example: "Санированный repair-loop: app-level proxy принимал локальные соединения, но UI заработал только после перехода на system-level TUN."
