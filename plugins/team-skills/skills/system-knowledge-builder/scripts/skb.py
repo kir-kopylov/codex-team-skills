@@ -17,6 +17,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlsplit, urlunsplit
 
 
 EVENT_TYPES = {
@@ -85,6 +86,22 @@ def artifact_id(kind: str, location: str) -> str:
     return f"artifact-{digest}"
 
 
+def iter_filesystem_paths(source: Path, excluded: set[str]) -> Iterable[Path]:
+    """Yield a deterministic, bounded-friendly walk without entering excluded trees."""
+    for root, directory_names, file_names in os.walk(source, topdown=True, followlinks=False):
+        directory_names[:] = sorted(
+            (name for name in directory_names if name not in excluded),
+            key=str.casefold,
+        )
+        names = sorted(
+            [*directory_names, *(name for name in file_names if name not in excluded)],
+            key=str.casefold,
+        )
+        root_path = Path(root)
+        for name in names:
+            yield root_path / name
+
+
 def inspect_filesystem(
     source: Path,
     *,
@@ -98,10 +115,8 @@ def inspect_filesystem(
     excluded = excludes or DEFAULT_EXCLUDES
     artifacts: list[dict[str, Any]] = []
     truncated = False
-    for path in sorted(source.rglob("*"), key=lambda item: item.as_posix().lower()):
+    for path in iter_filesystem_paths(source, excluded):
         relative = path.relative_to(source)
-        if any(part in excluded for part in relative.parts):
-            continue
         if len(artifacts) >= max_items:
             truncated = True
             break
@@ -149,12 +164,45 @@ def run_git(source: Path, *arguments: str, check: bool = True) -> str:
     return result.stdout.strip()
 
 
+def sanitize_git_remote_url(url: str) -> str:
+    """Drop credentials and query values before a remote can enter an evidence event."""
+    parsed = urlsplit(url)
+    if parsed.scheme and parsed.hostname:
+        host = parsed.hostname
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        if parsed.port:
+            host = f"{host}:{parsed.port}"
+        return urlunsplit((parsed.scheme, host, parsed.path, "", ""))
+
+    scp_style = re.match(r"^[^@/\s]+@(?P<host>[^:\s]+):(?P<path>.+)$", url)
+    if scp_style:
+        path = scp_style.group("path").split("?", 1)[0].split("#", 1)[0]
+        return f"{scp_style.group('host')}:{path}"
+
+    return re.sub(
+        r"(?i)([?&](?:access_)?(?:token|password|secret|key)=[^&\s]+)",
+        "?REDACTED",
+        url,
+    )
+
+
+def sanitize_git_remote_line(line: str) -> str:
+    fields = line.split(maxsplit=2)
+    if len(fields) < 2:
+        return line
+    return " ".join([fields[0], sanitize_git_remote_url(fields[1]), *fields[2:]])
+
+
 def inspect_git(source: Path) -> dict[str, Any]:
     source = source.resolve()
     top = Path(run_git(source, "rev-parse", "--show-toplevel")).resolve()
     branch = run_git(source, "branch", "--show-current", check=False) or None
     head = run_git(source, "rev-parse", "HEAD", check=False) or None
-    remotes = run_git(source, "remote", "-v", check=False).splitlines()
+    remotes = [
+        sanitize_git_remote_line(line)
+        for line in run_git(source, "remote", "-v", check=False).splitlines()
+    ]
     status = run_git(source, "status", "--short", "--branch", "--untracked-files=all")
     artifact = {
         "artifact_id": artifact_id("git_repository", str(top)),
@@ -376,6 +424,31 @@ def load_runtime_journal(state_root: Path, goalrt: str | None) -> list[dict[str,
     return events
 
 
+def promotion_blocking_claims(state: dict[str, Any], claim_ids: Iterable[str]) -> dict[str, str]:
+    return {
+        claim_id: state["claims"].get(claim_id, {}).get("state", "missing")
+        for claim_id in claim_ids
+        if state["claims"].get(claim_id, {}).get("state") not in PROMOTABLE_CLAIM_STATES
+    }
+
+
+def invalidate_promoted_documents(state: dict[str, Any], observed_at: str | None) -> None:
+    """Revoke an existing promotion when later claim evidence invalidates it."""
+    for document_id, document in state["documents"].items():
+        if document.get("promotion_status") != "promoted":
+            continue
+        bad = promotion_blocking_claims(state, document.get("claim_ids", []))
+        if not bad:
+            continue
+        document["promotion_status"] = "blocked"
+        document["blocking_claims"] = bad
+        document["promotion_invalidated_at"] = observed_at
+        document["updated_at"] = observed_at
+        state["errors"].append(
+            f"Document {document_id} promotion invalidated by claims {bad}"
+        )
+
+
 def project_domain_events(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
     state: dict[str, Any] = {
         "schema_version": "1.0",
@@ -432,6 +505,7 @@ def project_domain_events(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
                 claim["state"] = CLAIM_STATE_EVENTS[event_type]
                 claim["state_reason"] = payload.get("reason")
                 claim["updated_at"] = observed_at
+                invalidate_promoted_documents(state, observed_at)
         elif event_type == "unknown_opened":
             state["unknowns"][payload["unknown_id"]] = {
                 **payload,
@@ -469,11 +543,7 @@ def project_domain_events(events: Iterable[dict[str, Any]]) -> dict[str, Any]:
             }
         elif event_type == "document_promoted":
             claim_ids = payload["claim_ids"]
-            bad = {
-                claim_id: state["claims"].get(claim_id, {}).get("state", "missing")
-                for claim_id in claim_ids
-                if state["claims"].get(claim_id, {}).get("state") not in PROMOTABLE_CLAIM_STATES
-            }
+            bad = promotion_blocking_claims(state, claim_ids)
             document = {
                 **payload,
                 "source_event_id": event_id,

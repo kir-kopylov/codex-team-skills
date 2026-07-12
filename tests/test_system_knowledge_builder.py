@@ -71,6 +71,62 @@ def test_filesystem_adapter_is_path_first_and_excludes_runtime_noise(tmp_path: P
     assert payload["truncated"] is False
 
 
+def test_filesystem_adapter_prunes_excluded_trees_before_descending(
+    tmp_path: Path, monkeypatch
+) -> None:
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.py").write_text("print('ok')\n", encoding="utf-8")
+    (tmp_path / "node_modules").mkdir()
+
+    def walk_with_prune_check(source: Path, *, topdown: bool, followlinks: bool):
+        assert source == tmp_path
+        assert topdown is True
+        assert followlinks is False
+        directories = ["node_modules", "src"]
+        yield str(tmp_path), directories, []
+        assert "node_modules" not in directories
+        yield str(tmp_path / "src"), [], ["app.py"]
+
+    monkeypatch.setattr(skb.os, "walk", walk_with_prune_check)
+
+    payload = skb.inspect_filesystem(tmp_path)
+
+    assert [item["location"] for item in payload["artifacts"]] == ["src", "src/app.py"]
+
+
+def test_git_adapter_redacts_credential_bearing_remotes(tmp_path: Path, monkeypatch) -> None:
+    responses = {
+        ("rev-parse", "--show-toplevel"): str(tmp_path),
+        ("branch", "--show-current"): "main",
+        ("rev-parse", "HEAD"): "abc123",
+        (
+            "remote",
+            "-v",
+        ): (
+            "origin https://user:super-secret@git.example.test/team/repo.git?access_token=query-secret (fetch)\n"
+            "origin git@ssh.example.test:team/repo.git?token=query-secret (push)"
+        ),
+        ("status", "--short", "--branch", "--untracked-files=all"): "## main",
+    }
+
+    def fake_run_git(_source: Path, *arguments: str, check: bool = True) -> str:
+        del check
+        return responses[arguments]
+
+    monkeypatch.setattr(skb, "run_git", fake_run_git)
+
+    payload = skb.inspect_git(tmp_path)
+    remotes = payload["artifacts"][0]["remotes"]
+
+    assert remotes == [
+        "origin https://git.example.test/team/repo.git (fetch)",
+        "origin ssh.example.test:team/repo.git (push)",
+    ]
+    serialized = skb.canonical_json(payload)
+    assert "super-secret" not in serialized
+    assert "query-secret" not in serialized
+
+
 def test_csv_adapter_reports_quality_signals(tmp_path: Path) -> None:
     source = tmp_path / "input.csv"
     source.write_text("id,name\n1,A\n2,\n2,\n3,B,extra\n", encoding="utf-8")
@@ -150,6 +206,27 @@ def test_contradiction_blocks_stable_document_promotion() -> None:
     assert state["documents"]["D1"]["promotion_status"] == "blocked"
     assert state["documents"]["D1"]["blocking_claims"] == {"C1": "contradicted"}
     assert state["errors"]
+
+
+def test_later_claim_contradiction_revokes_existing_document_promotion() -> None:
+    state = skb.project_domain_events(
+        [
+            event("e1", "claim_proposed", {"claim_id": "C1", "text": "Current route is X."}),
+            event("e2", "claim_supported", {"claim_id": "C1"}),
+            event(
+                "e3",
+                "document_promoted",
+                {"document_id": "D1", "path": "docs/stable.md", "claim_ids": ["C1"]},
+            ),
+            event("e4", "claim_contradicted", {"claim_id": "C1", "reason": "Runtime differs."}),
+        ]
+    )
+
+    document = state["documents"]["D1"]
+    assert document["promotion_status"] == "blocked"
+    assert document["blocking_claims"] == {"C1": "contradicted"}
+    assert document["promotion_invalidated_at"] == "2026-07-12T00:00:04Z"
+    assert any("promotion invalidated" in error for error in state["errors"])
 
 
 def test_proven_claim_state_is_rejected() -> None:
