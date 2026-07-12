@@ -1,4 +1,8 @@
 exceptions:
+  - symptom: "Контракт содержит числовой budget и stop rule, но пользователь принимает их за автоматический hard enforcement без работающего runtime."
+    root_cause: "Shaper описал желаемое поведение исполнителя, не отделив текстовое условие от наблюдаемого счётчика и механизма запрета следующего tool call."
+    do_next_time: "После подтверждения передать draft владельцу schema через goalrt; показать hard/partial/advisory/uncovered, а без runtime прямо назвать режим supervised text-only."
+    source_example: "examples/anti-08-hard-token-budget.md"
   - symptom: "Ассистент начинает выполнять целевую задачу вместо shaping."
     root_cause: "Сырая цель выглядит как обычная практическая задача, и режим goal-shaper не удержан."
     do_next_time: "Сразу сказать, что skill не выполняет задачу и не запускает /goal; перейти к checklist и задать один вопрос."
