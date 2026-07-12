@@ -29,6 +29,9 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
     phone = "+" + "7 (999) 123-45-67"
     token = "sk-" + ("a" * 24)
     fine_grained_pat = "github_pat_" + ("a" * 24)
+    access_token = "compound-access-value"
+    refresh_token = "compound-refresh-value"
+    client_secret = "compound-client-value"
     mac_path = "/Users" + "/alice/Documents/private/SKILL.md"
     linux_path = "/home" + "/alice/project/private.txt"
     windows_path = "C:" + "\\Users\\Bob\\Desktop\\note.txt"
@@ -39,7 +42,11 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
         "--improve",
         f"ответить на {email} или {phone}",
         "--context",
-        f"url https://example.test/callback?token=secret-value&ok=1 key=plain-secret {token} {fine_grained_pat}",
+        (
+            "url https://example.test/callback?"
+            f"token=secret-value&access_token={access_token}&refresh_token={refresh_token}&"
+            f"client_secret={client_secret}&ok=1 key=plain-secret {token} {fine_grained_pat}"
+        ),
     )
 
     combined = json.dumps(record, ensure_ascii=False)
@@ -51,7 +58,13 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
     assert phone not in combined
     assert "secret-value" not in combined
     assert "plain-secret" not in combined
+    assert access_token not in combined
+    assert refresh_token not in combined
+    assert client_secret not in combined
     assert token not in combined
+    assert "access_token=[REDACTED_SECRET]" in combined
+    assert "refresh_token=[REDACTED_SECRET]" in combined
+    assert "client_secret=[REDACTED_SECRET]" in combined
     assert "[REDACTED_PATH]" in combined
     assert "[REDACTED_EMAIL]" in combined
     assert "[REDACTED_PHONE]" in combined
@@ -69,11 +82,13 @@ def test_feedback_logger_preserves_normal_feedback(tmp_path: Path) -> None:
         "сделать блоки короче",
         "--outcome",
         "ready",
+        "--context",
+        "monkey=banana token_type=bearer",
     )
 
     assert record["liked"] == "вопросы шли по одному"
     assert record["improve"] == "сделать блоки короче"
     assert record["outcome"] == "ready"
-    assert record["context"] == "unknown"
+    assert record["context"] == "monkey=banana token_type=bearer"
     assert record["redaction_applied"] is False
     assert record["redaction_types"] == []

@@ -31,7 +31,7 @@ REDACTION_PATTERNS = [
     ),
     (
         "url_secret",
-        re.compile(r"(?i)\b(token|api_key|key|password|secret)=([^&\s]+)"),
+        re.compile(r"(?i)\b((?:[a-z0-9]+[_-])*(?:token|key|password|secret))=([^&\s]+)"),
         lambda match: f"{match.group(1)}=[REDACTED_SECRET]",
     ),
     (
