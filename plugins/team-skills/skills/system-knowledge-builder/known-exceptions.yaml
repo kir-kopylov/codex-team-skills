@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "goalrt недоступен, но workflow продолжает обещать runtime journal и hard enforcement."
+    root_cause: "Domain skill подменил отсутствующий runtime текстовой имитацией."
+    do_next_time: "Запросить согласие на SUPERVISED_SOFT_MODE и записать отдельный observation batch, не journal.jsonl."
+    source_example: "examples/good-01.md"
+  - symptom: "Static source автоматически назван доказательством текущего production deployment."
+    root_cause: "Source-level claim смешан с live currentness."
+    do_next_time: "Открыть unknown с требованием датированного runtime evidence и запретить promotion."
+    source_example: "examples/good-03.md"
+  - symptom: "Skill пытается управлять budgets, retries или final approval."
+    root_cause: "Domain workflow захватил ответственность goal-runtime-enforcer."
+    do_next_time: "Остановить domain cycle и передать orchestration runtime plugin."
+    source_example: "examples/anti-02.md"
