@@ -1,0 +1,4 @@
+interface:
+  display_name: "System Knowledge Builder"
+  short_description: "Строит проверяемую карту знаний о системе"
+  default_prompt: "Используй $system-knowledge-builder, чтобы построить карту системы из claims, evidence и unknowns."

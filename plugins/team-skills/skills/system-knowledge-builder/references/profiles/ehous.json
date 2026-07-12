@@ -1,0 +1,18 @@
+{
+  "profile_id": "ehous",
+  "control_file": "doc/docs/ai-research/ROADMAP.md",
+  "research_roots": ["doc/docs/ai-research"],
+  "stable_doc_roots": ["doc/docs/ehous"],
+  "product_repo_policy": "read_only",
+  "sql_gate": {
+    "required_token": ["ALLOW_SELECT_ONLY", "NO_DB_ACCESS"],
+    "allow_select_only": "SELECT and metadata SELECT only; no PII or persistent side effects"
+  },
+  "forbidden": [
+    "product repository writes",
+    "SQL without the exact gate",
+    "credential guessing",
+    "static source presented as deployed runtime proof"
+  ],
+  "claim_states": ["proposed", "supported", "corroborated", "contradicted", "stale"]
+}

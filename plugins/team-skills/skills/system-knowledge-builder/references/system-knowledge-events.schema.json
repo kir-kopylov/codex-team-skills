@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/system-knowledge-builder/events.schema.json",
+  "title": "System Knowledge Domain Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_type", "payload"],
+  "properties": {
+    "event_type": {
+      "enum": [
+        "artifact_observed",
+        "claim_proposed",
+        "evidence_attached",
+        "claim_supported",
+        "claim_corroborated",
+        "claim_contradicted",
+        "claim_stale",
+        "unknown_opened",
+        "unknown_resolved",
+        "graph_node_changed",
+        "graph_edge_changed",
+        "observation_recorded",
+        "next_action_ranked",
+        "document_promoted"
+      ]
+    },
+    "payload": {"type": "object"}
+  }
+}

@@ -1,0 +1,23 @@
+owner: "@kir-kopylov"
+status: "experimental"
+summary: "Строит воспроизводимую карту системы из claims, evidence, unknowns, graph и stable-doc promotions."
+use_cases:
+  - "Инвентаризировать legacy system без преждевременной интерпретации."
+  - "Развести claims, evidence, contradictions и unknowns в воспроизводимую модель."
+  - "Собрать knowledge graph и безопасно продвигать подтверждённые stable docs."
+do_not_use_for:
+  - "Исполнение Goal, контроль budgets/retries/permissions или final approval."
+  - "Немедленную реализацию feature, bugfix или migration без этапа картирования."
+  - "Выдачу static source за доказательство текущего production runtime."
+natural_triggers:
+  - "построй карту этой системы"
+  - "собери claims, evidence и unknowns"
+  - "продолжи документирование по roadmap"
+  - "отдели research от stable docs"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-07-12"
