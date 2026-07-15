@@ -1,0 +1,861 @@
+#!/usr/bin/env python3
+"""Инвентаризирует Codex-session и проверяет evidence manifest по Git byte sources."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path, PurePosixPath
+from typing import Iterator, Sequence
+from urllib.parse import urlsplit, urlunsplit
+
+
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+THREAD_ID_RE = re.compile(r"^[0-9a-fA-F-]{16,64}$")
+TOOL_PATH_LITERAL_RE = re.compile(
+    r"\b(?:cwd|workdir)\s*:\s*(?:\"((?:\\.|[^\"\\])*)\"|'((?:\\.|[^'\\])*)')"
+)
+WINDOWS_ABSOLUTE_PATH_RE = re.compile(r'''[A-Za-z]:\\[^"'\r\n]+''')
+POSIX_QUOTED_PATH_RE = re.compile(r'''["'](/[^"'\r\n]+)["']''')
+ALLOWED_SOURCES = {"working", "index", "commit", "checkout"}
+LOCAL_STATE_ROOTS = {".codex", ".goal-runtime"}
+MAX_PATH_HINTS = 128
+LOCAL_STATE_FILES = {
+    ".codex-global-state.json",
+    "session_index.jsonl",
+}
+
+
+class RescueError(RuntimeError):
+    """Ожидаемая ошибка проверки с понятным сообщением для CLI."""
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sanitize_remote_url(raw_url: str) -> str:
+    """Удалить credentials, query и fragment, сохранив host/path для provenance."""
+
+    value = raw_url.strip()
+    if not value:
+        return value
+
+    if re.match(r"^[A-Za-z]:[\\/]", value) or value.startswith(("\\\\", "//")):
+        return value.split("?", 1)[0].split("#", 1)[0]
+
+    if "://" in value:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname or ""
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
+        port = f":{parsed.port}" if parsed.port else ""
+        safe_netloc = f"{hostname}{port}"
+        return urlunsplit((parsed.scheme, safe_netloc, parsed.path, "", ""))
+
+    scp_match = re.match(r"^(?:[^@/\s]+@)?([^:/\s]+):(.+)$", value)
+    if scp_match:
+        host, remote_path = scp_match.groups()
+        remote_path = remote_path.split("?", 1)[0].split("#", 1)[0]
+        return f"ssh://{host}/{remote_path.lstrip('/')}"
+
+    return value.split("?", 1)[0].split("#", 1)[0]
+
+
+def run_git_bytes(repo: Path, *arguments: str) -> bytes:
+    completed = subprocess.run(
+        ["git", "-C", str(repo), *arguments],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        message = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise RescueError(f"Git-команда не выполнена: git {' '.join(arguments)}: {message}")
+    return completed.stdout
+
+
+def run_git_text(repo: Path, *arguments: str) -> str:
+    return run_git_bytes(repo, *arguments).decode("utf-8", errors="replace").rstrip("\r\n")
+
+
+def resolve_commit(repo: Path, revision: str, label: str) -> str:
+    """Превратить недоверенную revision в OID до использования в других Git-командах."""
+
+    if not revision or "\0" in revision:
+        raise RescueError(f"{label} должен быть непустой Git revision")
+    try:
+        resolved = run_git_text(
+            repo,
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            f"{revision}^{{commit}}",
+        ).strip()
+    except RescueError as exc:
+        raise RescueError(f"{label} не разрешается в commit") from exc
+    if not GIT_OID_RE.fullmatch(resolved):
+        raise RescueError(f"{label} разрешился в неожиданный Git object id")
+    return resolved
+
+
+def optional_git_text(repo: Path, *arguments: str) -> str | None:
+    try:
+        value = run_git_text(repo, *arguments)
+    except RescueError:
+        return None
+    return value.strip() or None
+
+
+def parse_worktree_porcelain(text: str) -> list[dict[str, object]]:
+    worktrees: list[dict[str, object]] = []
+    current: dict[str, object] = {}
+
+    for line in [*text.splitlines(), ""]:
+        if not line:
+            if current:
+                worktrees.append(current)
+                current = {}
+            continue
+        key, _, value = line.partition(" ")
+        if key == "worktree":
+            current["path"] = value
+        elif key == "HEAD":
+            current["head"] = value
+        elif key == "branch":
+            current["branch"] = value.removeprefix("refs/heads/")
+        elif key in {"detached", "bare"}:
+            current[key] = True
+        elif key in {"locked", "prunable"}:
+            current[key] = value or True
+    return worktrees
+
+
+def status_summary(repo: Path) -> dict[str, int]:
+    lines = run_git_text(repo, "status", "--porcelain=v1", "--untracked-files=all").splitlines()
+    counts = {"staged": 0, "unstaged": 0, "untracked": 0}
+    for line in lines:
+        if line.startswith("??"):
+            counts["untracked"] += 1
+            continue
+        if len(line) >= 2 and line[0] != " ":
+            counts["staged"] += 1
+        if len(line) >= 2 and line[1] != " ":
+            counts["unstaged"] += 1
+    return counts
+
+
+def git_context_for_cwd(raw_cwd: str | None) -> dict[str, object]:
+    if not raw_cwd:
+        return {"cwd_status": "unknown"}
+
+    cwd = Path(raw_cwd).expanduser()
+    if not cwd.exists():
+        return {"cwd_status": "missing", "cwd": str(cwd)}
+    if not cwd.is_dir():
+        return {"cwd_status": "not_directory", "cwd": str(cwd)}
+
+    try:
+        repo_root = Path(run_git_text(cwd, "rev-parse", "--show-toplevel"))
+    except RescueError as exc:
+        return {"cwd_status": "not_git", "cwd": str(cwd), "detail": str(exc)}
+
+    remote_lines = run_git_text(repo_root, "remote", "-v").splitlines()
+    remotes: list[dict[str, str]] = []
+    for line in remote_lines:
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        kind = parts[2].strip("()") if len(parts) >= 3 else "unknown"
+        remotes.append(
+            {"name": parts[0], "url": sanitize_remote_url(parts[1]), "kind": kind}
+        )
+
+    branch = optional_git_text(repo_root, "branch", "--show-current")
+    return {
+        "cwd_status": "ok",
+        "cwd": str(cwd),
+        "repo_root": str(repo_root),
+        "git_common_dir": run_git_text(repo_root, "rev-parse", "--git-common-dir"),
+        "branch": branch,
+        "head": run_git_text(repo_root, "rev-parse", "HEAD"),
+        "upstream": optional_git_text(
+            repo_root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"
+        ),
+        "status": status_summary(repo_root),
+        "remotes": remotes,
+        "worktrees": parse_worktree_porcelain(
+            run_git_text(repo_root, "worktree", "list", "--porcelain")
+        ),
+    }
+
+
+def collect_working_directory_hints(
+    value: object,
+    hints: list[str],
+    seen: set[str],
+    *,
+    depth: int = 0,
+) -> bool:
+    """Извлечь только поля cwd/workdir и JSON tool arguments без raw message text."""
+
+    if depth > 12:
+        return False
+
+    def add_hint(raw_hint: str) -> bool:
+        normalized = raw_hint.strip()
+        if not normalized or normalized in seen:
+            return False
+        if len(hints) >= MAX_PATH_HINTS:
+            return True
+        seen.add(normalized)
+        hints.append(normalized)
+        return False
+
+    def tool_input_hints(source: str) -> list[str]:
+        extracted: list[str] = []
+        for match in TOOL_PATH_LITERAL_RE.finditer(source):
+            double_quoted, single_quoted = match.groups()
+            literal = double_quoted if double_quoted is not None else single_quoted
+            quote = '"' if double_quoted is not None else "'"
+            try:
+                if quote == '"':
+                    decoded = json.loads(f'"{literal}"')
+                else:
+                    decoded = bytes(literal, "utf-8").decode("unicode_escape")
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            extracted.append(decoded)
+
+        simplified = source.replace("\\\\", "\\").replace('\\"', '"').replace("\\'", "'")
+        extracted.extend(match.group(0).strip() for match in WINDOWS_ABSOLUTE_PATH_RE.finditer(simplified))
+        extracted.extend(match.group(1).strip() for match in POSIX_QUOTED_PATH_RE.finditer(simplified))
+        return extracted
+
+    truncated = False
+    if isinstance(value, dict):
+        for raw_key, item in value.items():
+            key = str(raw_key).lower()
+            if key in {"cwd", "workdir"} and isinstance(item, str):
+                truncated = add_hint(item) or truncated
+                continue
+            if key in {"arguments", "input"} and isinstance(item, str) and item.lstrip().startswith(("{", "[")):
+                try:
+                    decoded = json.loads(item)
+                except json.JSONDecodeError:
+                    continue
+                truncated = (
+                    collect_working_directory_hints(
+                        decoded, hints, seen, depth=depth + 1
+                    )
+                    or truncated
+                )
+                continue
+            if key in {"arguments", "input"} and isinstance(item, str):
+                for path_hint in tool_input_hints(item):
+                    truncated = add_hint(path_hint) or truncated
+                continue
+            if isinstance(item, (dict, list)):
+                truncated = (
+                    collect_working_directory_hints(
+                        item, hints, seen, depth=depth + 1
+                    )
+                    or truncated
+                )
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, (dict, list)):
+                truncated = (
+                    collect_working_directory_hints(
+                        item, hints, seen, depth=depth + 1
+                    )
+                    or truncated
+                )
+    return truncated
+
+
+def git_candidates_from_hints(hints: Sequence[str]) -> list[dict[str, object]]:
+    candidates: list[dict[str, object]] = []
+    seen_roots: set[str] = set()
+    for hint in hints:
+        hint_path = Path(hint).expanduser()
+        if any(part.lower() in LOCAL_STATE_ROOTS for part in hint_path.parts):
+            continue
+        candidate_cwd = hint_path.parent if hint_path.is_file() else hint_path
+        context = git_context_for_cwd(str(candidate_cwd))
+        if context.get("cwd_status") != "ok":
+            continue
+        root = str(context["repo_root"])
+        root_key = os.path.normcase(os.path.abspath(root))
+        if root_key in seen_roots:
+            continue
+        seen_roots.add(root_key)
+        candidates.append(context)
+    return candidates
+
+
+def inspect_session_file(
+    path: Path, expected_thread_id: str, max_records: int
+) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "session_file": str(path),
+        "archived": "archived_sessions" in {part.lower() for part in path.parts},
+        "size": path.stat().st_size,
+        "records_scanned": 0,
+        "parse_errors": 0,
+        "thread_id": None,
+        "id_source": None,
+        "cwd": None,
+        "timestamp": None,
+    }
+    path_hints: list[str] = []
+    seen_path_hints: set[str] = set()
+    path_hints_truncated = False
+    records_truncated = False
+
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for record_number, line in enumerate(stream, start=1):
+                if record_number > max_records:
+                    records_truncated = True
+                    break
+                metadata["records_scanned"] = record_number
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    metadata["parse_errors"] = int(metadata["parse_errors"]) + 1
+                    continue
+                if not isinstance(record, dict):
+                    continue
+
+                path_hints_truncated = (
+                    collect_working_directory_hints(record, path_hints, seen_path_hints)
+                    or path_hints_truncated
+                )
+
+                payload = record.get("payload")
+                if not isinstance(payload, dict):
+                    payload = {}
+
+                if record.get("type") == "session_meta":
+                    observed_id = payload.get("id") or record.get("id")
+                    if isinstance(observed_id, str):
+                        metadata["thread_id"] = observed_id
+                        metadata["id_source"] = "session_meta"
+                    observed_cwd = payload.get("cwd") or record.get("cwd")
+                    if isinstance(observed_cwd, str):
+                        metadata["cwd"] = observed_cwd
+                    observed_timestamp = payload.get("timestamp") or record.get("timestamp")
+                    if isinstance(observed_timestamp, str):
+                        metadata["timestamp"] = observed_timestamp
+
+                if metadata["cwd"] is None:
+                    observed_cwd = payload.get("cwd") or record.get("cwd")
+                    if isinstance(observed_cwd, str):
+                        metadata["cwd"] = observed_cwd
+
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать session file {path}: {exc}") from exc
+
+    if metadata["thread_id"] is None and expected_thread_id.lower() in path.name.lower():
+        metadata["thread_id"] = expected_thread_id
+        metadata["id_source"] = "filename"
+
+    metadata["schema_status"] = (
+        "confirmed" if metadata["id_source"] == "session_meta" else "schema_unconfirmed"
+    )
+    primary_cwd = metadata["cwd"] if isinstance(metadata["cwd"], str) else None
+    if primary_cwd and primary_cwd not in seen_path_hints:
+        path_hints.insert(0, primary_cwd)
+    metadata["path_hints_observed"] = len(path_hints)
+    metadata["path_hints_truncated"] = path_hints_truncated
+    metadata["records_truncated"] = records_truncated
+    metadata["discovery_status"] = (
+        "partial" if records_truncated or path_hints_truncated else "complete"
+    )
+    metadata["git"] = git_context_for_cwd(
+        primary_cwd
+    )
+    metadata["git_candidates"] = git_candidates_from_hints(path_hints)
+    return metadata
+
+
+def session_roots(codex_home: Path) -> list[Path]:
+    return [codex_home / "sessions", codex_home / "archived_sessions"]
+
+
+def session_file_declares_thread_id(path: Path, thread_id: str, max_records: int) -> bool:
+    """Дешёво проверить session_meta без Git discovery и разбора tool inputs."""
+
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for record_number, line in enumerate(stream, start=1):
+                if record_number > max_records:
+                    break
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if not isinstance(record, dict) or record.get("type") != "session_meta":
+                    continue
+                payload = record.get("payload")
+                if not isinstance(payload, dict):
+                    payload = {}
+                observed_id = payload.get("id") or record.get("id")
+                return isinstance(observed_id, str) and observed_id.lower() == thread_id.lower()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать session file {path}: {exc}") from exc
+    return False
+
+
+def find_session_files(
+    codex_home: Path,
+    thread_id: str,
+    *,
+    max_records: int = 10000,
+    scan_content: bool = False,
+) -> list[dict[str, object]]:
+    if not THREAD_ID_RE.fullmatch(thread_id):
+        raise RescueError("thread_id имеет неожиданный формат")
+    if max_records < 1:
+        raise RescueError("max_records должен быть положительным")
+
+    candidates: set[Path] = set()
+    all_files: list[Path] = []
+    for root in session_roots(codex_home):
+        if not root.is_dir():
+            continue
+        try:
+            files = list(root.rglob("*.jsonl"))
+        except OSError as exc:
+            raise RescueError(f"Не удалось просмотреть каталог sessions {root}: {exc}") from exc
+        all_files.extend(files)
+        candidates.update(path for path in files if thread_id.lower() in path.name.lower())
+
+    if not candidates and scan_content:
+        for path in all_files:
+            if session_file_declares_thread_id(path, thread_id, max_records):
+                candidates.add(path)
+
+    results = [
+        inspect_session_file(path, thread_id, max_records)
+        for path in sorted(candidates, key=lambda item: str(item).lower())
+    ]
+    return [
+        item
+        for item in results
+        if str(item.get("thread_id", "")).lower() == thread_id.lower()
+    ]
+
+
+def manifest_path(raw_path: object) -> PurePosixPath:
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise RescueError("Manifest path должен быть непустой строкой")
+    if "\\" in raw_path:
+        raise RescueError(f"Manifest path должен использовать POSIX separator: {raw_path}")
+
+    path = PurePosixPath(raw_path)
+    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+        raise RescueError(f"Manifest path должен быть безопасным repo-relative path: {raw_path}")
+
+    parts_lower = [part.lower() for part in path.parts]
+    filename = parts_lower[-1]
+    if any(part in LOCAL_STATE_ROOTS | {".git"} for part in parts_lower):
+        raise RescueError(f"Manifest содержит локальное служебное состояние: {raw_path}")
+    if filename in LOCAL_STATE_FILES or filename.startswith("rollout-") and filename.endswith(".jsonl"):
+        raise RescueError(f"Manifest содержит raw session/state file: {raw_path}")
+    if filename.startswith(".env"):
+        raise RescueError(f"Manifest содержит credential-prone env file: {raw_path}")
+    return path
+
+
+def load_manifest(path: Path) -> list[dict[str, object]]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать JSON manifest {path}: {exc}") from exc
+
+    if not isinstance(payload, dict) or payload.get("version") != 1:
+        raise RescueError("Manifest должен быть object с version=1")
+    files = payload.get("files")
+    if not isinstance(files, list) or not files:
+        raise RescueError("Manifest files должен быть непустым списком")
+
+    normalized: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(files):
+        if not isinstance(item, dict):
+            raise RescueError(f"Manifest files[{index}] должен быть object")
+        safe_path = manifest_path(item.get("path"))
+        path_text = safe_path.as_posix()
+        if path_text in seen:
+            raise RescueError(f"Manifest содержит duplicate path: {path_text}")
+        seen.add(path_text)
+
+        digest = item.get("sha256")
+        size = item.get("size")
+        if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+            raise RescueError(f"Manifest содержит некорректный sha256: {path_text}")
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            raise RescueError(f"Manifest содержит некорректный size: {path_text}")
+        normalized.append({"path": path_text, "sha256": digest, "size": size})
+    return normalized
+
+
+def resolve_working_path(repo: Path, relative_path: str) -> Path:
+    repo_resolved = repo.resolve()
+    candidate = Path(os.path.abspath(repo / Path(*PurePosixPath(relative_path).parts)))
+    try:
+        candidate.relative_to(repo_resolved)
+    except ValueError as exc:
+        raise RescueError(f"Path вышел за границы repo: {relative_path}") from exc
+
+    resolved_parent = candidate.parent.resolve()
+    try:
+        resolved_parent.relative_to(repo_resolved)
+    except ValueError as exc:
+        raise RescueError(f"Parent path вышел за границы repo: {relative_path}") from exc
+
+    if candidate.is_symlink():
+        return candidate
+
+    resolved_candidate = candidate.resolve()
+    try:
+        resolved_candidate.relative_to(repo_resolved)
+    except ValueError as exc:
+        raise RescueError(f"Path вышел за границы repo через symlink: {relative_path}") from exc
+    return resolved_candidate
+
+
+def read_filesystem_bytes(repo: Path, relative_path: str) -> bytes:
+    path = resolve_working_path(repo, relative_path)
+    if path.is_symlink():
+        return os.fsencode(os.readlink(path))
+    return path.read_bytes()
+
+
+@contextmanager
+def fresh_checkout(repo: Path, commit: str) -> Iterator[Path]:
+    with tempfile.TemporaryDirectory(prefix="codex-session-rescue-") as temporary:
+        checkout = Path(temporary) / "checkout"
+        clone = subprocess.run(
+            ["git", "clone", "--quiet", "--no-checkout", "--no-hardlinks", str(repo), str(checkout)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if clone.returncode != 0:
+            message = clone.stderr.decode("utf-8", errors="replace").strip()
+            raise RescueError(f"Не удалось создать fresh local clone: {message}")
+        run_git_bytes(checkout, "checkout", "--quiet", "--detach", commit)
+        yield checkout
+
+
+def bytes_for_source(
+    repo: Path,
+    relative_path: str,
+    source: str,
+    *,
+    commit: str,
+    checkout_root: Path | None,
+) -> bytes:
+    if source == "working":
+        return read_filesystem_bytes(repo, relative_path)
+    if source == "index":
+        return run_git_bytes(repo, "show", f":{relative_path}")
+    if source == "commit":
+        return run_git_bytes(repo, "show", f"{commit}:{relative_path}")
+    if source == "checkout" and checkout_root is not None:
+        return read_filesystem_bytes(checkout_root, relative_path)
+    raise RescueError(f"Неизвестный byte source: {source}")
+
+
+def decode_nul_paths(output: bytes) -> set[str]:
+    paths: set[str] = set()
+    for raw_path in output.split(b"\0"):
+        if not raw_path:
+            continue
+        try:
+            paths.add(raw_path.decode("utf-8"))
+        except UnicodeDecodeError as exc:
+            raise RescueError("Git вернул path, который не является UTF-8; exact scope не доказан") from exc
+    return paths
+
+
+def scope_diff_arguments(
+    mode: str,
+    *,
+    commit: str,
+    base: str,
+    diff_filter: str | None = None,
+) -> tuple[str, ...]:
+    options = ["--name-only", "-z", "--no-renames"]
+    if diff_filter:
+        options.append(f"--diff-filter={diff_filter}")
+    if mode == "index":
+        return ("diff", "--cached", *options, base, "--")
+    if mode == "commit":
+        return ("diff", *options, base, commit, "--")
+    raise RescueError("exact_scope должен быть index или commit")
+
+
+def changed_paths_for_scope(
+    repo: Path,
+    mode: str,
+    *,
+    commit: str,
+    base: str,
+) -> dict[str, object]:
+    all_paths = decode_nul_paths(
+        run_git_bytes(
+            repo,
+            *scope_diff_arguments(mode, commit=commit, base=base),
+        )
+    )
+    type_changes = decode_nul_paths(
+        run_git_bytes(
+            repo,
+            *scope_diff_arguments(mode, commit=commit, base=base, diff_filter="T"),
+        )
+    )
+    conflicts: set[str] = set()
+    if mode == "index":
+        conflicts = decode_nul_paths(
+            run_git_bytes(
+                repo,
+                *scope_diff_arguments(mode, commit=commit, base=base, diff_filter="U"),
+            )
+        )
+    unsupported_changes = [
+        *({"status": "T", "path": path} for path in sorted(type_changes)),
+        *({"status": "U", "path": path} for path in sorted(conflicts)),
+    ]
+    return {"paths": all_paths, "unsupported_changes": unsupported_changes}
+
+
+def verify_manifest(
+    repo: Path,
+    entries: Sequence[dict[str, object]],
+    sources: Sequence[str],
+    *,
+    commit: str = "HEAD",
+    exact_scope: str | None = None,
+    base: str | None = None,
+) -> dict[str, object]:
+    repo_root = Path(run_git_text(repo, "rev-parse", "--show-toplevel"))
+    requested_sources = list(dict.fromkeys(sources))
+    unknown_sources = sorted(set(requested_sources) - ALLOWED_SOURCES)
+    if unknown_sources or not requested_sources:
+        raise RescueError(
+            "sources должен содержать working,index,commit или checkout; неизвестно: "
+            + ",".join(unknown_sources)
+        )
+    if exact_scope and exact_scope not in requested_sources:
+        raise RescueError(
+            f"--exact-scope {exact_scope} требует --sources с byte source {exact_scope}"
+        )
+
+    commit_oid = resolve_commit(repo_root, commit, "commit")
+    if exact_scope == "commit" and not base:
+        raise RescueError("Для exact scope commit нужен --base с доказанным target tip")
+    base_oid = resolve_commit(repo_root, base or "HEAD", "base") if exact_scope else None
+
+    results: list[dict[str, object]] = []
+
+    def verify_with_checkout(checkout_root: Path | None) -> None:
+        for source in requested_sources:
+            for entry in entries:
+                relative_path = str(entry["path"])
+                row: dict[str, object] = {
+                    "source": source,
+                    "path": relative_path,
+                    "expected_sha256": entry["sha256"],
+                    "expected_size": entry["size"],
+                }
+                try:
+                    data = bytes_for_source(
+                        repo_root,
+                        relative_path,
+                        source,
+                        commit=commit_oid,
+                        checkout_root=checkout_root,
+                    )
+                except (OSError, RescueError) as exc:
+                    row.update({"status": "missing_or_unreadable", "detail": str(exc)})
+                else:
+                    actual_sha256 = sha256_bytes(data)
+                    actual_size = len(data)
+                    row.update(
+                        {
+                            "actual_sha256": actual_sha256,
+                            "actual_size": actual_size,
+                            "status": (
+                                "ok"
+                                if actual_sha256 == entry["sha256"]
+                                and actual_size == entry["size"]
+                                else "mismatch"
+                            ),
+                        }
+                    )
+                results.append(row)
+
+    if "checkout" in requested_sources:
+        with fresh_checkout(repo_root, commit_oid) as checkout_root:
+            verify_with_checkout(checkout_root)
+    else:
+        verify_with_checkout(None)
+
+    hash_status = "ok" if all(row["status"] == "ok" for row in results) else "mismatch"
+    scope_report: dict[str, object]
+    if exact_scope:
+        expected_paths = {str(entry["path"]) for entry in entries}
+        scope_evidence = changed_paths_for_scope(
+            repo_root,
+            exact_scope,
+            commit=commit_oid,
+            base=str(base_oid),
+        )
+        actual_paths = set(scope_evidence["paths"])
+        unsupported_changes = list(scope_evidence["unsupported_changes"])
+        unexpected = sorted(actual_paths - expected_paths)
+        missing = sorted(expected_paths - actual_paths)
+        scope_status = (
+            "ok" if not unexpected and not missing and not unsupported_changes else "mismatch"
+        )
+        scope_report = {
+            "status": scope_status,
+            "mode": exact_scope,
+            "base": base_oid,
+            "unexpected_changed_paths": unexpected,
+            "manifest_paths_not_changed": missing,
+            "unsupported_changes": unsupported_changes,
+        }
+    else:
+        scope_status = "unchecked"
+        scope_report = {
+            "status": "unchecked",
+            "detail": "Проверены bytes manifest entries, но exact changed-path coverage не запрошен.",
+        }
+
+    if hash_status == "mismatch" or scope_status == "mismatch":
+        status = "mismatch"
+    elif scope_status == "ok":
+        status = "ok"
+    else:
+        status = "hashes_ok_scope_unchecked"
+    return {
+        "status": status,
+        "hash_status": hash_status,
+        "scope": scope_report,
+        "package_ready": status == "ok",
+        "repo": str(repo_root),
+        "commit": commit_oid,
+        "sources": requested_sources,
+        "files": results,
+    }
+
+
+def parse_sources(raw: str) -> list[str]:
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Инвентаризация Codex-session и проверка evidence manifest."
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    inventory = subparsers.add_parser(
+        "inventory-session", help="Найти session file, cwd и связанный Git worktree."
+    )
+    inventory.add_argument("--thread-id", required=True, help="Точный Codex thread/task ID.")
+    inventory.add_argument(
+        "--codex-home",
+        type=Path,
+        default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")),
+        help="Корень Codex state; по умолчанию CODEX_HOME или ~/.codex.",
+    )
+    inventory.add_argument(
+        "--max-records",
+        type=int,
+        default=10000,
+        help="Максимум JSONL records для извлечения metadata из одного файла.",
+    )
+    inventory.add_argument(
+        "--scan-content",
+        action="store_true",
+        help="Если ID нет в filename, потоково проверить metadata всех session JSONL.",
+    )
+
+    verify = subparsers.add_parser(
+        "verify-manifest", help="Сверить path, SHA256 и size по Git byte sources."
+    )
+    verify.add_argument("--repo", type=Path, default=Path.cwd(), help="Путь к Git repo.")
+    verify.add_argument("--manifest", type=Path, required=True, help="JSON manifest version=1.")
+    verify.add_argument(
+        "--sources",
+        default="working,index,commit,checkout",
+        help="Список через запятую: working,index,commit,checkout.",
+    )
+    verify.add_argument("--commit", default="HEAD", help="Commit для sources commit и checkout.")
+    verify.add_argument(
+        "--exact-scope",
+        choices=("index", "commit"),
+        help="Сверить manifest paths с полным changed-path scope index или commit.",
+    )
+    verify.add_argument(
+        "--base",
+        help="Доказанный target tip; обязателен для --exact-scope commit, для index default=HEAD.",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "inventory-session":
+            matches = find_session_files(
+                args.codex_home,
+                args.thread_id,
+                max_records=args.max_records,
+                scan_content=args.scan_content,
+            )
+            payload = {
+                "status": "found" if matches else "not_found",
+                "thread_id": args.thread_id,
+                "codex_home": str(args.codex_home),
+                "matches": matches,
+            }
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0 if matches else 3
+
+        if args.command == "verify-manifest":
+            entries = load_manifest(args.manifest)
+            payload = verify_manifest(
+                args.repo,
+                entries,
+                parse_sources(args.sources),
+                commit=args.commit,
+                exact_scope=args.exact_scope,
+                base=args.base,
+            )
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0 if payload["status"] != "mismatch" else 2
+    except RescueError as exc:
+        print(json.dumps({"status": "error", "detail": str(exc)}, ensure_ascii=False, indent=2))
+        return 2
+
+    parser.error("Неизвестная команда")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
