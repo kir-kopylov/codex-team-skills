@@ -76,7 +76,7 @@ function global:git {{
             '^credential-manager get --no-ui$' {{
                 $global:LASTEXITCODE = 0
                 'protocol=https'
-                'host=gitlab.test'
+                'host=gitlab.test:8443'
                 'username=skill-test-user'
                 'password=fake-secret-for-test'
                 break
@@ -98,7 +98,7 @@ function global:Read-Host {{
     return 'skill-test-user'
 }}
 
-$output = & '{script_path}' -GitLabHost gitlab.test
+$output = & '{script_path}' -GitLabHost gitlab.test:8443
 $outputText = $output -join "`n"
 
 if ($outputText -notmatch 'LOCAL_CREDENTIAL_READY') {{
@@ -109,6 +109,35 @@ if ($outputText -match 'fake-secret-for-test') {{
 }}
 if ($global:MockStored -notmatch 'password=fake-secret-for-test') {{
     throw 'GCM mock не получил credential payload.'
+}}
+if ($global:MockStored -notmatch 'host=gitlab.test:8443') {{
+    throw 'GCM mock не получил GitLab host вместе с нестандартным портом.'
+}}
+"""
+    encoded = base64.b64encode(harness.encode("utf-16le")).decode("ascii")
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-EncodedCommand", encoded],
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, (result.stdout + result.stderr).decode(errors="replace")
+
+
+@pytest.mark.skipif(shutil.which("powershell.exe") is None, reason="нужен Windows PowerShell")
+def test_connect_script_rejects_port_outside_valid_range() -> None:
+    script_path = str(CONNECT_SCRIPT).replace("'", "''")
+    harness = rf"""
+try {{
+    & '{script_path}' -GitLabHost gitlab.test:70000
+    exit 1
+}}
+catch {{
+    if ($_.Exception.Message -match '1\.\.65535') {{
+        exit 0
+    }}
+    Write-Output $_.Exception.Message
+    exit 1
 }}
 """
     encoded = base64.b64encode(harness.encode("utf-16le")).decode("ascii")

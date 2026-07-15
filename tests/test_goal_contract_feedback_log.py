@@ -29,6 +29,8 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
     phone = "+" + "7 (999) 123-45-67"
     token = "sk-" + ("a" * 24)
     fine_grained_pat = "github_pat_" + ("a" * 24)
+    gitlab_pat = "glpat-" + ("a" * 24)
+    gitlab_pat_ending_in_hyphen = "glpat-" + ("a" * 19) + "-"
     access_token = "compound-access-value"
     refresh_token = "compound-refresh-value"
     client_secret = "compound-client-value"
@@ -45,7 +47,8 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
         (
             "url https://example.test/callback?"
             f"token=secret-value&access_token={access_token}&refresh_token={refresh_token}&"
-            f"client_secret={client_secret}&ok=1 key=plain-secret {token} {fine_grained_pat}"
+            f"client_secret={client_secret}&ok=1 key=plain-secret {token} {fine_grained_pat} "
+            f"{gitlab_pat} {gitlab_pat_ending_in_hyphen}"
         ),
     )
 
@@ -54,6 +57,8 @@ def test_feedback_logger_redacts_sensitive_fields(tmp_path: Path) -> None:
     assert linux_path not in combined
     assert windows_path not in combined
     assert fine_grained_pat not in combined
+    assert gitlab_pat not in combined
+    assert gitlab_pat_ending_in_hyphen not in combined
     assert email not in combined
     assert phone not in combined
     assert "secret-value" not in combined
