@@ -2,7 +2,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidatePattern('^[A-Za-z0-9.-]+$')]
+    [ValidatePattern('^[A-Za-z0-9.-]+(?::[0-9]{1,5})?$')]
     [string]$GitLabHost = 'gitlab.com',
 
     [switch]$Replace,
@@ -12,6 +12,13 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($GitLabHost -match ':(?<Port>[0-9]{1,5})$') {
+    $gitLabPort = [int]$Matches.Port
+    if ($gitLabPort -lt 1 -or $gitLabPort -gt 65535) {
+        throw 'Порт GitLabHost должен быть в диапазоне 1..65535.'
+    }
+}
 
 if ($env:OS -ne 'Windows_NT') {
     throw 'Этот script предназначен только для Windows.'
