@@ -1,0 +1,26 @@
+owner: "@kir-kopylov"
+status: "experimental"
+summary: "Пошагово подключает одну учётную запись GitLab к локальному Git в Codex на Windows через HTTPS, Personal Access Token и Git Credential Manager без раскрытия токена и ложных API-проверок."
+use_cases:
+  - "Подключить GitLab к Codex на новом Windows-компьютере без выбора конкретного репозитория."
+  - "Создать Personal Access Token с минимальными repository scopes и безопасно сохранить его в Git Credential Manager."
+  - "Заменить старый GitLab credential, когда Git продолжает использовать прежний или отозванный токен."
+  - "Отделить локальное сохранение credential от реальной проверки доступа к приватному репозиторию."
+do_not_use_for:
+  - "Настройка SSH keys, GitLab CLI/API, OAuth, CI/CD, deploy, project или group access tokens."
+  - "Несколько GitLab-аккаунтов на одном host: host-wide credential может выбрать не того пользователя."
+  - "Автоматический clone или push конкретного проекта без отдельного запроса пользователя и точного URL."
+natural_triggers:
+  - "подключи мою учётную запись GitLab к Codex на новом компьютере"
+  - "войти в GitLab для git через HTTPS-токен"
+  - "сохрани GitLab PAT для всех моих репозиториев"
+  - "GitLab продолжает брать старый токен в Windows"
+  - "подключить GitLab без выбора репозитория"
+example_files:
+  - "examples/good-01-new-pc-no-repo.md"
+  - "examples/good-02-replace-stale-credential.md"
+  - "examples/good-03-private-repo-verification.md"
+  - "examples/anti-01-api-or-public-repo-proof.md"
+  - "examples/anti-02-guessed-repo-or-multi-account.md"
+last_reviewed: "2026-07-15"
+source_asset: "Сформирован из обезличенного диалога подключения GitLab на новом Windows-компьютере: создание repository-only PAT, удаление старого Windows credential, сохранение через GCM и разбор ложных проверок через API и публичный repo."

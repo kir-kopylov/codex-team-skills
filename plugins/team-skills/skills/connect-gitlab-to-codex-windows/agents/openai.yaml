@@ -1,0 +1,4 @@
+interface:
+  display_name: "Подключить GitLab к Codex на Windows"
+  short_description: "Сохраняет HTTPS PAT в GCM без раскрытия токена."
+  default_prompt: "Используй connect-gitlab-to-codex-windows и по одному шагу подключи одну учётную запись GitLab к локальному Git на Windows без выбора репозитория и без показа токена."
