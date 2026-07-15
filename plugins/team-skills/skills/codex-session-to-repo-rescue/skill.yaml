@@ -1,0 +1,27 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Сохраняет полезный результат длинной или архивной Codex-сессии в целевом repo через доказуемый clean PR/MR."
+use_cases:
+  - "Найти связанные с длинной или архивной Codex-сессией cwd, worktree, commit, файлы и remote, не загружая весь чат."
+  - "Отделить полезные артефакты от raw session и локальных служебных файлов, затем перенести allowlist в clean branch и PR/MR."
+  - "Проверить manifest, хэши, Git blobs и fresh checkout, а после merge доказать результат в настоящем target project и branch."
+do_not_use_for:
+  - "Известный WIP или SHA в уже выбранном repo без необходимости восстанавливать след Codex-сессии."
+  - "Диагностика производительности Codex Desktop без задачи сохранить repo-результат."
+  - "Публикация raw chat/session logs, destructive cleanup, force-push или удаление checkpoint без отдельного явного решения."
+natural_triggers:
+  - "сохрани результат длинной Codex-сессии в repo"
+  - "архивируй Codex-task, но сначала сохрани её repo-результат"
+  - "найди, куда сессия записала файлы"
+  - "перенеси результат сессии в чистый MR"
+  - "проверь, попала ли работа из сессии в main"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-07-15"
+authors:
+  - "Пользователь Codex"
+source_asset: "Санитизированный workflow из сессии: архивирование длинной task, поиск durable artifacts и публикация чистого migration evidence package с доказательством target branch."
