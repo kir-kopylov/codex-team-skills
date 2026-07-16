@@ -58,6 +58,55 @@ def write_manifest(path: Path, relative_path: str, data: bytes) -> Path:
     return path
 
 
+def write_target_lock(path: Path, session: Path, thread_id: str, *, archived: bool) -> Path:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"thread_id": thread_id},
+        "target": {
+            "thread_id": thread_id,
+            "session_file": str(session.resolve()),
+            "archived": archived,
+            "size_bytes": session.stat().st_size,
+            "size_mib": rescue.size_mib_rounded(session.stat().st_size),
+            "title": None,
+            "title_source": None,
+        },
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def write_sized_session(path: Path, thread_id: str, title: str, size_mib: str) -> Path:
+    prefix = (
+        json.dumps(
+            {"type": "session_meta", "payload": {"id": thread_id}},
+            separators=(",", ":"),
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": f"Запусти {title}."}],
+                },
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    target_size = int(float(size_mib) * 1024 * 1024)
+    padding_template = b'{"type":"padding","payload":{"text":""}}\n'
+    padding_size = target_size - len(prefix) - len(padding_template)
+    assert padding_size >= 0
+    path.write_bytes(prefix + b'{"type":"padding","payload":{"text":"' + b"x" * padding_size + b'"}}\n')
+    assert rescue.size_mib_rounded(path.stat().st_size) == size_mib
+    return path
+
+
 def test_skill_preserves_unique_session_forensics_boundary() -> None:
     content = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for phrase in (
@@ -69,8 +118,66 @@ def test_skill_preserves_unique_session_forensics_boundary() -> None:
         "git-pr-lifecycle-safeguard",
         "auto-merge",
         "настоящий target не подтверждён",
+        "TARGET_LOCKED",
     ):
         assert phrase in content
+
+
+def test_resolver_uses_size_gate_before_locking_same_title_candidates(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    title = "Status Export Pass"
+    decoy_id = "019f0000-0000-7000-8000-000000000216"
+    target_id = "019f0000-0000-7000-8000-000000000253"
+    write_sized_session(archive / f"rollout-{decoy_id}.jsonl", decoy_id, title, "2.16")
+    target = write_sized_session(
+        archive / f"rollout-{target_id}.jsonl", target_id, title, "2.53"
+    )
+
+    incomplete = rescue.resolve_session_target(codex_home, title=title)
+    assert incomplete["status"] == "identity_incomplete"
+    assert incomplete["candidates"] == []
+
+    resolved = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_size_mib="2,53",
+    )
+    assert resolved["status"] == "resolved"
+    assert resolved["target"]["thread_id"] == target_id
+    assert Path(resolved["target"]["session_file"]) == target.resolve()
+
+
+def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
+    first = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000001",
+            "session_file": str((tmp_path / "first.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    second = {
+        **first,
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000002",
+            "session_file": str((tmp_path / "second.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    lock = tmp_path / "target-lock.json"
+
+    created = rescue.write_target_lock(lock, first)
+    before = lock.read_bytes()
+    conflict = rescue.write_target_lock(lock, second)
+
+    assert created == {"status": "target_locked", "lock_state": "created"}
+    assert conflict["status"] == "target_lock_conflict"
+    assert conflict["invalidation_required"] is True
+    assert lock.read_bytes() == before
 
 
 def test_inventory_finds_archived_session_and_git_worktree(tmp_path: Path) -> None:
@@ -192,14 +299,15 @@ def test_inventory_reports_invalid_utf8_as_structured_cli_error(
         json.dumps({"type": "session_meta", "payload": {"id": thread_id}}).encode()
         + b"\n\xff\n"
     )
+    lock = write_target_lock(tmp_path / "target-lock.json", session, thread_id, archived=False)
 
     exit_code = rescue.main(
         [
             "inventory-session",
             "--codex-home",
             str(codex_home),
-            "--thread-id",
-            thread_id,
+            "--target-lock",
+            str(lock),
         ]
     )
     output = json.loads(capsys.readouterr().out)

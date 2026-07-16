@@ -11,6 +11,7 @@ import re
 import subprocess
 import tempfile
 from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Iterator, Sequence
 from urllib.parse import urlsplit, urlunsplit
@@ -19,6 +20,9 @@ from urllib.parse import urlsplit, urlunsplit
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_OID_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 THREAD_ID_RE = re.compile(r"^[0-9a-fA-F-]{16,64}$")
+THREAD_ID_SEARCH_RE = re.compile(
+    r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}"
+)
 TOOL_PATH_LITERAL_RE = re.compile(
     r"\b(?:cwd|workdir)\s*:\s*(?:\"((?:\\.|[^\"\\])*)\"|'((?:\\.|[^'\\])*)')"
 )
@@ -31,10 +35,35 @@ LOCAL_STATE_FILES = {
     ".codex-global-state.json",
     "session_index.jsonl",
 }
+MIB = 1024 * 1024
+TARGET_LOCK_KIND = "codex-session-target-lock"
+TARGET_LOCK_VERSION = 1
+TARGET_TITLE_RECORD_LIMIT = 200
 
 
 class RescueError(RuntimeError):
     """Ожидаемая ошибка проверки с понятным сообщением для CLI."""
+
+
+def normalize_title(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
+def size_mib_rounded(size_bytes: int) -> str:
+    value = Decimal(size_bytes) / Decimal(MIB)
+    return str(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def parse_expected_size_mib(raw_value: str | None) -> Decimal | None:
+    if raw_value is None:
+        return None
+    try:
+        value = Decimal(raw_value.replace(",", "."))
+    except InvalidOperation as exc:
+        raise RescueError("expected_size_mib должен быть числом") from exc
+    if value < 0:
+        raise RescueError("expected_size_mib не может быть отрицательным")
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -389,6 +418,292 @@ def inspect_session_file(
 
 def session_roots(codex_home: Path) -> list[Path]:
     return [codex_home / "sessions", codex_home / "archived_sessions"]
+
+
+def all_session_files(codex_home: Path) -> list[Path]:
+    files: list[Path] = []
+    for root in session_roots(codex_home):
+        if not root.is_dir():
+            continue
+        try:
+            files.extend(root.rglob("*.jsonl"))
+        except OSError as exc:
+            raise RescueError(f"Не удалось просмотреть каталог sessions {root}: {exc}") from exc
+    return sorted(set(files), key=lambda item: str(item).lower())
+
+
+def load_session_index(codex_home: Path) -> dict[str, str]:
+    index_path = codex_home / "session_index.jsonl"
+    if not index_path.is_file():
+        return {}
+
+    titles: dict[str, str] = {}
+    try:
+        with index_path.open("r", encoding="utf-8") as stream:
+            for line in stream:
+                try:
+                    row = json.loads(line)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                thread_id = row.get("id")
+                title = row.get("thread_name")
+                if isinstance(thread_id, str) and isinstance(title, str) and title.strip():
+                    titles[thread_id.lower()] = title.strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать session index {index_path}: {exc}") from exc
+    return titles
+
+
+def message_text(payload: dict[str, object]) -> str:
+    content = payload.get("content")
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, dict) and isinstance(item.get("text"), str):
+            parts.append(str(item["text"]))
+    return " ".join(parts)
+
+
+def inspect_session_identity(
+    path: Path,
+    index_titles: dict[str, str],
+    *,
+    title_query: str | None,
+    max_records: int = TARGET_TITLE_RECORD_LIMIT,
+) -> dict[str, object]:
+    thread_id: str | None = None
+    filename_match = THREAD_ID_SEARCH_RE.search(path.name)
+    if filename_match:
+        thread_id = filename_match.group(0)
+
+    normalized_query = normalize_title(title_query) if title_query else None
+    title_source: str | None = None
+    observed_title: str | None = None
+    if thread_id and thread_id.lower() in index_titles:
+        observed_title = index_titles[thread_id.lower()]
+        if normalized_query and normalize_title(observed_title) == normalized_query:
+            title_source = "session_index"
+
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            for record_number, line in enumerate(stream, start=1):
+                if record_number > max_records:
+                    break
+                try:
+                    record = json.loads(line)
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                payload = record.get("payload")
+                if not isinstance(payload, dict):
+                    payload = {}
+
+                if record.get("type") == "session_meta":
+                    observed_id = payload.get("id") or record.get("id")
+                    if isinstance(observed_id, str):
+                        thread_id = observed_id
+                        indexed_title = index_titles.get(observed_id.lower())
+                        if indexed_title:
+                            observed_title = indexed_title
+                            if normalized_query and normalize_title(indexed_title) == normalized_query:
+                                title_source = "session_index"
+
+                if (
+                    normalized_query
+                    and record.get("type") == "response_item"
+                    and payload.get("type") == "message"
+                    and payload.get("role") == "user"
+                ):
+                    observed_message = normalize_title(message_text(payload))
+                    if normalized_query in observed_message:
+                        observed_title = title_query
+                        title_source = title_source or "early_user_message"
+
+                if thread_id and (not normalized_query or title_source):
+                    break
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать session identity {path}: {exc}") from exc
+
+    size_bytes = path.stat().st_size
+    return {
+        "thread_id": thread_id,
+        "session_file": str(path.resolve()),
+        "archived": "archived_sessions" in {part.lower() for part in path.parts},
+        "size_bytes": size_bytes,
+        "size_mib": size_mib_rounded(size_bytes),
+        "title": observed_title,
+        "title_source": title_source,
+    }
+
+
+def resolve_session_target(
+    codex_home: Path,
+    *,
+    thread_id: str | None = None,
+    title: str | None = None,
+    expected_size_mib: str | None = None,
+    expected_bytes: int | None = None,
+) -> dict[str, object]:
+    if bool(thread_id) == bool(title):
+        raise RescueError("Нужно указать ровно одно: thread_id или title")
+    if thread_id and not THREAD_ID_RE.fullmatch(thread_id):
+        raise RescueError("thread_id имеет неожиданный формат")
+    if expected_bytes is not None and expected_bytes < 0:
+        raise RescueError("expected_bytes не может быть отрицательным")
+    expected_mib = parse_expected_size_mib(expected_size_mib)
+
+    query: dict[str, object] = {}
+    if thread_id:
+        query["thread_id"] = thread_id
+    if title:
+        query["title"] = title
+    if expected_mib is not None:
+        query["expected_size_mib"] = str(expected_mib)
+    if expected_bytes is not None:
+        query["expected_bytes"] = expected_bytes
+    if title and expected_mib is None and expected_bytes is None:
+        return {
+            "status": "identity_incomplete",
+            "query": query,
+            "detail": "Поиск по title требует expected_size_mib или expected_bytes; иначе target не блокируется.",
+            "candidates": [],
+        }
+
+    index_titles = load_session_index(codex_home)
+    candidates: list[dict[str, object]] = []
+    for path in all_session_files(codex_home):
+        identity = inspect_session_identity(
+            path,
+            index_titles,
+            title_query=title,
+        )
+        observed_id = identity.get("thread_id")
+        if thread_id and (
+            not isinstance(observed_id, str) or observed_id.lower() != thread_id.lower()
+        ):
+            continue
+        if title and not identity.get("title_source"):
+            continue
+        if expected_bytes is not None and identity["size_bytes"] != expected_bytes:
+            continue
+        if expected_mib is not None and Decimal(str(identity["size_mib"])) != expected_mib:
+            continue
+        candidates.append(identity)
+
+    if not candidates:
+        return {"status": "target_not_found", "query": query, "candidates": []}
+    if len(candidates) > 1:
+        return {
+            "status": "ambiguous_target",
+            "query": query,
+            "candidates": candidates,
+        }
+    return {"status": "resolved", "query": query, "target": candidates[0]}
+
+
+def target_identity(target: dict[str, object]) -> tuple[object, object, object]:
+    return target.get("thread_id"), target.get("session_file"), target.get("archived")
+
+
+def target_lock_payload(resolution: dict[str, object]) -> dict[str, object]:
+    if resolution.get("status") != "resolved" or not isinstance(
+        resolution.get("target"), dict
+    ):
+        raise RescueError("Target lock можно создать только из однозначного resolution")
+    return {
+        "version": TARGET_LOCK_VERSION,
+        "kind": TARGET_LOCK_KIND,
+        "query": resolution.get("query", {}),
+        "target": resolution["target"],
+    }
+
+
+def load_target_lock(path: Path) -> dict[str, object]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RescueError(f"Не удалось прочитать target lock {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RescueError("Target lock должен быть JSON object")
+    if payload.get("version") != TARGET_LOCK_VERSION or payload.get("kind") != TARGET_LOCK_KIND:
+        raise RescueError("Target lock имеет неизвестную schema")
+    target = payload.get("target")
+    if not isinstance(target, dict):
+        raise RescueError("Target lock не содержит target object")
+    thread_id = target.get("thread_id")
+    session_file = target.get("session_file")
+    if not isinstance(thread_id, str) or not THREAD_ID_RE.fullmatch(thread_id):
+        raise RescueError("Target lock содержит некорректный thread_id")
+    if not isinstance(session_file, str) or not Path(session_file).is_absolute():
+        raise RescueError("Target lock содержит не абсолютный session_file")
+    return payload
+
+
+def write_target_lock(path: Path, payload: dict[str, object]) -> dict[str, object]:
+    if path.exists():
+        existing = load_target_lock(path)
+        existing_target = existing.get("target")
+        new_target = payload.get("target")
+        if isinstance(existing_target, dict) and isinstance(new_target, dict):
+            if target_identity(existing_target) == target_identity(new_target):
+                return {"status": "target_locked", "lock_state": "reused"}
+        return {
+            "status": "target_lock_conflict",
+            "lock_state": "unchanged",
+            "invalidation_required": True,
+            "active_target": existing_target,
+            "rejected_target": new_target,
+        }
+    if not path.parent.is_dir():
+        raise RescueError(f"Каталог для target lock не существует: {path.parent}")
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as stream:
+            json.dump(payload, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+    except OSError as exc:
+        raise RescueError(f"Не удалось записать target lock {path}: {exc}") from exc
+    return {"status": "target_locked", "lock_state": "created"}
+
+
+def path_is_under(path: Path, roots: Sequence[Path]) -> bool:
+    resolved = path.resolve()
+    for root in roots:
+        try:
+            resolved.relative_to(root.resolve())
+        except ValueError:
+            continue
+        return True
+    return False
+
+
+def inventory_from_target_lock(
+    codex_home: Path,
+    lock_path: Path,
+    *,
+    max_records: int,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    lock = load_target_lock(lock_path)
+    target = lock["target"]
+    assert isinstance(target, dict)
+    session_path = Path(str(target["session_file"]))
+    if not path_is_under(session_path, session_roots(codex_home)):
+        raise RescueError("Target lock указывает вне CODEX_HOME sessions")
+    if not session_path.is_file():
+        raise RescueError("Target lock session_file больше не существует; нужен новый resolution")
+
+    thread_id = str(target["thread_id"])
+    inspected = inspect_session_file(session_path, thread_id, max_records)
+    if str(inspected.get("thread_id", "")).lower() != thread_id.lower():
+        raise RescueError("TARGET_LOCK_MISMATCH: session file объявляет другой thread_id")
+    if bool(target.get("archived")) != bool(inspected.get("archived")):
+        raise RescueError("TARGET_LOCK_MISMATCH: archive state изменился")
+    if target.get("archived") and inspected.get("size") != target.get("size_bytes"):
+        raise RescueError("TARGET_LOCK_MISMATCH: размер архивной session изменился")
+    return lock, [inspected]
 
 
 def session_file_declares_thread_id(path: Path, thread_id: str, max_records: int) -> bool:
@@ -772,10 +1087,35 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    resolve = subparsers.add_parser(
+        "resolve-session", help="Однозначно разрешить task/session и создать target lock."
+    )
+    identity = resolve.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--thread-id", help="Точный Codex thread/task ID из native tool.")
+    identity.add_argument("--title", help="Название task; при совпадениях нужен size gate.")
+    size = resolve.add_mutually_exclusive_group()
+    size.add_argument(
+        "--expected-size-mib",
+        help="Размер как в UI, округлённый до 0.01 MiB; запятая допустима.",
+    )
+    size.add_argument("--expected-bytes", type=int, help="Точный размер session file в bytes.")
+    resolve.add_argument("--lock-file", type=Path, required=True, help="Новый immutable JSON lock.")
+    resolve.add_argument(
+        "--codex-home",
+        type=Path,
+        default=Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")),
+        help="Корень Codex state; по умолчанию CODEX_HOME или ~/.codex.",
+    )
+
     inventory = subparsers.add_parser(
         "inventory-session", help="Найти session file, cwd и связанный Git worktree."
     )
-    inventory.add_argument("--thread-id", required=True, help="Точный Codex thread/task ID.")
+    inventory.add_argument(
+        "--target-lock",
+        type=Path,
+        required=True,
+        help="Lock, созданный resolve-session; свободный thread_id не принимается.",
+    )
     inventory.add_argument(
         "--codex-home",
         type=Path,
@@ -787,11 +1127,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=10000,
         help="Максимум JSONL records для извлечения metadata из одного файла.",
-    )
-    inventory.add_argument(
-        "--scan-content",
-        action="store_true",
-        help="Если ID нет в filename, потоково проверить metadata всех session JSONL.",
     )
 
     verify = subparsers.add_parser(
@@ -821,21 +1156,44 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "inventory-session":
-            matches = find_session_files(
+        if args.command == "resolve-session":
+            resolution = resolve_session_target(
                 args.codex_home,
-                args.thread_id,
-                max_records=args.max_records,
-                scan_content=args.scan_content,
+                thread_id=args.thread_id,
+                title=args.title,
+                expected_size_mib=args.expected_size_mib,
+                expected_bytes=args.expected_bytes,
             )
+            if resolution["status"] != "resolved":
+                print(json.dumps(resolution, ensure_ascii=False, indent=2))
+                return 4 if resolution["status"] in {"ambiguous_target", "identity_incomplete"} else 3
+            lock = target_lock_payload(resolution)
+            lock_result = write_target_lock(args.lock_file, lock)
             payload = {
-                "status": "found" if matches else "not_found",
-                "thread_id": args.thread_id,
+                **lock_result,
+                "lock_file": str(args.lock_file.resolve()),
+                "target": lock["target"],
+            }
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0 if lock_result["status"] == "target_locked" else 4
+
+        if args.command == "inventory-session":
+            lock, matches = inventory_from_target_lock(
+                args.codex_home,
+                args.target_lock,
+                max_records=args.max_records,
+            )
+            target = lock["target"]
+            assert isinstance(target, dict)
+            payload = {
+                "status": "found",
+                "target_lock": str(args.target_lock.resolve()),
+                "thread_id": target["thread_id"],
                 "codex_home": str(args.codex_home),
                 "matches": matches,
             }
             print(json.dumps(payload, ensure_ascii=False, indent=2))
-            return 0 if matches else 3
+            return 0
 
         if args.command == "verify-manifest":
             entries = load_manifest(args.manifest)
