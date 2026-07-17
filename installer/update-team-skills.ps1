@@ -2,12 +2,15 @@ param(
     [string]$ManifestUrl = $env:CODEX_TEAM_SKILLS_MANIFEST_URL,
     [string]$LatestUrl = $env:CODEX_TEAM_SKILLS_LATEST_URL,
     [switch]$RepairInstall,
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [switch]$VerifySignatureOnly,
+    [string]$PayloadPath,
+    [string]$SignaturePath
 )
 
 $ErrorActionPreference = "Stop"
 
-$UpdaterVersion = "1.0.0"
+$UpdaterVersion = "1.1.0"
 $PluginName = "team-skills"
 $MarketplaceName = "codex-team-skills"
 $RepoReleaseBase = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
@@ -25,6 +28,10 @@ $PublicKeyPath = if ($env:CODEX_TEAM_SKILLS_PUBLIC_KEY) { $env:CODEX_TEAM_SKILLS
 # Trust anchor pinned at build time: sha256 of installer/team-skills-public-key.pem.
 # Если установленный public key не совпадает с этим значением — это подмена якоря доверия.
 $ExpectedPublicKeySha256 = "6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
+# Те же public RSA parameters, что в закреплённом PEM. Windows PowerShell 5.1
+# не умеет RSA.ImportFromPem, поэтому импортирует параметры через CAPI.
+$PinnedPublicKeyModulusBase64 = "5XeHpCkSYFOrpk717iXbEM7Pf7UWajm5zor6C8eX0+wSXq2dOQGk2VKW217gtFLQXtnEmVIeB3VRiU1lmltnOJVpNoLxoayTSiBUYoNUSRrMxb5WqPLLT9LiHk2GtNx/VLhwMJxvbR2cidTcYmnQyNBcsSCEV+BWeY0ExCaRzLAxoh9ulDcdnhEASL7Lp/BrxR6rJz2hRboBgPEVh8bC0ZTv+DGjuF4XJPmBtj3RC8nt307s3sKHIn/rcqK9qY9bUsU4Tp6HarNId7EoaPC6SEvTndy/CjYXcLJp/oLzcy6b0RPRI7qJFX8MhqnvyBdinYZTk2VO6bqGQR0rJkvN2g7eYRhThPHKiIMGXMM8QedZZW6Sqjvk8PjLLupy44VHUn5OH0verJMGe0gkMW664AnY5laFIYMxR+OHD/4cLB+bwwoBYfiZf9o4r4PkIwbzb1KLA0AnXXmEiF/oT8Bgu/mpmFCSPxe3jzoN6UDgQ3g4pr2kV0rbe19+iNbIUItx"
+$PinnedPublicKeyExponentBase64 = "AQAB"
 $StatePath = Join-Path $StateDir "state.json"
 $LogPath = Join-Path $LogDir "team-skills-update.log"
 $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
@@ -80,19 +87,34 @@ function Verify-Signature($PayloadPath, $SignaturePath) {
     }
     Verify-PublicKeyPin
 
-    $rsa = [System.Security.Cryptography.RSA]::Create()
-    $pem = Get-Content $PublicKeyPath -Raw
-    $rsa.ImportFromPem($pem.ToCharArray())
-    $payload = [System.IO.File]::ReadAllBytes($PayloadPath)
-    $signature = [System.IO.File]::ReadAllBytes($SignaturePath)
-    $ok = $rsa.VerifyData(
-        $payload,
-        $signature,
-        [System.Security.Cryptography.HashAlgorithmName]::SHA256,
-        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
-    )
+    $rsa = $null
+    try {
+        $cspParameters = New-Object System.Security.Cryptography.CspParameters
+        $cspParameters.ProviderType = 24
+        $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider -ArgumentList $cspParameters
+        $rsa.PersistKeyInCsp = $false
+
+        $rsaParameters = New-Object System.Security.Cryptography.RSAParameters
+        $rsaParameters.Modulus = [Convert]::FromBase64String($PinnedPublicKeyModulusBase64)
+        $rsaParameters.Exponent = [Convert]::FromBase64String($PinnedPublicKeyExponentBase64)
+        $rsa.ImportParameters($rsaParameters)
+    } catch {
+        if ($rsa) { $rsa.Dispose() }
+        throw "Не удалось инициализировать проверку подписи в Windows PowerShell 5.1. Обновление не применено; запустите свежий официальный installer. Причина: $($_.Exception.Message)"
+    }
+
+    try {
+        $payload = [System.IO.File]::ReadAllBytes($PayloadPath)
+        $signature = [System.IO.File]::ReadAllBytes($SignaturePath)
+        $sha256Oid = [System.Security.Cryptography.CryptoConfig]::MapNameToOID("SHA256")
+        $ok = $rsa.VerifyData($payload, $sha256Oid, $signature)
+    } catch {
+        throw "Не удалось проверить подпись обновления в Windows PowerShell 5.1. Обновление не применено. Причина: $($_.Exception.Message)"
+    } finally {
+        if ($rsa) { $rsa.Dispose() }
+    }
     if (-not $ok) {
-        throw "Signature verification failed: $PayloadPath"
+        throw "Подпись обновления недействительна: $PayloadPath. Оставляю текущий рабочий plugin без изменений."
     }
 }
 
@@ -327,6 +349,25 @@ function Repair-Install() {
     }
     Write-State $manifest "" "repair-no-download"
     Write-Log "Repair завершён: Codex registry настроен. Перезапустите Codex."
+}
+
+if ($VerifySignatureOnly) {
+    if ($AllowUnsigned) {
+        Write-Error "VerifySignatureOnly запрещён при CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1."
+        exit 1
+    }
+    if ([string]::IsNullOrWhiteSpace($PayloadPath) -or [string]::IsNullOrWhiteSpace($SignaturePath)) {
+        Write-Error "Для VerifySignatureOnly нужны PayloadPath и SignaturePath."
+        exit 1
+    }
+    try {
+        Verify-Signature $PayloadPath $SignaturePath
+        Write-Host "[team-skills] Подпись проверена: $PayloadPath"
+        exit 0
+    } catch {
+        Write-Error $_.Exception.Message
+        exit 1
+    }
 }
 
 try {

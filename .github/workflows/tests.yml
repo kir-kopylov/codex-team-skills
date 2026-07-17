@@ -107,6 +107,9 @@ jobs:
     needs: build-release-bundle
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
       - name: Download installable bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -149,6 +152,47 @@ jobs:
             }
 
             powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly
+          }
+
+      - name: Verify production signature in Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $updater = Join-Path $PWD "dist\update-team-skills.ps1"
+          $publicKey = Join-Path $PWD "dist\team-skills-public-key.pem"
+          $fixtureDir = Join-Path $PWD "tests\fixtures\windows-signature"
+          $payload = Join-Path $fixtureDir "latest.json"
+          $signature = Join-Path $fixtureDir "latest.json.sig"
+          $work = Join-Path $env:RUNNER_TEMP "team-skills-signature-smoke"
+          New-Item -ItemType Directory -Path $work -Force | Out-Null
+          Remove-Item Env:\CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -ErrorAction SilentlyContinue
+          $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $publicKey
+
+          $validOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
+            -VerifySignatureOnly -PayloadPath $payload -SignaturePath $signature 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Valid production signature was rejected: $($validOutput -join [Environment]::NewLine)"
+          }
+
+          $tamperedPayload = Join-Path $work "latest-tampered.json"
+          $payloadBytes = [System.IO.File]::ReadAllBytes($payload)
+          $payloadBytes[0] = $payloadBytes[0] -bxor 1
+          [System.IO.File]::WriteAllBytes($tamperedPayload, $payloadBytes)
+          $tamperedOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
+            -VerifySignatureOnly -PayloadPath $tamperedPayload -SignaturePath $signature 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "Tampered production payload was accepted: $($tamperedOutput -join [Environment]::NewLine)"
+          }
+
+          $tamperedKey = Join-Path $work "team-skills-public-key-tampered.pem"
+          $keyBytes = [System.IO.File]::ReadAllBytes($publicKey)
+          $keyBytes[0] = $keyBytes[0] -bxor 1
+          [System.IO.File]::WriteAllBytes($tamperedKey, $keyBytes)
+          $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $tamperedKey
+          $pinOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
+            -VerifySignatureOnly -PayloadPath $payload -SignaturePath $signature 2>&1
+          if ($LASTEXITCODE -eq 0) {
+            throw "Tampered public key pin was accepted: $($pinOutput -join [Environment]::NewLine)"
           }
 
   claude-sync-smoke:

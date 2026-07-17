@@ -59,6 +59,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Codex
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\uninstall-team-skills.ps1"
 ```
 
+Если установленный Windows updater падает на `ImportFromPem`, он не сможет
+получить исправление через собственный signed update. Дайте коллеге повторно
+запустить официальную команду установки из `START_HERE_CONNECT_CODEX_SKILLS.md`.
+Не используйте `CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1` и Git checkout как
+пользовательское восстановление.
+
 macOS:
 
 ```bash
