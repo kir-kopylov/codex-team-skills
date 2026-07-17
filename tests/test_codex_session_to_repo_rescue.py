@@ -207,6 +207,30 @@ def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
     assert result["status"] == "target_not_found"
 
 
+def test_title_resolution_skips_invalid_utf8_index_line(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000274"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        title,
+        "2.53",
+    )
+    (codex_home / "session_index.jsonl").write_bytes(b"\xff\n")
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["title_source"] == "early_user_message"
+
+
 @pytest.mark.parametrize("raw_size", ["NaN", "Infinity", "-Infinity", "1e999999"])
 def test_resolver_rejects_nonfinite_or_unquantizable_sizes_as_structured_error(
     tmp_path: Path,

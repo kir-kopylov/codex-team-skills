@@ -442,7 +442,7 @@ def load_session_index(codex_home: Path) -> dict[str, str]:
 
     titles: dict[str, str] = {}
     try:
-        with index_path.open("r", encoding="utf-8") as stream:
+        with index_path.open("rb") as stream:
             for line in stream:
                 try:
                     row = json.loads(line)
@@ -454,7 +454,7 @@ def load_session_index(codex_home: Path) -> dict[str, str]:
                 title = row.get("thread_name")
                 if isinstance(thread_id, str) and isinstance(title, str) and title.strip():
                     titles[thread_id.lower()] = title.strip()
-    except (OSError, UnicodeDecodeError) as exc:
+    except OSError as exc:
         raise RescueError(f"Не удалось прочитать session index {index_path}: {exc}") from exc
     return titles
 
