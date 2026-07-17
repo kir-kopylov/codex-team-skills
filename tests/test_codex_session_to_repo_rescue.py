@@ -125,7 +125,7 @@ def test_skill_preserves_unique_session_forensics_boundary() -> None:
         "git-pr-lifecycle-safeguard",
         "auto-merge",
         "настоящий target не подтверждён",
-        "TARGET_LOCKED",
+        "target_locked",
     ):
         assert phrase in content
 
@@ -280,6 +280,53 @@ def test_title_resolution_skips_and_reports_unrelated_corrupt_sessions(
     assert result["target"]["thread_id"] == thread_id
     assert result["inspection_errors"][0]["session_file"] == str(corrupt.resolve())
     assert "Не удалось прочитать session identity" in result["inspection_errors"][0]["detail"]
+
+
+def test_title_resolution_rejects_candidate_without_valid_thread_id(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    session = sessions / "generic.jsonl"
+    session.write_text(
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": title}],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    lock = tmp_path / "target-lock.json"
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--title",
+            title,
+            "--expected-bytes",
+            str(session.stat().st_size),
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 3
+    assert output["status"] == "target_not_found"
+    assert output["inspection_errors"][0]["session_file"] == str(session.resolve())
+    assert "корректный thread_id" in output["inspection_errors"][0]["detail"]
+    assert not lock.exists()
 
 
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:

@@ -610,8 +610,16 @@ def resolve_session_target(
             )
             continue
         observed_id = identity.get("thread_id")
+        if not isinstance(observed_id, str) or not THREAD_ID_RE.fullmatch(observed_id):
+            inspection_errors.append(
+                {
+                    "session_file": str(path.resolve()),
+                    "detail": "Session candidate не содержит корректный thread_id",
+                }
+            )
+            continue
         if thread_id and (
-            not isinstance(observed_id, str) or observed_id.lower() != thread_id.lower()
+            observed_id.lower() != thread_id.lower()
         ):
             continue
         if title and not identity.get("title_source"):

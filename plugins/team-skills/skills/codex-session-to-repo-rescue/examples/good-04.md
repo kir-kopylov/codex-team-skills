@@ -10,4 +10,4 @@ Skill сначала запускает `resolve-session` с точным title 
 
 ## Нельзя
 
-Нельзя выбирать session по первому текстовому совпадению, начинать repo-анализ до `TARGET_LOCKED` или молча заменить target в существующем recovery run.
+Нельзя выбирать session по первому текстовому совпадению, начинать repo-анализ до `target_locked` или молча заменить target в существующем recovery run.
