@@ -10,7 +10,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$UpdaterVersion = "1.1.0"
+$UpdaterVersion = "1.2.0"
 $PluginName = "team-skills"
 $MarketplaceName = "codex-team-skills"
 $RepoReleaseBase = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
@@ -33,9 +33,18 @@ $ExpectedPublicKeySha256 = "6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e492
 $PinnedPublicKeyModulusBase64 = "5XeHpCkSYFOrpk717iXbEM7Pf7UWajm5zor6C8eX0+wSXq2dOQGk2VKW217gtFLQXtnEmVIeB3VRiU1lmltnOJVpNoLxoayTSiBUYoNUSRrMxb5WqPLLT9LiHk2GtNx/VLhwMJxvbR2cidTcYmnQyNBcsSCEV+BWeY0ExCaRzLAxoh9ulDcdnhEASL7Lp/BrxR6rJz2hRboBgPEVh8bC0ZTv+DGjuF4XJPmBtj3RC8nt307s3sKHIn/rcqK9qY9bUsU4Tp6HarNId7EoaPC6SEvTndy/CjYXcLJp/oLzcy6b0RPRI7qJFX8MhqnvyBdinYZTk2VO6bqGQR0rJkvN2g7eYRhThPHKiIMGXMM8QedZZW6Sqjvk8PjLLupy44VHUn5OH0verJMGe0gkMW664AnY5laFIYMxR+OHD/4cLB+bwwoBYfiZf9o4r4PkIwbzb1KLA0AnXXmEiF/oT8Bgu/mpmFCSPxe3jzoN6UDgQ3g4pr2kV0rbe19+iNbIUItx"
 $PinnedPublicKeyExponentBase64 = "AQAB"
 $StatePath = Join-Path $StateDir "state.json"
+$FailureStatePath = Join-Path $StateDir "last-failure.json"
+$RepairStatePath = Join-Path $StateDir "last-repair.json"
 $LogPath = Join-Path $LogDir "team-skills-update.log"
 $AllowUnsigned = $env:CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -eq "1"
 $Script:InvalidatedCodexPluginCache = ""
+$Script:DownloadTimeoutSec = 45
+$Script:DownloadMaxAttemptsOverride = $null
+$Script:CurrentOperation = if ($RepairInstall) { "repair" } else { "update" }
+$Script:CurrentStage = "initialization"
+$Script:PluginSwapActive = $false
+$Script:PluginBackupPath = ""
+$Script:PluginHadPrevious = $false
 
 if (-not $LatestUrl) {
     $LatestUrl = "$RepoReleaseBase/latest.json"
@@ -59,34 +68,191 @@ function Write-Log($Message) {
     Write-Host "[team-skills] $Message"
 }
 
+function Write-LogSafe($Message) {
+    try {
+        Write-Log $Message
+    } catch {
+        Write-Host "[team-skills] Не удалось записать update-log: $($_.Exception.Message)"
+        Write-Host "[team-skills] $Message"
+    }
+}
+
+function New-TeamSkillsException($Code, $Stage, $Message, [System.Exception]$InnerException = $null) {
+    $exception = if ($InnerException) {
+        [System.Exception]::new($Message, $InnerException)
+    } else {
+        [System.Exception]::new($Message)
+    }
+    $exception.Data["TeamSkillsCode"] = $Code
+    $exception.Data["TeamSkillsStage"] = $Stage
+    return $exception
+}
+
+function Get-TeamSkillsErrorCode([System.Exception]$Exception) {
+    if ($Exception -and $Exception.Data.Contains("TeamSkillsCode")) {
+        return [string]$Exception.Data["TeamSkillsCode"]
+    }
+    return "UNKNOWN_FAILURE"
+}
+
+function Get-TeamSkillsErrorStage([System.Exception]$Exception) {
+    if ($Exception -and $Exception.Data.Contains("TeamSkillsStage")) {
+        return [string]$Exception.Data["TeamSkillsStage"]
+    }
+    return $Script:CurrentStage
+}
+
+function Get-SafeFailureMessage($Code) {
+    switch ($Code) {
+        "SIGNATURE_SETUP_FAILED" { return "Не удалось подготовить совместимую проверку подписи." }
+        "SIGNATURE_INVALID" { return "Подпись release metadata недействительна." }
+        "DOWNLOAD_FAILED" { return "Не удалось скачать обязательный файл после ограниченного числа попыток." }
+        "CHECKSUM_MISMATCH" { return "Контрольная сумма скачанного файла не совпала с manifest." }
+        "PLUGIN_MISSING" { return "Локальный plugin не найден; нужен полный официальный installer." }
+        "INSTALL_FAILED" { return "Не удалось безопасно завершить установку служебных файлов или plugin." }
+        "SCHEDULE_FAILED" { return "Не удалось создать или проверить задачу автообновления." }
+        default { return "Операция завершилась неизвестной ошибкой; подробности сохранены в локальном update-log." }
+    }
+}
+
+function Write-JsonAtomically($Path, $Value) {
+    $parent = Split-Path $Path -Parent
+    Ensure-Directory $parent
+    $tempPath = "$Path.tmp.$PID.$([guid]::NewGuid().ToString('N'))"
+    try {
+        $Value | ConvertTo-Json -Depth 10 | Set-Content -Path $tempPath -Encoding UTF8
+        Move-Item $tempPath $Path -Force
+    } finally {
+        if (Test-Path $tempPath) {
+            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Write-FailureState($Code, $Stage) {
+    $failure = [ordered]@{
+        schema_version = 1
+        failed_at = (Get-Date).ToUniversalTime().ToString("o")
+        operation = $Script:CurrentOperation
+        stage = $Stage
+        code = $Code
+        message = (Get-SafeFailureMessage $Code)
+        updater_version = $UpdaterVersion
+    }
+    Write-JsonAtomically $FailureStatePath $failure
+}
+
+function Clear-FailureState() {
+    if (Test-Path $FailureStatePath) {
+        Remove-Item $FailureStatePath -Force
+    }
+}
+
+function Write-ExceptionLog([System.Management.Automation.ErrorRecord]$ErrorRecord, $Code, $Stage) {
+    try {
+        Ensure-Directory $LogDir
+        $stamp = (Get-Date).ToUniversalTime().ToString("o")
+        Add-Content -Path $LogPath -Value "$stamp FAILURE code=$Code operation=$($Script:CurrentOperation) stage=$Stage" -Encoding UTF8
+        Add-Content -Path $LogPath -Value (($ErrorRecord | Format-List * -Force | Out-String).TrimEnd()) -Encoding UTF8
+    } catch {
+        Write-Host "[team-skills] Не удалось записать полное исключение в update-log: $($_.Exception.Message)"
+    }
+}
+
+function Get-ValidatedEnvInt($Name, $DefaultValue, $Minimum, $Maximum) {
+    $raw = [Environment]::GetEnvironmentVariable($Name)
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        return $DefaultValue
+    }
+    $parsed = 0
+    if (-not [int]::TryParse($raw, [ref]$parsed) -or $parsed -lt $Minimum -or $parsed -gt $Maximum) {
+        throw (New-TeamSkillsException "UNKNOWN_FAILURE" "configuration" "$Name должен быть целым числом в диапазоне $Minimum..$Maximum.")
+    }
+    return $parsed
+}
+
+function Initialize-DownloadSettings() {
+    $Script:DownloadTimeoutSec = Get-ValidatedEnvInt "CODEX_TEAM_SKILLS_DOWNLOAD_TIMEOUT_SEC" 45 1 300
+    $rawAttempts = [Environment]::GetEnvironmentVariable("CODEX_TEAM_SKILLS_DOWNLOAD_MAX_ATTEMPTS")
+    if ([string]::IsNullOrWhiteSpace($rawAttempts)) {
+        $Script:DownloadMaxAttemptsOverride = $null
+    } else {
+        $Script:DownloadMaxAttemptsOverride = Get-ValidatedEnvInt "CODEX_TEAM_SKILLS_DOWNLOAD_MAX_ATTEMPTS" 3 1 5
+    }
+}
+
+function Test-TransientDownloadFailure([System.Management.Automation.ErrorRecord]$ErrorRecord) {
+    $current = $ErrorRecord.Exception
+    while ($current) {
+        if ($current -is [System.Net.WebException]) {
+            $statusName = $current.Status.ToString()
+            if (@("Timeout", "ConnectFailure", "ConnectionClosed", "KeepAliveFailure", "ReceiveFailure", "SendFailure") -contains $statusName) {
+                return $true
+            }
+            try {
+                if ($current.Response -and $current.Response.StatusCode) {
+                    $statusCode = [int]$current.Response.StatusCode
+                    if ($statusCode -eq 408 -or $statusCode -eq 429 -or ($statusCode -ge 500 -and $statusCode -le 599)) {
+                        return $true
+                    }
+                }
+            } catch {
+                # У некоторых WebException response не даёт прочитать StatusCode.
+            }
+        }
+        $current = $current.InnerException
+    }
+    return $false
+}
+
+function Invoke-Download($Url, $Destination, $DefaultMaxAttempts, $Stage) {
+    $maxAttempts = if ($null -ne $Script:DownloadMaxAttemptsOverride) {
+        $Script:DownloadMaxAttemptsOverride
+    } else {
+        $DefaultMaxAttempts
+    }
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            if (Test-Path $Destination) {
+                Remove-Item $Destination -Force
+            }
+            Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Destination -TimeoutSec $Script:DownloadTimeoutSec
+            return
+        } catch {
+            $transient = Test-TransientDownloadFailure $_
+            if (-not $transient -or $attempt -ge $maxAttempts) {
+                throw (New-TeamSkillsException "DOWNLOAD_FAILED" $Stage "Не удалось скачать обязательный файл: $Url" $_.Exception)
+            }
+            $delay = if ($attempt -eq 1) { 2 } else { 5 }
+            Write-Log "Скачивание не удалось на попытке $attempt/$maxAttempts; повтор через $delay сек. Stage=$Stage"
+            Start-Sleep -Seconds $delay
+        }
+    }
+}
+
 function Get-Sha256($Path) {
     return (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLowerInvariant()
 }
 
-function Verify-Sha256($Path, $Expected) {
+function Verify-Sha256($Path, $Expected, $Stage = "checksum_verification") {
     $actual = Get-Sha256 $Path
     if ($actual -ne $Expected.ToLowerInvariant()) {
-        throw "Checksum mismatch для $Path."
+        throw (New-TeamSkillsException "CHECKSUM_MISMATCH" $Stage "Checksum mismatch для $Path.")
     }
 }
 
 function Verify-PublicKeyPin() {
     if (-not (Test-Path $PublicKeyPath)) {
-        throw "Public key не найден: $PublicKeyPath"
+        throw (New-TeamSkillsException "SIGNATURE_SETUP_FAILED" "signature_key_pin" "Public key не найден: $PublicKeyPath")
     }
     $actual = (Get-FileHash -Algorithm SHA256 $PublicKeyPath).Hash.ToLowerInvariant()
     if ($actual -ne $ExpectedPublicKeySha256) {
-        throw "Public key не совпадает с закреплённым якорем доверия (sha256 mismatch). Возможна подмена ключа подписи. Оставляю текущий рабочий plugin без изменений."
+        throw (New-TeamSkillsException "SIGNATURE_SETUP_FAILED" "signature_key_pin" "Public key не совпадает с закреплённым якорем доверия (sha256 mismatch). Возможна подмена ключа подписи. Оставляю текущий рабочий plugin без изменений.")
     }
 }
 
-function Verify-Signature($PayloadPath, $SignaturePath) {
-    if ($AllowUnsigned) {
-        Write-Log "ВНИМАНИЕ: проверка подписи ОТКЛЮЧЕНА (CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1). Это небезопасный режим только для разработки: устанавливается НЕпроверенный код. В обычной работе не используйте."
-        return
-    }
-    Verify-PublicKeyPin
-
+function New-PinnedRsaProvider() {
     $rsa = $null
     try {
         $cspParameters = New-Object System.Security.Cryptography.CspParameters
@@ -98,10 +264,27 @@ function Verify-Signature($PayloadPath, $SignaturePath) {
         $rsaParameters.Modulus = [Convert]::FromBase64String($PinnedPublicKeyModulusBase64)
         $rsaParameters.Exponent = [Convert]::FromBase64String($PinnedPublicKeyExponentBase64)
         $rsa.ImportParameters($rsaParameters)
+        return $rsa
     } catch {
         if ($rsa) { $rsa.Dispose() }
-        throw "Не удалось инициализировать проверку подписи в Windows PowerShell 5.1. Обновление не применено; запустите свежий официальный installer. Причина: $($_.Exception.Message)"
+        throw (New-TeamSkillsException "SIGNATURE_SETUP_FAILED" "signature_provider" "Не удалось инициализировать проверку подписи в Windows PowerShell 5.1. Обновление не применено; запустите свежий официальный installer." $_.Exception)
     }
+}
+
+function Test-SignatureSetup() {
+    Verify-PublicKeyPin
+    $rsa = New-PinnedRsaProvider
+    $rsa.Dispose()
+}
+
+function Verify-Signature($PayloadPath, $SignaturePath, $Stage = "signature_verification") {
+    if ($AllowUnsigned) {
+        Write-Log "ВНИМАНИЕ: проверка подписи ОТКЛЮЧЕНА (CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1). Это небезопасный режим только для разработки: устанавливается НЕпроверенный код. В обычной работе не используйте."
+        return
+    }
+    Verify-PublicKeyPin
+
+    $rsa = New-PinnedRsaProvider
 
     try {
         $payload = [System.IO.File]::ReadAllBytes($PayloadPath)
@@ -109,23 +292,23 @@ function Verify-Signature($PayloadPath, $SignaturePath) {
         $sha256Oid = [System.Security.Cryptography.CryptoConfig]::MapNameToOID("SHA256")
         $ok = $rsa.VerifyData($payload, $sha256Oid, $signature)
     } catch {
-        throw "Не удалось проверить подпись обновления в Windows PowerShell 5.1. Обновление не применено. Причина: $($_.Exception.Message)"
+        throw (New-TeamSkillsException "SIGNATURE_INVALID" $Stage "Не удалось проверить подпись обновления в Windows PowerShell 5.1. Обновление не применено." $_.Exception)
     } finally {
         if ($rsa) { $rsa.Dispose() }
     }
     if (-not $ok) {
-        throw "Подпись обновления недействительна: $PayloadPath. Оставляю текущий рабочий plugin без изменений."
+        throw (New-TeamSkillsException "SIGNATURE_INVALID" $Stage "Подпись обновления недействительна: $PayloadPath. Оставляю текущий рабочий plugin без изменений.")
     }
 }
 
-function Download-Signed($Url, $Destination) {
-    Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Destination
+function Download-Signed($Url, $Destination, $Stage) {
+    Invoke-Download $Url $Destination 3 "$Stage-payload"
     if ($AllowUnsigned) {
         return
     }
     $signaturePath = "$Destination.sig"
-    Invoke-WebRequest -UseBasicParsing -Uri "$Url.sig" -OutFile $signaturePath
-    Verify-Signature $Destination $signaturePath
+    Invoke-Download "$Url.sig" $signaturePath 3 "$Stage-signature-download"
+    Verify-Signature $Destination $signaturePath "$Stage-signature"
 }
 
 function Update-Marketplace($PluginPath) {
@@ -273,23 +456,25 @@ function Find-PluginRoot($ExpandedDir) {
     throw "В bundle не найден .codex-plugin/plugin.json для team-skills."
 }
 
-function Swap-Plugin($SourceDir) {
+function Start-PluginSwap($SourceDir) {
     $destParent = Split-Path $PluginDest -Parent
     Ensure-Directory $destParent
 
     $tmpDest = "$PluginDest.tmp.$PID"
-    $backupDest = "$PluginDest.previous"
+    $backupDest = "$PluginDest.previous.$PID"
     if (Test-Path $tmpDest) { Remove-Item $tmpDest -Recurse -Force }
     if (Test-Path $backupDest) { Remove-Item $backupDest -Recurse -Force }
 
     Copy-Item $SourceDir $tmpDest -Recurse -Force
 
     try {
+        $Script:PluginHadPrevious = Test-Path $PluginDest
         if (Test-Path $PluginDest) {
             Move-Item $PluginDest $backupDest -Force
         }
         Move-Item $tmpDest $PluginDest -Force
-        if (Test-Path $backupDest) { Remove-Item $backupDest -Recurse -Force }
+        $Script:PluginBackupPath = $backupDest
+        $Script:PluginSwapActive = $true
     } catch {
         if (Test-Path $PluginDest) { Remove-Item $PluginDest -Recurse -Force }
         if (Test-Path $backupDest) { Move-Item $backupDest $PluginDest -Force }
@@ -298,15 +483,44 @@ function Swap-Plugin($SourceDir) {
     }
 }
 
+function Undo-PluginSwap() {
+    if (-not $Script:PluginSwapActive) {
+        return
+    }
+    if (Test-Path $PluginDest) {
+        Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($Script:PluginHadPrevious -and (Test-Path $Script:PluginBackupPath)) {
+        Move-Item $Script:PluginBackupPath $PluginDest -Force
+    }
+    $Script:PluginSwapActive = $false
+    $Script:PluginBackupPath = ""
+}
+
+function Complete-PluginSwap() {
+    if ($Script:PluginBackupPath -and (Test-Path $Script:PluginBackupPath)) {
+        Remove-Item $Script:PluginBackupPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $Script:PluginSwapActive = $false
+    $Script:PluginBackupPath = ""
+}
+
 function Install-SupportFiles($SupportDir) {
     Ensure-Directory $BinDir
     foreach ($file in Get-ChildItem $SupportDir -File) {
         $dest = Join-Path $BinDir $file.Name
         if ($file.Name -eq "update-team-skills.ps1") {
-            Copy-Item $file.FullName "$dest.next" -Force
-            continue
+            $dest = "$dest.next"
         }
-        Copy-Item $file.FullName $dest -Force
+        $stagedDest = "$dest.replace.$PID"
+        try {
+            Copy-Item $file.FullName $stagedDest -Force
+            Move-Item $stagedDest $dest -Force
+        } finally {
+            if (Test-Path $stagedDest) {
+                Remove-Item $stagedDest -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
 }
 
@@ -328,27 +542,153 @@ function Write-State($Manifest, $BundleUrl, $SignatureState) {
         codex_plugin_cache_invalidated_path = $Script:InvalidatedCodexPluginCache
         runtime_visibility = "requires Codex restart after plugin swap and Codex cache invalidation; cannot be proven from shell"
     }
-    Ensure-Directory $StateDir
-    $state | ConvertTo-Json -Depth 8 | Set-Content -Path $StatePath -Encoding UTF8
+    Write-JsonAtomically $StatePath $state
 }
 
-function Repair-Install() {
+function Write-RepairState($Manifest) {
+    $repair = [ordered]@{
+        schema_version = 1
+        completed_at = (Get-Date).ToUniversalTime().ToString("o")
+        release_id = $Manifest.release_id
+        support_files_refreshed = $true
+        registry_repaired = $true
+        cache_invalidated = $true
+        scheduled_task_present = $true
+        plugin_changed = $false
+        updater_version = $UpdaterVersion
+    }
+    Write-JsonAtomically $RepairStatePath $repair
+}
+
+function Get-ReleaseManifest($WorkDir) {
+    $latestPath = Join-Path $WorkDir "latest.json"
+    $manifestPath = Join-Path $WorkDir "manifest.json"
+    $effectiveManifestUrl = $ManifestUrl
+
+    if (-not $effectiveManifestUrl) {
+        $Script:CurrentStage = "latest_metadata"
+        Write-Log "Скачиваю signed latest.json."
+        Download-Signed $LatestUrl $latestPath "latest"
+        try {
+            $latest = Get-Content $latestPath -Raw | ConvertFrom-Json
+            $effectiveManifestUrl = $latest.manifest_url
+        } catch {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "latest_metadata_parse" "Не удалось прочитать latest.json." $_.Exception)
+        }
+        if ([string]::IsNullOrWhiteSpace($effectiveManifestUrl)) {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "latest_metadata_parse" "latest.json не содержит manifest_url.")
+        }
+    }
+
+    $Script:CurrentStage = "manifest_metadata"
+    Write-Log "Скачиваю signed manifest.json."
+    Download-Signed $effectiveManifestUrl $manifestPath "manifest"
+    try {
+        return (Get-Content $manifestPath -Raw | ConvertFrom-Json)
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "manifest_metadata_parse" "Не удалось прочитать manifest.json." $_.Exception)
+    }
+}
+
+function Download-SupportFiles($Manifest, $SupportDir) {
+    Ensure-Directory $SupportDir
+    foreach ($entry in @($Manifest.support_files)) {
+        if ([string]::IsNullOrWhiteSpace($entry.name) -or [string]::IsNullOrWhiteSpace($entry.url) -or [string]::IsNullOrWhiteSpace($entry.sha256)) {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "support_manifest" "manifest содержит неполное описание support file.")
+        }
+        $dest = Join-Path $SupportDir $entry.name
+        $stageName = "support-$($entry.name)"
+        $Script:CurrentStage = $stageName
+        Invoke-Download $entry.url $dest 2 "$stageName-download"
+        Verify-Sha256 $dest $entry.sha256 "$stageName-checksum"
+    }
+}
+
+function Invoke-RegistryRepair() {
+    try {
+        Update-Marketplace $PluginDest
+        Update-CodexRegistry
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "registry_repair" "Не удалось восстановить marketplace/config." $_.Exception)
+    }
+}
+
+function Invoke-CacheInvalidation() {
+    try {
+        Invalidate-CodexPluginCache
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "cache_invalidation" "Не удалось инвалидировать Codex plugin cache." $_.Exception)
+    }
+}
+
+function Invoke-ScheduleRegistration() {
+    $bootstrapScript = Join-Path $BinDir "bootstrap-team-skills.ps1"
+    if (-not (Test-Path $bootstrapScript)) {
+        throw (New-TeamSkillsException "SCHEDULE_FAILED" "schedule_registration" "Bootstrap не найден после обновления support files.")
+    }
+
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $bootstrapScript -RegisterAutoUpdate 2>&1 |
+            ForEach-Object { Write-Host $_ }
+        $bootstrapExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($bootstrapExitCode -ne 0) {
+        throw (New-TeamSkillsException "SCHEDULE_FAILED" "schedule_registration" "Bootstrap не смог зарегистрировать Scheduled Task; exit code $bootstrapExitCode.")
+    }
+
+    try {
+        $task = Get-ScheduledTask -TaskName "Codex Team Skills Auto Update" -ErrorAction Stop
+        if (-not $task) {
+            throw "Scheduled Task отсутствует после регистрации."
+        }
+    } catch {
+        throw (New-TeamSkillsException "SCHEDULE_FAILED" "schedule_verification" "Не удалось подтвердить Scheduled Task после регистрации." $_.Exception)
+    }
+}
+
+function Repair-Install($WorkDir) {
     if (-not (Test-Path (Join-Path $PluginDest ".codex-plugin\plugin.json"))) {
-        throw "Repair не применён: plugin не найден: $PluginDest"
+        throw (New-TeamSkillsException "PLUGIN_MISSING" "plugin_precondition" "Repair не применён: plugin не найден: $PluginDest. Запустите полный официальный installer.")
     }
-    Update-Marketplace $PluginDest
-    Update-CodexRegistry
-    Invalidate-CodexPluginCache
-    $pluginManifest = Get-Content (Join-Path $PluginDest ".codex-plugin\plugin.json") -Raw | ConvertFrom-Json
-    $manifest = [pscustomobject]@{
-        product_version = if ($pluginManifest.product_version) { $pluginManifest.product_version } else { $pluginManifest.version }
-        runtime_version = $pluginManifest.version
-        release_id = "repair-install"
-        commit = ""
-        channel = "local"
+
+    $Script:CurrentStage = "signature_setup"
+    Test-SignatureSetup
+
+    if ($AllowUnsigned) {
+        Write-Log "ВНИМАНИЕ: repair использует CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1. Режим разрешён только для локальной разработки."
     }
-    Write-State $manifest "" "repair-no-download"
-    Write-Log "Repair завершён: Codex registry настроен. Перезапустите Codex."
+
+    $manifest = Get-ReleaseManifest $WorkDir
+    $supportDir = Join-Path $WorkDir "support"
+    Download-SupportFiles $manifest $supportDir
+
+    $Script:CurrentStage = "support_install"
+    try {
+        Install-SupportFiles $supportDir
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "support_install" "Не удалось атомарно обновить support files." $_.Exception)
+    }
+
+    $Script:CurrentStage = "registry_repair"
+    Invoke-RegistryRepair
+    $Script:CurrentStage = "cache_invalidation"
+    Invoke-CacheInvalidation
+
+    $Script:CurrentStage = "schedule_registration"
+    Invoke-ScheduleRegistration
+
+    $Script:CurrentStage = "repair_state"
+    try {
+        Clear-FailureState
+        Write-RepairState $manifest
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "repair_state" "Не удалось записать last-repair state." $_.Exception)
+    }
+    Write-LogSafe "Repair завершён: support files, registry/cache и Scheduled Task восстановлены; plugin и last_success_at не менялись. Перезапустите Codex."
 }
 
 if ($VerifySignatureOnly) {
@@ -370,68 +710,104 @@ if ($VerifySignatureOnly) {
     }
 }
 
+$scriptFailed = $false
+$workDir = $null
+
 try {
     Ensure-Directory $CacheDir
     Ensure-Directory $StateDir
     Ensure-Directory $LogDir
     Ensure-Directory $BinDir
 
-    if ($RepairInstall) {
-        Repair-Install
-        exit 0
-    }
+    $Script:CurrentStage = "configuration"
+    Initialize-DownloadSettings
 
     $workDir = Join-Path $CacheDir ("work-" + [guid]::NewGuid().ToString("N"))
     Ensure-Directory $workDir
-    $latestPath = Join-Path $workDir "latest.json"
-    $manifestPath = Join-Path $workDir "manifest.json"
-    $bundlePath = Join-Path $workDir "team-skills-bundle.zip"
-    $expandedDir = Join-Path $workDir "expanded"
-    $supportDir = Join-Path $workDir "support"
-    Ensure-Directory $supportDir
 
-    if (-not $ManifestUrl) {
-        Write-Log "Скачиваю signed latest.json."
-        Download-Signed $LatestUrl $latestPath
-        $latest = Get-Content $latestPath -Raw | ConvertFrom-Json
-        $ManifestUrl = $latest.manifest_url
+    if ($RepairInstall) {
+        Repair-Install $workDir
+    } else {
+        $manifest = Get-ReleaseManifest $workDir
+        $bundleUrl = $manifest.plugin_bundle.url
+        if ([string]::IsNullOrWhiteSpace($bundleUrl) -or [string]::IsNullOrWhiteSpace($manifest.plugin_bundle.sha256)) {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "bundle_manifest" "manifest не содержит полный plugin_bundle.")
+        }
+
+        $bundlePath = Join-Path $workDir "team-skills-bundle.zip"
+        $expandedDir = Join-Path $workDir "expanded"
+        $supportDir = Join-Path $workDir "support"
+
+        $Script:CurrentStage = "bundle_download"
+        Write-Log "Скачиваю plugin bundle."
+        Invoke-Download $bundleUrl $bundlePath 3 "bundle_download"
+        Verify-Sha256 $bundlePath $manifest.plugin_bundle.sha256 "bundle_checksum"
+        Download-SupportFiles $manifest $supportDir
+
+        $Script:CurrentStage = "bundle_validation"
+        try {
+            Expand-Archive -Path $bundlePath -DestinationPath $expandedDir -Force
+            $pluginRoot = Find-PluginRoot $expandedDir
+            $pluginManifest = Get-Content (Join-Path $pluginRoot ".codex-plugin\plugin.json") -Raw | ConvertFrom-Json
+            if ($pluginManifest.version -ne $manifest.runtime_version) {
+                throw "runtime_version mismatch: plugin=$($pluginManifest.version) manifest=$($manifest.runtime_version)"
+            }
+        } catch {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "bundle_validation" "Plugin bundle не прошёл структурную проверку." $_.Exception)
+        }
+
+        $Script:CurrentStage = "support_install"
+        try {
+            Install-SupportFiles $supportDir
+        } catch {
+            throw (New-TeamSkillsException "INSTALL_FAILED" "support_install" "Не удалось атомарно обновить support files." $_.Exception)
+        }
+
+        $Script:CurrentStage = "registry_repair"
+        Invoke-RegistryRepair
+        $Script:CurrentStage = "cache_invalidation"
+        Invoke-CacheInvalidation
+
+        $Script:CurrentStage = "plugin_swap"
+        try {
+            Clear-FailureState
+            Start-PluginSwap $pluginRoot
+            $signatureState = if ($AllowUnsigned) { "unsigned-development" } else { "signed" }
+            Write-State $manifest $bundleUrl $signatureState
+            Complete-PluginSwap
+        } catch {
+            Undo-PluginSwap
+            throw (New-TeamSkillsException "INSTALL_FAILED" "plugin_swap" "Не удалось атомарно заменить plugin и записать success state." $_.Exception)
+        }
+
+        Write-LogSafe "Установлена проверенная версия team-skills: product=$($manifest.product_version) runtime=$($manifest.runtime_version) release=$($manifest.release_id)."
+        Write-LogSafe "Перезапустите Codex, чтобы он перечитал plugin после cache invalidation; runtime visibility cannot be proven from shell."
     }
-
-    Write-Log "Скачиваю signed manifest.json."
-    Download-Signed $ManifestUrl $manifestPath
-    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    $bundleUrl = $manifest.plugin_bundle.url
-
-    Write-Log "Скачиваю plugin bundle."
-    Invoke-WebRequest -UseBasicParsing -Uri $bundleUrl -OutFile $bundlePath
-    Verify-Sha256 $bundlePath $manifest.plugin_bundle.sha256
-
-    foreach ($entry in @($manifest.support_files)) {
-        $dest = Join-Path $supportDir $entry.name
-        Invoke-WebRequest -UseBasicParsing -Uri $entry.url -OutFile $dest
-        Verify-Sha256 $dest $entry.sha256
-    }
-
-    Expand-Archive -Path $bundlePath -DestinationPath $expandedDir -Force
-    $pluginRoot = Find-PluginRoot $expandedDir
-    $pluginManifest = Get-Content (Join-Path $pluginRoot ".codex-plugin\plugin.json") -Raw | ConvertFrom-Json
-    if ($pluginManifest.version -ne $manifest.runtime_version) {
-        throw "runtime_version mismatch: plugin=$($pluginManifest.version) manifest=$($manifest.runtime_version)"
-    }
-
-    Update-Marketplace $PluginDest
-    Update-CodexRegistry
-    Swap-Plugin $pluginRoot
-    Install-SupportFiles $supportDir
-    Invalidate-CodexPluginCache
-    Write-State $manifest $bundleUrl "signed"
-    Write-Log "Установлена проверенная версия team-skills: product=$($manifest.product_version) runtime=$($manifest.runtime_version) release=$($manifest.release_id)."
-    Write-Log "Перезапустите Codex, чтобы он перечитал plugin после cache invalidation; runtime visibility cannot be proven from shell."
 } catch {
-    Write-Log "Обновление не применено: $($_.Exception.Message)"
-    throw
+    $failureRecord = $_
+    try {
+        Undo-PluginSwap
+    } catch {
+        Write-LogSafe "Не удалось автоматически откатить plugin swap: $($_.Exception.Message)"
+    }
+
+    $code = Get-TeamSkillsErrorCode $failureRecord.Exception
+    $stage = Get-TeamSkillsErrorStage $failureRecord.Exception
+    try {
+        Write-FailureState $code $stage
+    } catch {
+        Write-LogSafe "Не удалось записать last-failure.json: $($_.Exception.Message)"
+    }
+    Write-ExceptionLog $failureRecord $code $stage
+    Write-Error "[$code] $(Get-SafeFailureMessage $code) Stage=$stage" -ErrorAction Continue
+    $scriptFailed = $true
 } finally {
     if ($workDir -and (Test-Path $workDir)) {
         Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
+
+if ($scriptFailed) {
+    exit 1
+}
+exit 0
