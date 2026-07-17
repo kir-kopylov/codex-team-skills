@@ -540,10 +540,10 @@ def inspect_session_identity(
                     not normalized_query or title_source
                 ):
                     break
+        size_bytes = path.stat().st_size
     except (OSError, UnicodeDecodeError) as exc:
         raise RescueError(f"Не удалось прочитать session identity {path}: {exc}") from exc
 
-    size_bytes = path.stat().st_size
     return {
         "thread_id": thread_id,
         "thread_id_source": thread_id_source,
@@ -589,7 +589,7 @@ def resolve_session_target(
             "candidates": [],
         }
 
-    index_titles = load_session_index(codex_home)
+    index_titles = load_session_index(codex_home) if title else {}
     candidates: list[dict[str, object]] = []
     inspection_errors: list[dict[str, str]] = []
     session_files = all_session_files(codex_home)

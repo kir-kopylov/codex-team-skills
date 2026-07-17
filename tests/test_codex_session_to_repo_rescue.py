@@ -351,6 +351,49 @@ def test_thread_id_resolution_requires_matching_session_meta_after_filename_hint
     assert result["status"] == "target_not_found"
 
 
+def test_thread_id_resolution_does_not_depend_on_session_index(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    (codex_home / "session_index.jsonl").write_bytes(b"\xff\n")
+    thread_id = "019f0000-0000-7000-8000-000000000270"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["session_file"] == str(session.resolve())
+
+
+def test_identity_reports_session_disappearing_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    thread_id = "019f0000-0000-7000-8000-000000000271"
+    session = tmp_path / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    original_stat = Path.stat
+
+    def disappearing_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+        if path == session:
+            raise FileNotFoundError(session)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", disappearing_stat)
+
+    with pytest.raises(rescue.RescueError, match="Не удалось прочитать session identity"):
+        rescue.inspect_session_identity(session, {}, title_query=None)
+
+
 def test_thread_id_resolution_falls_back_after_false_filename_hint(
     tmp_path: Path,
 ) -> None:
