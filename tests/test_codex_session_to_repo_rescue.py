@@ -207,6 +207,33 @@ def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
     assert result["status"] == "target_not_found"
 
 
+@pytest.mark.parametrize("raw_size", ["NaN", "Infinity", "-Infinity", "1e999999"])
+def test_resolver_rejects_nonfinite_or_unquantizable_sizes_as_structured_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    raw_size: str,
+) -> None:
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(tmp_path / "codex-home"),
+            "--title",
+            "Status Export Pass",
+            f"--expected-size-mib={raw_size}",
+            "--lock-file",
+            str(tmp_path / "target-lock.json"),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output == {
+        "status": "error",
+        "detail": "expected_size_mib должен быть конечным числом",
+    }
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,

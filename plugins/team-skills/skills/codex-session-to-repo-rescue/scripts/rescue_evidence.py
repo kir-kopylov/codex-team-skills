@@ -59,11 +59,13 @@ def parse_expected_size_mib(raw_value: str | None) -> Decimal | None:
         return None
     try:
         value = Decimal(raw_value.replace(",", "."))
+        if not value.is_finite():
+            raise RescueError("expected_size_mib должен быть конечным числом")
+        if value < 0:
+            raise RescueError("expected_size_mib не может быть отрицательным")
+        return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except InvalidOperation as exc:
-        raise RescueError("expected_size_mib должен быть числом") from exc
-    if value < 0:
-        raise RescueError("expected_size_mib не может быть отрицательным")
-    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        raise RescueError("expected_size_mib должен быть конечным числом") from exc
 
 
 def sha256_bytes(data: bytes) -> str:
