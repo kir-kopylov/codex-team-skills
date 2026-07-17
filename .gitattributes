@@ -1,1 +1,3 @@
 installer/team-skills-public-key.pem text eol=lf
+tests/fixtures/windows-signature/latest.json text eol=lf
+tests/fixtures/windows-signature/latest.json.sig binary

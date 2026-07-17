@@ -50,6 +50,11 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\update-team-skills.ps1 -RepairInstall`
 - macOS: `~/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh --repair-install`
 
+Если старый Windows updater падает на `ImportFromPem`, он не может безопасно
+обновить сам себя. Не отключайте проверку подписи и не копируйте plugin из Git.
+Один раз повторно запустите официальную Windows-команду установки из раздела
+`User Mode` выше, затем проверьте status и перезапустите Codex.
+
 Для удаления:
 
 - Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`

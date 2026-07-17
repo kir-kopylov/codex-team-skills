@@ -46,7 +46,24 @@
 
 Публикация release после merge требует GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`. Он должен содержать приватный ключ, соответствующий публичному ключу `installer/team-skills-public-key.pem`. Без этого CI должен падать на publish-step, потому что unsigned release не должен становиться источником автообновления.
 
-Честно про bus-factor: приватный ключ хранится только офлайн и как GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, и сейчас до него дотягивается только владелец repo. Это единая точка отказа: если ключ потерян или скомпрометирован, новые подписанные release выпускать некем. Восстановление — это смена доверенного якоря, а не починка старого ключа. Порядок такой: сгенерировать новую пару ключей, заменить значение secret `TEAM_SKILLS_SIGNING_KEY_PEM` в настройках repo, закоммитить новый публичный ключ `installer/team-skills-public-key.pem`, обновить закреплённый отпечаток `EXPECTED_PUBLIC_KEY_SHA256` в `installer/update-team-skills.sh` и `installer/update-team-skills.ps1` на sha256 нового ключа (иначе после переустановки обновления упрут в проверку якоря доверия) и опубликовать свежий подписанный release. Коллеги подхватят новый якорь доверия, заново запустив установщик; до этого их клиент остаётся на старой подписи. Деградация при этом штатная: как уже описано выше, если подпись невалидна, старый рабочий plugin остаётся на месте, так что подмена ключа не ломает текущие установки, а лишь откладывает новые обновления до повторного запуска установщика.
+Честно про bus-factor: приватный ключ хранится только офлайн и как GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, и сейчас до него дотягивается только владелец repo. Это единая точка отказа: если ключ потерян или скомпрометирован, новые подписанные release выпускать некем. Восстановление — это смена доверенного якоря, а не починка старого ключа.
+
+Ротация не должна зависеть от ещё не опубликованного release:
+
+1. Офлайн сгенерируйте новую пару ключей. Приватный ключ не копируйте в repo.
+2. В одном PR замените `installer/team-skills-public-key.pem`, оба значения `EXPECTED_PUBLIC_KEY_SHA256`, `$PinnedPublicKeyModulusBase64` и `$PinnedPublicKeyExponentBase64`.
+3. До merge этим же PR соберите candidate metadata штатным `scripts/build_release_bundle.py`. В офлайн-среде подпишите полученный `latest.json` новым приватным ключом той же командой, что использует publish job:
+
+   ```bash
+   python scripts/build_release_bundle.py --dist <candidate-dist> --commit <candidate-commit> --run-number 0 --run-attempt 0
+   openssl dgst -sha256 -sign <new-private-key.pem> -out tests/fixtures/windows-signature/latest.json.sig <candidate-dist>/latest.json
+   ```
+
+   Сам `latest.json` скопируйте из `<candidate-dist>` в `tests/fixtures/windows-signature/latest.json`. Эта публичная пара нужна для проверки нового ключа до merge; приватный ключ в fixture не входит.
+4. PEM, оба pin, встроенные RSA-параметры и fixture должны меняться одним PR. Полный suite и Windows PowerShell 5.1 smoke обязаны доказать соответствие и отклонить изменённый байт.
+5. Только после зелёного PR замените GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, сразу выполните merge и дождитесь свежего подписанного release. После публикации можно заменить candidate fixture публичной парой этого release отдельным PR без смены ключа.
+
+Коллеги подхватят новый якорь доверия, заново запустив установщик; до этого их клиент остаётся на старой подписи. Деградация при этом штатная: если подпись невалидна, старый рабочий plugin остаётся на месте, так что смена ключа не ломает текущие установки, а лишь откладывает новые обновления до повторного запуска установщика.
 
 ## Команды Поддержки
 
@@ -58,6 +75,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Codex
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1" -RepairInstall
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\uninstall-team-skills.ps1"
 ```
+
+Если установленный Windows updater падает на `ImportFromPem`, он не сможет
+получить исправление через собственный signed update. Дайте коллеге повторно
+запустить официальную команду установки из `START_HERE_CONNECT_CODEX_SKILLS.md`.
+Не используйте `CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1` и Git checkout как
+пользовательское восстановление.
 
 macOS:
 
