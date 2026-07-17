@@ -113,6 +113,9 @@ def test_windows_pinned_rsa_parameters_match_shipped_public_key() -> None:
 def test_production_windows_fixture_accepts_valid_and_rejects_tampered(tmp_path: Path) -> None:
     assert WINDOWS_FIXTURE_PAYLOAD.exists()
     assert WINDOWS_FIXTURE_SIGNATURE.exists()
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    assert "tests/fixtures/windows-signature/latest.json text eol=lf" in attributes
+    assert "tests/fixtures/windows-signature/latest.json.sig binary" in attributes
 
     valid = subprocess.run(
         [

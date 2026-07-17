@@ -168,20 +168,31 @@ jobs:
           Remove-Item Env:\CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -ErrorAction SilentlyContinue
           $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $publicKey
 
-          $validOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
-            -VerifySignatureOnly -PayloadPath $payload -SignaturePath $signature 2>&1
-          if ($LASTEXITCODE -ne 0) {
-            throw "Valid production signature was rejected: $($validOutput -join [Environment]::NewLine)"
+          function Invoke-SignatureCheck($PayloadPath) {
+            $previousPreference = $ErrorActionPreference
+            try {
+              $ErrorActionPreference = "Continue"
+              $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
+                -VerifySignatureOnly -PayloadPath $PayloadPath -SignaturePath $signature 2>&1
+              $exitCode = $LASTEXITCODE
+              return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
+            } finally {
+              $ErrorActionPreference = $previousPreference
+            }
+          }
+
+          $validResult = Invoke-SignatureCheck $payload
+          if ($validResult.ExitCode -ne 0) {
+            throw "Valid production signature was rejected: $($validResult.Output -join [Environment]::NewLine)"
           }
 
           $tamperedPayload = Join-Path $work "latest-tampered.json"
           $payloadBytes = [System.IO.File]::ReadAllBytes($payload)
           $payloadBytes[0] = $payloadBytes[0] -bxor 1
           [System.IO.File]::WriteAllBytes($tamperedPayload, $payloadBytes)
-          $tamperedOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
-            -VerifySignatureOnly -PayloadPath $tamperedPayload -SignaturePath $signature 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            throw "Tampered production payload was accepted: $($tamperedOutput -join [Environment]::NewLine)"
+          $tamperedResult = Invoke-SignatureCheck $tamperedPayload
+          if ($tamperedResult.ExitCode -eq 0) {
+            throw "Tampered production payload was accepted: $($tamperedResult.Output -join [Environment]::NewLine)"
           }
 
           $tamperedKey = Join-Path $work "team-skills-public-key-tampered.pem"
@@ -189,10 +200,9 @@ jobs:
           $keyBytes[0] = $keyBytes[0] -bxor 1
           [System.IO.File]::WriteAllBytes($tamperedKey, $keyBytes)
           $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $tamperedKey
-          $pinOutput = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
-            -VerifySignatureOnly -PayloadPath $payload -SignaturePath $signature 2>&1
-          if ($LASTEXITCODE -eq 0) {
-            throw "Tampered public key pin was accepted: $($pinOutput -join [Environment]::NewLine)"
+          $pinResult = Invoke-SignatureCheck $payload
+          if ($pinResult.ExitCode -eq 0) {
+            throw "Tampered public key pin was accepted: $($pinResult.Output -join [Environment]::NewLine)"
           }
 
   claude-sync-smoke:
