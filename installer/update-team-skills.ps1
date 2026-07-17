@@ -521,12 +521,12 @@ function Undo-PluginSwap() {
                     throw "Одновременно существуют PluginDest и replacement recovery path; автоматический rollback остановлен."
                 }
                 Move-Item $PluginDest $Script:PluginReplacementRecoveryPath -Force -ErrorAction Stop
-            }
-            if (Test-Path $PluginDest) {
-                throw "Replacement plugin остался на месте после перемещения в recovery path: $PluginDest"
-            }
-            if (-not (Test-Path $Script:PluginReplacementRecoveryPath)) {
-                throw "Replacement plugin не найден в recovery path: $($Script:PluginReplacementRecoveryPath)"
+                if (Test-Path $PluginDest) {
+                    throw "Replacement plugin остался на месте после перемещения в recovery path: $PluginDest"
+                }
+                if (-not (Test-Path $Script:PluginReplacementRecoveryPath)) {
+                    throw "Replacement plugin не найден в recovery path: $($Script:PluginReplacementRecoveryPath)"
+                }
             }
 
             try {

@@ -111,6 +111,8 @@ def test_plugin_rollback_requires_confirmed_destination_removal_and_restore() ->
     assert rollback.index(restored_check) < rollback.rindex(return_replacement)
     assert rollback.rindex(return_replacement) < rollback.index(remove_recovery)
     assert rollback.index(remove_recovery) < rollback.index(transaction_clear)
+    stage_branch = rollback.split("if (Test-Path $PluginDest) {", 1)[1].split("try {", 1)[0]
+    assert staged_check in stage_branch
     assert '"plugin_rollback"' in rollback
 
 
