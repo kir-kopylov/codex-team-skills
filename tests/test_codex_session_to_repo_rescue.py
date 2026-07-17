@@ -329,6 +329,42 @@ def test_title_resolution_rejects_candidate_without_valid_thread_id(
     assert not lock.exists()
 
 
+def test_title_resolution_preserves_early_message_before_session_meta(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000272"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": title}],
+                },
+            }
+        )
+        + "\n"
+        + json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["title_source"] == "early_user_message"
+
+
 def test_thread_id_resolution_requires_matching_session_meta_after_filename_hint(
     tmp_path: Path,
 ) -> None:
@@ -576,6 +612,36 @@ def test_target_lock_is_created_with_private_mode(
     assert requested_modes == [0o600]
     if os.name != "nt":
         assert lock.stat().st_mode & 0o777 == 0o600
+
+
+def test_symlinked_archive_keeps_consistent_lock_state(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    external_archive = tmp_path / "external-store"
+    external_archive.mkdir()
+    archive_link = codex_home / "archived_sessions"
+    try:
+        archive_link.symlink_to(external_archive, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"directory symlinks unavailable: {exc}")
+    thread_id = "019f0000-0000-7000-8000-000000000273"
+    logical_session = archive_link / f"rollout-{thread_id}.jsonl"
+    (external_archive / logical_session.name).write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    resolution = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert resolution["status"] == "resolved"
+    assert resolution["target"]["archived"] is True
+    assert resolution["target"]["session_file"] == str(logical_session.absolute())
+    lock = tmp_path / "target-lock.json"
+    rescue.write_target_lock(lock, rescue.target_lock_payload(resolution))
+
+    _, inventory = rescue.inventory_from_target_lock(codex_home, lock, max_records=200)
+
+    assert inventory[0]["archived"] is True
 
 
 def test_resolve_cli_reports_persisted_target_when_lock_is_reused(

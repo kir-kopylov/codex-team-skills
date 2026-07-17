@@ -521,8 +521,9 @@ def inspect_session_identity(
                             if normalized_query and normalize_title(indexed_title) == normalized_query:
                                 title_source = "session_index"
                         else:
-                            observed_title = None
-                            title_source = None
+                            if title_source != "early_user_message":
+                                observed_title = None
+                                title_source = None
 
                 if (
                     normalized_query
@@ -547,7 +548,7 @@ def inspect_session_identity(
     return {
         "thread_id": thread_id,
         "thread_id_source": thread_id_source,
-        "session_file": str(path.resolve()),
+        "session_file": str(path.absolute()),
         "archived": "archived_sessions" in {part.lower() for part in path.parts},
         "size_bytes": size_bytes,
         "size_mib": size_mib_rounded(size_bytes),
