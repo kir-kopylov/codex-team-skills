@@ -593,7 +593,7 @@ def resolve_session_target(
     candidates: list[dict[str, object]] = []
     inspection_errors: list[dict[str, str]] = []
     session_files = all_session_files(codex_home)
-    session_file_groups = [session_files]
+    filename_matches: list[Path] = []
     if thread_id:
         filename_matches = [
             path
@@ -601,15 +601,9 @@ def resolve_session_target(
             if (match := THREAD_ID_SEARCH_RE.search(path.name))
             and match.group(0).lower() == thread_id.lower()
         ]
-        if filename_matches:
-            filename_match_set = set(filename_matches)
-            session_file_groups = [
-                filename_matches,
-                [path for path in session_files if path not in filename_match_set],
-            ]
 
-    for session_file_group in session_file_groups:
-        for path in session_file_group:
+    def inspect_paths(paths: Sequence[Path]) -> None:
+        for path in paths:
             try:
                 identity = inspect_session_identity(
                     path,
@@ -643,6 +637,30 @@ def resolve_session_target(
             if expected_mib is not None and Decimal(str(identity["size_mib"])) != expected_mib:
                 continue
             candidates.append(identity)
+
+    if thread_id and filename_matches:
+        inspect_paths(filename_matches)
+        filename_match_set = set(filename_matches)
+        remaining = [path for path in session_files if path not in filename_match_set]
+        if candidates:
+            duplicate_paths: list[Path] = []
+            for path in remaining:
+                try:
+                    if session_file_declares_thread_id(
+                        path,
+                        thread_id,
+                        TARGET_TITLE_RECORD_LIMIT,
+                    ):
+                        duplicate_paths.append(path)
+                except RescueError as exc:
+                    inspection_errors.append(
+                        {"session_file": str(path.resolve()), "detail": str(exc)}
+                    )
+            inspect_paths(duplicate_paths)
+        else:
+            inspect_paths(remaining)
+    else:
+        inspect_paths(session_files)
 
     diagnostics = {"inspection_errors": inspection_errors} if inspection_errors else {}
     if not candidates:
@@ -800,10 +818,12 @@ def session_file_declares_thread_id(path: Path, thread_id: str, max_records: int
     """Дешёво проверить session_meta без Git discovery и разбора tool inputs."""
 
     try:
-        with path.open("r", encoding="utf-8") as stream:
+        with path.open("rb") as stream:
             for record_number, line in enumerate(stream, start=1):
                 if record_number > max_records:
                     break
+                if b"session_meta" not in line:
+                    continue
                 try:
                     record = json.loads(line)
                 except (json.JSONDecodeError, UnicodeDecodeError):
@@ -815,7 +835,7 @@ def session_file_declares_thread_id(path: Path, thread_id: str, max_records: int
                     payload = {}
                 observed_id = payload.get("id") or record.get("id")
                 return isinstance(observed_id, str) and observed_id.lower() == thread_id.lower()
-    except (OSError, UnicodeDecodeError) as exc:
+    except OSError as exc:
         raise RescueError(f"Не удалось прочитать session file {path}: {exc}") from exc
     return False
 

@@ -401,6 +401,40 @@ def test_thread_id_resolution_reports_renamed_duplicate_as_ambiguous(
     }
 
 
+def test_confirmed_filename_match_uses_lightweight_scan_for_unrelated_sessions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000269"
+    target = sessions / f"rollout-{thread_id}.jsonl"
+    unrelated = sessions / "unrelated.jsonl"
+    target.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    unrelated.write_text(
+        json.dumps({"type": "event_msg", "payload": {"message": "not metadata"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    inspected: list[Path] = []
+    original_inspect = rescue.inspect_session_identity
+
+    def recording_inspect(path: Path, *args: object, **kwargs: object) -> dict[str, object]:
+        inspected.append(path)
+        return original_inspect(path, *args, **kwargs)
+
+    monkeypatch.setattr(rescue, "inspect_session_identity", recording_inspect)
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert inspected == [target]
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
