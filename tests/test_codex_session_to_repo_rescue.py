@@ -313,6 +313,27 @@ def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     assert lock.read_bytes() == before
 
 
+def test_target_lock_cannot_be_created_inside_git_worktree(tmp_path: Path) -> None:
+    repo = create_repo(tmp_path / "repo")
+    lock = repo / "private" / "target-lock.json"
+    lock.parent.mkdir()
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000261",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+
+    with pytest.raises(rescue.RescueError, match="внутри Git worktree"):
+        rescue.write_target_lock(lock, payload)
+
+    assert not lock.exists()
+
+
 def test_resolve_cli_reports_persisted_target_when_lock_is_reused(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -879,6 +900,8 @@ def test_working_source_hashes_symlink_itself_without_following_target(tmp_path:
         ".goal-runtime/active.json",
         "docs/.goal-runtime/active.json",
         ".git/config",
+        "target-lock.json",
+        "docs/target-lock.json",
         "rollout-2026-07-15-session.jsonl",
         "../outside.txt",
         ".env.local",

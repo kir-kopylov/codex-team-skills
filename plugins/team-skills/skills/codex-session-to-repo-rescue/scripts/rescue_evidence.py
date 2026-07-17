@@ -34,6 +34,7 @@ MAX_PATH_HINTS = 128
 LOCAL_STATE_FILES = {
     ".codex-global-state.json",
     "session_index.jsonl",
+    "target-lock.json",
 }
 MIB = 1024 * 1024
 TARGET_LOCK_KIND = "codex-session-target-lock"
@@ -682,7 +683,28 @@ def load_target_lock(path: Path) -> dict[str, object]:
     return payload
 
 
+def path_is_inside_git_worktree(path: Path) -> bool:
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(path.resolve().parent),
+                "rev-parse",
+                "--is-inside-work-tree",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError as exc:
+        raise RescueError(f"Не удалось проверить каталог target lock через Git: {exc}") from exc
+    return completed.returncode == 0 and completed.stdout.strip().lower() == b"true"
+
+
 def write_target_lock(path: Path, payload: dict[str, object]) -> dict[str, object]:
+    if path_is_inside_git_worktree(path):
+        raise RescueError("Target lock нельзя размещать внутри Git worktree")
     if path.exists():
         existing = load_target_lock(path)
         existing_target = existing.get("target")

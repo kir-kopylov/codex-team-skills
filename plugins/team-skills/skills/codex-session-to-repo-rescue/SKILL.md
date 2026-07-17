@@ -56,6 +56,8 @@ Codex task -> session file -> cwd -> repo/worktree -> commit/files -> remote -> 
      --lock-file <run-dir>/target-lock.json
    ```
 
+   `<run-dir>` должен быть приватным локальным каталогом вне любого Git worktree. `target-lock.json` содержит локальную identity и абсолютный session path: никогда не добавляйте его в manifest, commit или publish package.
+
    Если native task tool уже вернул точный ID, используйте `--thread-id <id>` вместо `--title`. Статус `identity_incomplete`, `ambiguous_target` или `target_not_found` — жёсткий стоп; не выбирайте первый или самый похожий candidate.
 3. Продолжайте только после `TARGET_LOCKED`. Inventory принимает lock, а не свободный `thread_id`:
 
