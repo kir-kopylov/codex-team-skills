@@ -265,6 +265,29 @@ def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     assert lock.read_bytes() == before
 
 
+def test_inventory_reports_invalid_target_lock_utf8_as_structured_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    lock = tmp_path / "target-lock.json"
+    lock.write_bytes(b'{"title":"\xff"}')
+
+    exit_code = rescue.main(
+        [
+            "inventory-session",
+            "--codex-home",
+            str(tmp_path / "codex-home"),
+            "--target-lock",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output["status"] == "error"
+    assert f"Не удалось прочитать target lock {lock}" in output["detail"]
+
+
 def test_inventory_finds_archived_session_and_git_worktree(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()

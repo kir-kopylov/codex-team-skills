@@ -634,7 +634,7 @@ def target_lock_payload(resolution: dict[str, object]) -> dict[str, object]:
 def load_target_lock(path: Path) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise RescueError(f"Не удалось прочитать target lock {path}: {exc}") from exc
     if not isinstance(payload, dict):
         raise RescueError("Target lock должен быть JSON object")
