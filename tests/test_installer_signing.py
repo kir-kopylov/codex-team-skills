@@ -116,6 +116,10 @@ def test_key_rotation_runbook_updates_all_windows_trust_material() -> None:
         "$PinnedPublicKeyExponentBase64",
         "tests/fixtures/windows-signature/latest.json",
         "PEM, оба pin, встроенные RSA-параметры и fixture должны меняться одним PR",
+        "openssl dgst -sha256 -sign",
+        "scripts/build_release_bundle.py --dist <candidate-dist>",
+        "До merge этим же PR соберите candidate metadata",
+        "Только после зелёного PR замените GitHub Actions secret",
     ):
         assert marker in content
 
