@@ -489,6 +489,7 @@ def inspect_session_identity(
     observed_title: str | None = None
     indexed_title: str | None = None
     user_message_seen = False
+    message_fallback_closed = False
     if thread_id and thread_id.lower() in index_titles:
         indexed_title = index_titles[thread_id.lower()]
         observed_title = indexed_title
@@ -503,6 +504,8 @@ def inspect_session_identity(
                 try:
                     record = json.loads(line)
                 except (json.JSONDecodeError, UnicodeDecodeError):
+                    if normalized_query and not user_message_seen:
+                        message_fallback_closed = True
                     continue
                 if not isinstance(record, dict):
                     continue
@@ -533,7 +536,7 @@ def inspect_session_identity(
                     and payload.get("type") == "message"
                     and payload.get("role") == "user"
                 ):
-                    if not user_message_seen:
+                    if not user_message_seen and not message_fallback_closed:
                         observed_message = normalize_title(message_text(payload))
                         if normalized_query == observed_message:
                             observed_title = title_query
@@ -545,6 +548,7 @@ def inspect_session_identity(
                     or indexed_title is not None
                     or title_source
                     or user_message_seen
+                    or message_fallback_closed
                 ):
                     break
         size_bytes = path.stat().st_size

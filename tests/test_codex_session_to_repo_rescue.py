@@ -291,6 +291,43 @@ def test_title_resolution_rejects_late_exact_user_message(
     assert parsed_lines == 2
 
 
+def test_title_resolution_closes_fallback_after_corrupt_early_record(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000277"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    corrupt_user = (
+        b'{"type":"response_item","payload":{"type":"message",'
+        b'"role":"user","content":['
+    )
+    metadata = json.dumps(
+        {"type": "session_meta", "payload": {"id": thread_id}}
+    ).encode("utf-8")
+    late_user = json.dumps(
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": title}],
+            },
+        }
+    ).encode("utf-8")
+    session.write_bytes(corrupt_user + b"\n" + metadata + b"\n" + late_user + b"\n")
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
 def test_title_resolution_skips_invalid_utf8_index_line(tmp_path: Path) -> None:
     codex_home = tmp_path / "codex-home"
     archive = codex_home / "archived_sessions"
