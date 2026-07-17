@@ -22,7 +22,7 @@ def test_personal_skill_uses_documented_discovery_and_invocation() -> None:
         "ChatGPT Desktop",
         "enabled skills появляются в slash-списке",
         "один restart",
-        "фактический запуск проверены",
+        "фактического запуска проверены",
     ):
         assert required in combined
 
@@ -49,6 +49,44 @@ def test_generated_skill_name_is_normalized_before_write() -> None:
     assert "`fast-migration`" in example
     assert "`$fast-migration`" in example
     assert r"^[a-z0-9]+(?:-[a-z0-9]+)*$" in exceptions
+
+
+def test_completion_is_scoped_to_the_target_surface() -> None:
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    example = (SKILL_DIR / "examples" / "good-01-existing-skill.md").read_text(
+        encoding="utf-8"
+    )
+    exceptions = (SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8")
+    process = skill.split("## Процесс", 1)[1].split("## Границы", 1)[0]
+    done = skill.split("## Definition Of Done", 1)[1].split(
+        "## Опрос После Использования", 1
+    )[0]
+
+    for required in (
+        "для выбранной целевой поверхности",
+        "Slash-список проверяйте только для ChatGPT Desktop",
+        "для CLI/IDE проверяйте `$имя` и `/skills`",
+        "Статус `первое после /` применим только при явном запросе приоритета",
+        "для статуса другой поверхности или незапрошенного приоритета — `не применимо`",
+    ):
+        assert required in process
+
+    for required in (
+        "применимые статусы обнаружения и фактического запуска",
+        "для CLI/IDE отдельно проверен `/skills`",
+        "Desktop-статусы помечены `не применимо`",
+        "Применимый, но непроверенный статус означает честный стоп",
+    ):
+        assert required in done
+
+    for required in (
+        "Работаю только в CLI",
+        "не требуя нерелевантного скриншота",
+    ):
+        assert required in example
+
+    assert "Desktop slash-список не является условием готовности CLI/IDE" in exceptions
+    assert "обнаружение, видимость в slash-списке и фактический запуск проверены" not in done
 
 
 def test_failed_discovery_cannot_jump_to_plugin_or_config_guess() -> None:
