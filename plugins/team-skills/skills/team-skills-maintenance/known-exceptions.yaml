@@ -3,3 +3,7 @@ exceptions:
     root_cause: "Updater заменил local plugin, но не инвалидировал persistent snapshot ~/.codex/plugins/cache/codex-team-skills, поэтому restart мог перечитать старый cache."
     do_next_time: "Сравнить local plugin, Codex plugin cache и state.json; ручной cache reset считать обходом, а не штатным решением. Штатный updater должен записать codex_plugin_cache_invalidated_path."
     source_example: "Пользователь видит 12 session-visible skills после многократного restart, хотя ~/plugins/team-skills уже содержит 24 skills."
+  - symptom: "Windows updater падает на ImportFromPem и не может проверить подпись release metadata."
+    root_cause: "Старая версия updater использует crypto API, которого нет в Windows PowerShell 5.1 / .NET Framework."
+    do_next_time: "Не отключать подпись и не заменять plugin через Git checkout. Один раз повторно запустить свежий официальный installer, затем проверить status и перезапустить Codex."
+    source_example: "Обезличенная Windows-установка сохраняет старый рабочий plugin после ошибки RSACryptoServiceProvider и требует обновления support files через installer."
