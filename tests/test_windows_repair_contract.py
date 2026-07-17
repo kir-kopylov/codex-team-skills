@@ -122,3 +122,5 @@ def test_windows_repair_fixture_starts_from_an_existing_updater() -> None:
     assert current_updater in integration
     assert integration.index(current_updater) < integration.index('$repair = Invoke-WindowsPowerShell $Updater @("-RepairInstall")')
     assert 'Test-Path (Join-Path $BinDir "update-team-skills.ps1.next")' in integration
+    assert "Get-Content $MarketplacePath -Raw | ConvertFrom-Json" in integration
+    assert '$_.name -eq "team-skills"' in integration

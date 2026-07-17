@@ -202,7 +202,9 @@ try {
     Assert-True (Test-Path (Join-Path $BinDir "update-team-skills.ps1.next")) "updater must remain staged as .next"
     Assert-True (-not (Test-Path $CachePath)) "active cache directory must move away"
     Assert-True (@(Get-ChildItem "$CachePath.stale.*" -Directory -ErrorAction SilentlyContinue).Count -ge 1) "stale cache directory must exist"
-    Assert-True ((Get-Content $MarketplacePath -Raw).Contains('"name": "team-skills"')) "marketplace must contain team-skills"
+    $marketplace = Get-Content $MarketplacePath -Raw | ConvertFrom-Json
+    $teamSkillsEntries = @($marketplace.plugins | Where-Object { $_.name -eq "team-skills" })
+    Assert-True ($teamSkillsEntries.Count -eq 1) "marketplace must contain exactly one team-skills entry"
     Assert-True ((Get-Content $ConfigPath -Raw).Contains("# BEGIN codex-team-skills managed block")) "Codex config must contain managed block"
 
     $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
