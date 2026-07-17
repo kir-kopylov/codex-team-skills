@@ -4,6 +4,7 @@ from conftest import ROOT
 
 
 INSTALLER = ROOT / "installer"
+WINDOWS_INTEGRATION = ROOT / "tests" / "windows" / "windows-update-repair-integration.ps1"
 
 
 def read(name: str) -> str:
@@ -113,3 +114,11 @@ def test_bootstrap_owns_idempotent_schedule_registration() -> None:
     assert "& powershell.exe" in install
     assert "Invoke-BootstrapProcess -RegisterAutoUpdate" in install
     assert install.index("if ($updateExitCode -ne 0)") < install.index("Invoke-BootstrapProcess -RegisterAutoUpdate")
+
+
+def test_windows_repair_fixture_starts_from_an_existing_updater() -> None:
+    integration = WINDOWS_INTEGRATION.read_text(encoding="utf-8")
+    current_updater = 'Copy-Item $Updater (Join-Path $BinDir "update-team-skills.ps1") -Force'
+    assert current_updater in integration
+    assert integration.index(current_updater) < integration.index('$repair = Invoke-WindowsPowerShell $Updater @("-RepairInstall")')
+    assert 'Test-Path (Join-Path $BinDir "update-team-skills.ps1.next")' in integration

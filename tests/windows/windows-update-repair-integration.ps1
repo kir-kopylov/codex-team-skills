@@ -78,6 +78,7 @@ try {
     Set-Content -Path (Join-Path $PluginDir ".codex-plugin\plugin.json") -Value '{"name":"team-skills","version":"0.1.0-test"}' -Encoding UTF8
     Set-Content -Path (Join-Path $PluginDir "plugin-marker.txt") -Value "plugin-must-stay" -Encoding UTF8
     Set-Content -Path (Join-Path $CachePath "cache-marker.txt") -Value "stale-cache" -Encoding UTF8
+    Copy-Item $Updater (Join-Path $BinDir "update-team-skills.ps1") -Force
     Copy-Item (Join-Path $DistDir "team-skills-public-key.pem") (Join-Path $BinDir "team-skills-public-key.pem") -Force
 
     $statePath = Join-Path $StateDir "state.json"
