@@ -478,9 +478,11 @@ def inspect_session_identity(
     max_records: int = TARGET_TITLE_RECORD_LIMIT,
 ) -> dict[str, object]:
     thread_id: str | None = None
+    thread_id_source: str | None = None
     filename_match = THREAD_ID_SEARCH_RE.search(path.name)
     if filename_match:
         thread_id = filename_match.group(0)
+        thread_id_source = "filename"
 
     normalized_query = normalize_title(title_query) if title_query else None
     title_source: str | None = None
@@ -511,6 +513,7 @@ def inspect_session_identity(
                     observed_id = payload.get("id") or record.get("id")
                     if isinstance(observed_id, str):
                         thread_id = observed_id
+                        thread_id_source = "session_meta"
                         indexed_title = index_titles.get(observed_id.lower())
                         if indexed_title:
                             observed_title = indexed_title
@@ -533,7 +536,9 @@ def inspect_session_identity(
                         observed_title = title_query
                         title_source = "early_user_message"
 
-                if thread_id and (not normalized_query or title_source):
+                if thread_id_source == "session_meta" and (
+                    not normalized_query or title_source
+                ):
                     break
     except (OSError, UnicodeDecodeError) as exc:
         raise RescueError(f"Не удалось прочитать session identity {path}: {exc}") from exc
@@ -541,6 +546,7 @@ def inspect_session_identity(
     size_bytes = path.stat().st_size
     return {
         "thread_id": thread_id,
+        "thread_id_source": thread_id_source,
         "session_file": str(path.resolve()),
         "archived": "archived_sessions" in {part.lower() for part in path.parts},
         "size_bytes": size_bytes,
@@ -610,11 +616,15 @@ def resolve_session_target(
             )
             continue
         observed_id = identity.get("thread_id")
-        if not isinstance(observed_id, str) or not THREAD_ID_RE.fullmatch(observed_id):
+        if (
+            not isinstance(observed_id, str)
+            or not THREAD_ID_RE.fullmatch(observed_id)
+            or identity.get("thread_id_source") != "session_meta"
+        ):
             inspection_errors.append(
                 {
                     "session_file": str(path.resolve()),
-                    "detail": "Session candidate не содержит корректный thread_id",
+                    "detail": "Session candidate не подтверждает корректный thread_id через session_meta",
                 }
             )
             continue
@@ -768,6 +778,8 @@ def inventory_from_target_lock(
 
     thread_id = str(target["thread_id"])
     inspected = inspect_session_file(session_path, thread_id, max_records)
+    if inspected.get("id_source") != "session_meta":
+        raise RescueError("TARGET_LOCK_UNCONFIRMED: session_meta с thread_id не найден")
     if str(inspected.get("thread_id", "")).lower() != thread_id.lower():
         raise RescueError("TARGET_LOCK_MISMATCH: session file объявляет другой thread_id")
     if bool(target.get("archived")) != bool(inspected.get("archived")):

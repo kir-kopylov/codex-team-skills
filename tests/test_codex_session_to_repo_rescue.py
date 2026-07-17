@@ -329,6 +329,28 @@ def test_title_resolution_rejects_candidate_without_valid_thread_id(
     assert not lock.exists()
 
 
+def test_thread_id_resolution_requires_matching_session_meta_after_filename_hint(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000262"
+    actual_id = "019f0000-0000-7000-8000-000000000263"
+    session = sessions / f"rollout-{requested_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "event_msg", "payload": {"message": "before metadata"}})
+        + "\n"
+        + json.dumps({"type": "session_meta", "payload": {"id": actual_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=requested_id)
+
+    assert result["status"] == "target_not_found"
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
