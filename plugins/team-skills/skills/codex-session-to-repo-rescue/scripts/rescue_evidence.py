@@ -643,8 +643,6 @@ def resolve_session_target(
             if expected_mib is not None and Decimal(str(identity["size_mib"])) != expected_mib:
                 continue
             candidates.append(identity)
-        if candidates:
-            break
 
     diagnostics = {"inspection_errors": inspection_errors} if inspection_errors else {}
     if not candidates:

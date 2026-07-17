@@ -377,6 +377,30 @@ def test_thread_id_resolution_falls_back_after_false_filename_hint(
     assert result["target"]["session_file"] == str(valid.resolve())
 
 
+def test_thread_id_resolution_reports_renamed_duplicate_as_ambiguous(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    archive = codex_home / "archived_sessions"
+    sessions.mkdir(parents=True)
+    archive.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000268"
+    active = sessions / f"rollout-{thread_id}.jsonl"
+    archived = archive / "renamed-copy.jsonl"
+    record = json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n"
+    active.write_text(record, encoding="utf-8")
+    archived.write_text(record, encoding="utf-8")
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "ambiguous_target"
+    assert {item["session_file"] for item in result["candidates"]} == {
+        str(active.resolve()),
+        str(archived.resolve()),
+    }
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
