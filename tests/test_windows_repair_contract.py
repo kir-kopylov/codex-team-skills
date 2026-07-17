@@ -95,18 +95,22 @@ def test_plugin_rollback_requires_confirmed_destination_removal_and_restore() ->
     update = read("update-team-skills.ps1")
     rollback = update.split("function Undo-PluginSwap", 1)[1].split("function Complete-PluginSwap", 1)[0]
     backup_check = "if ($Script:PluginHadPrevious -and -not (Test-Path $Script:PluginBackupPath))"
-    remove_replacement = "Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop"
+    stage_replacement = "Move-Item $PluginDest $Script:PluginReplacementRecoveryPath -Force -ErrorAction Stop"
     assert backup_check in rollback
-    assert rollback.index(backup_check) < rollback.index(remove_replacement)
-    assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop" in rollback
+    assert rollback.index(backup_check) < rollback.index(stage_replacement)
     assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue" not in rollback
-    removal_check = 'if (Test-Path $PluginDest) {'
+    staged_check = 'if (-not (Test-Path $Script:PluginReplacementRecoveryPath)) {'
     restore = "Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop"
     restored_check = 'if (-not (Test-Path $PluginDest)) {'
+    return_replacement = "Move-Item $Script:PluginReplacementRecoveryPath $PluginDest -Force -ErrorAction Stop"
+    remove_recovery = "Remove-Item $Script:PluginReplacementRecoveryPath -Recurse -Force -ErrorAction Stop"
     transaction_clear = "$Script:PluginSwapActive = $false"
-    assert rollback.rindex(removal_check) < rollback.index(restore)
+    assert rollback.index(stage_replacement) < rollback.index(staged_check)
+    assert rollback.index(staged_check) < rollback.index(restore)
     assert rollback.index(restore) < rollback.index(restored_check)
-    assert rollback.index(restored_check) < rollback.index(transaction_clear)
+    assert rollback.index(restored_check) < rollback.rindex(return_replacement)
+    assert rollback.rindex(return_replacement) < rollback.index(remove_recovery)
+    assert rollback.index(remove_recovery) < rollback.index(transaction_clear)
     assert '"plugin_rollback"' in rollback
 
 

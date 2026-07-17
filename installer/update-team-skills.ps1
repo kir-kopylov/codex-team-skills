@@ -45,6 +45,7 @@ $Script:CurrentStage = "initialization"
 $Script:PluginSwapActive = $false
 $Script:PluginBackupPath = ""
 $Script:PluginHadPrevious = $false
+$Script:PluginReplacementRecoveryPath = ""
 
 if (-not $LatestUrl) {
     $LatestUrl = "$RepoReleaseBase/latest.json"
@@ -457,6 +458,10 @@ function Find-PluginRoot($ExpandedDir) {
 }
 
 function Start-PluginSwap($SourceDir) {
+    if ($Script:PluginSwapActive) {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "plugin_swap" "Нельзя начать новый plugin swap, пока предыдущая транзакция не завершена.")
+    }
+    $Script:PluginReplacementRecoveryPath = ""
     $destParent = Split-Path $PluginDest -Parent
     Ensure-Directory $destParent
 
@@ -501,18 +506,55 @@ function Undo-PluginSwap() {
     }
     try {
         if ($Script:PluginHadPrevious -and -not (Test-Path $Script:PluginBackupPath)) {
+            if (-not (Test-Path $PluginDest) -and $Script:PluginReplacementRecoveryPath -and (Test-Path $Script:PluginReplacementRecoveryPath)) {
+                Move-Item $Script:PluginReplacementRecoveryPath $PluginDest -Force -ErrorAction Stop
+            }
             throw "Backup прежнего plugin не найден: $($Script:PluginBackupPath). Replacement сохранён на месте."
         }
-        if (Test-Path $PluginDest) {
-            Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop
-        }
-        if (Test-Path $PluginDest) {
-            throw "Новый plugin остался на месте после попытки удаления: $PluginDest"
-        }
         if ($Script:PluginHadPrevious) {
-            Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop
-            if (-not (Test-Path $PluginDest)) {
-                throw "Прежний plugin не появился после восстановления backup: $PluginDest"
+            if (-not $Script:PluginReplacementRecoveryPath) {
+                $recoveryId = [guid]::NewGuid().ToString("N")
+                $Script:PluginReplacementRecoveryPath = "$PluginDest.rollback-replacement.$recoveryId"
+            }
+            if (Test-Path $PluginDest) {
+                if (Test-Path $Script:PluginReplacementRecoveryPath) {
+                    throw "Одновременно существуют PluginDest и replacement recovery path; автоматический rollback остановлен."
+                }
+                Move-Item $PluginDest $Script:PluginReplacementRecoveryPath -Force -ErrorAction Stop
+            }
+            if (Test-Path $PluginDest) {
+                throw "Replacement plugin остался на месте после перемещения в recovery path: $PluginDest"
+            }
+            if (-not (Test-Path $Script:PluginReplacementRecoveryPath)) {
+                throw "Replacement plugin не найден в recovery path: $($Script:PluginReplacementRecoveryPath)"
+            }
+
+            try {
+                Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop
+                if (-not (Test-Path $PluginDest)) {
+                    throw "Прежний plugin не появился после восстановления backup: $PluginDest"
+                }
+            } catch {
+                $backupRestoreError = $_
+                if (-not (Test-Path $PluginDest) -and (Test-Path $Script:PluginReplacementRecoveryPath)) {
+                    Move-Item $Script:PluginReplacementRecoveryPath $PluginDest -Force -ErrorAction Stop
+                }
+                throw $backupRestoreError.Exception
+            }
+
+            if (Test-Path $Script:PluginReplacementRecoveryPath) {
+                try {
+                    Remove-Item $Script:PluginReplacementRecoveryPath -Recurse -Force -ErrorAction Stop
+                } catch {
+                    Write-LogSafe "Прежний plugin восстановлен, но replacement recovery path не удалён: $($Script:PluginReplacementRecoveryPath). $($_.Exception.Message)"
+                }
+            }
+        } else {
+            if (Test-Path $PluginDest) {
+                Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop
+            }
+            if (Test-Path $PluginDest) {
+                throw "Replacement plugin остался на месте после попытки удалить fresh install: $PluginDest"
             }
         }
     } catch {
@@ -521,6 +563,7 @@ function Undo-PluginSwap() {
     $Script:PluginSwapActive = $false
     $Script:PluginBackupPath = ""
     $Script:PluginHadPrevious = $false
+    $Script:PluginReplacementRecoveryPath = ""
 }
 
 function Complete-PluginSwap() {
@@ -530,6 +573,7 @@ function Complete-PluginSwap() {
     $Script:PluginSwapActive = $false
     $Script:PluginBackupPath = ""
     $Script:PluginHadPrevious = $false
+    $Script:PluginReplacementRecoveryPath = ""
 }
 
 function Install-SupportFiles($SupportDir) {
