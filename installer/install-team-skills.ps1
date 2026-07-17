@@ -7,7 +7,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoReleaseBase = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
-$TaskName = "Codex Team Skills Auto Update"
 $InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } else { Join-Path $env:LOCALAPPDATA "CodexTeamSkills" }
 $BinDir = Join-Path $InstallRoot "bin"
 $LogDir = Join-Path $InstallRoot "logs"
@@ -45,31 +44,21 @@ function Install-SupportFile($Name) {
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
 }
 
-function Register-AutoUpdateTask() {
-    if ($SkipSchedule) {
-        Write-Info "Автообновление пропущено по параметру SkipSchedule."
-        return
+function Invoke-BootstrapProcess([switch]$RegisterAutoUpdate) {
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        if ($RegisterAutoUpdate) {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BootstrapScript -RegisterAutoUpdate 2>&1 |
+                ForEach-Object { Write-Host $_ }
+        } else {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $BootstrapScript 2>&1 |
+                ForEach-Object { Write-Host $_ }
+        }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
     }
-
-    $triggerTime = Get-Date -Hour 10 -Minute 0 -Second 0
-    $action = New-ScheduledTaskAction `
-        -Execute "powershell.exe" `
-        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$BootstrapScript`""
-    $trigger = New-ScheduledTaskTrigger -Daily -DaysInterval 2 -At $triggerTime
-    $settings = New-ScheduledTaskSettingsSet `
-        -AllowStartIfOnBatteries `
-        -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable
-
-    Register-ScheduledTask `
-        -TaskName $TaskName `
-        -Action $action `
-        -Trigger $trigger `
-        -Settings $settings `
-        -Description "Раз в двое суток обновляет локальные командные Codex skills из проверенного release-bundle." `
-        -Force | Out-Null
-
-    Write-Info "Автообновление включено: Windows Task Scheduler, раз в двое суток."
 }
 
 Ensure-Directory $InstallRoot
@@ -83,13 +72,31 @@ Install-SupportFile "team-skills-status.ps1"
 Install-SupportFile "team-skills-public-key.pem"
 
 Write-Info "Ставлю последнюю проверенную версию командных Codex skills."
-if ($ManifestUrl) {
-    & $BootstrapScript -ForwardArgs @("-ManifestUrl", $ManifestUrl)
-} else {
-    & $BootstrapScript
+$previousManifestUrl = $env:CODEX_TEAM_SKILLS_MANIFEST_URL
+try {
+    if ($ManifestUrl) {
+        $env:CODEX_TEAM_SKILLS_MANIFEST_URL = $ManifestUrl
+    }
+    $updateExitCode = Invoke-BootstrapProcess
+} finally {
+    if ($null -eq $previousManifestUrl) {
+        Remove-Item Env:\CODEX_TEAM_SKILLS_MANIFEST_URL -ErrorAction SilentlyContinue
+    } else {
+        $env:CODEX_TEAM_SKILLS_MANIFEST_URL = $previousManifestUrl
+    }
+}
+if ($updateExitCode -ne 0) {
+    throw "Проверенное обновление завершилось с exit code $updateExitCode. Scheduled Task не создаётся."
 }
 
-Register-AutoUpdateTask
+if ($SkipSchedule) {
+    Write-Info "Автообновление пропущено по параметру SkipSchedule."
+} else {
+    $scheduleExitCode = Invoke-BootstrapProcess -RegisterAutoUpdate
+    if ($scheduleExitCode -ne 0) {
+        throw "Plugin обновлён, но Scheduled Task не создан; bootstrap exit code $scheduleExitCode."
+    }
+}
 
 Write-Info "Готово. Перезапустите Codex, чтобы он перечитал plugin team-skills."
 Write-Info "Проверка статуса: powershell -NoProfile -ExecutionPolicy Bypass -File `"$BinDir\team-skills-status.ps1`""
