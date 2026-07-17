@@ -1,4 +1,8 @@
 exceptions:
+  - symptom: "Папка и `name` совпадают, но содержат кириллицу, пробелы, `_`, uppercase, крайний/двойной дефис или больше 64 символов, и skill не обнаруживается."
+    root_cause: "Совпадение папки и frontmatter было ошибочно принято за полную валидность имени; Codex skill требует короткое имя в lowercase hyphen-case."
+    do_next_time: "До записи нормализовать имя по `^[a-z0-9]+(?:-[a-z0-9]+)*$`, проверить предел 64 символа, показать итоговый `$имя` пользователю и только затем создать совпадающие папку и поле `name`."
+    source_example: "examples/good-03-legacy-prompt-migration.md"
   - symptom: "Пользовательский skill создан в `.codex/skills`, но не обнаруживается на ожидаемой поверхности."
     root_cause: "Для нового личного skill был выбран недокументированный discovery path; актуальная документация перечисляет `$HOME/.agents/skills`."
     do_next_time: "Сначала использовать `%USERPROFILE%\\.agents\\skills\\<имя>\\SKILL.md` на Windows или `$HOME/.agents/skills/<имя>/SKILL.md` на macOS/Linux, затем проверить `$имя` или Skills и выполнить не более одного restart."

@@ -27,6 +27,30 @@ def test_personal_skill_uses_documented_discovery_and_invocation() -> None:
         assert required in combined
 
 
+def test_generated_skill_name_is_normalized_before_write() -> None:
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    example = (SKILL_DIR / "examples" / "good-03-legacy-prompt-migration.md").read_text(
+        encoding="utf-8"
+    )
+    exceptions = (SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8")
+
+    for required in (
+        r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "не длиннее 64 символов",
+        "Кириллицу, пробелы, `_`, uppercase",
+        "до записи покажите пользователю итоговый вызов `$имя`",
+        "папка и `name` совпадают уже после нормализации",
+        "Get-Content -Raw -Encoding UTF8",
+    ):
+        assert required in skill
+
+    assert skill.index("До выбора пути") < skill.index("Создайте минимальный валидный")
+    assert "`Fast_Migration`" in example
+    assert "`fast-migration`" in example
+    assert "`$fast-migration`" in example
+    assert r"^[a-z0-9]+(?:-[a-z0-9]+)*$" in exceptions
+
+
 def test_failed_discovery_cannot_jump_to_plugin_or_config_guess() -> None:
     skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     anti_example = (SKILL_DIR / "examples" / "anti-03-plugin-detour.md").read_text(
