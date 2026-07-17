@@ -584,6 +584,7 @@ def resolve_session_target(
 
     index_titles = load_session_index(codex_home)
     candidates: list[dict[str, object]] = []
+    inspection_errors: list[dict[str, str]] = []
     session_files = all_session_files(codex_home)
     if thread_id:
         filename_matches = [
@@ -596,11 +597,17 @@ def resolve_session_target(
             session_files = filename_matches
 
     for path in session_files:
-        identity = inspect_session_identity(
-            path,
-            index_titles,
-            title_query=title,
-        )
+        try:
+            identity = inspect_session_identity(
+                path,
+                index_titles,
+                title_query=title,
+            )
+        except RescueError as exc:
+            inspection_errors.append(
+                {"session_file": str(path.resolve()), "detail": str(exc)}
+            )
+            continue
         observed_id = identity.get("thread_id")
         if thread_id and (
             not isinstance(observed_id, str) or observed_id.lower() != thread_id.lower()
@@ -614,15 +621,27 @@ def resolve_session_target(
             continue
         candidates.append(identity)
 
+    diagnostics = {"inspection_errors": inspection_errors} if inspection_errors else {}
     if not candidates:
-        return {"status": "target_not_found", "query": query, "candidates": []}
+        return {
+            "status": "target_not_found",
+            "query": query,
+            "candidates": [],
+            **diagnostics,
+        }
     if len(candidates) > 1:
         return {
             "status": "ambiguous_target",
             "query": query,
             "candidates": candidates,
+            **diagnostics,
         }
-    return {"status": "resolved", "query": query, "target": candidates[0]}
+    return {
+        "status": "resolved",
+        "query": query,
+        "target": candidates[0],
+        **diagnostics,
+    }
 
 
 def target_identity(target: dict[str, object]) -> tuple[object, object, object]:

@@ -253,6 +253,35 @@ def test_thread_id_resolution_skips_unrelated_corrupt_sessions(tmp_path: Path) -
     assert Path(result["target"]["session_file"]) == target.resolve()
 
 
+def test_title_resolution_skips_and_reports_unrelated_corrupt_sessions(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    corrupt = archive / "000-unrelated.jsonl"
+    corrupt.write_bytes(b"\xff\n")
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000257"
+    target = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        title,
+        "2.53",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=target.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["thread_id"] == thread_id
+    assert result["inspection_errors"][0]["session_file"] == str(corrupt.resolve())
+    assert "Не удалось прочитать session identity" in result["inspection_errors"][0]["detail"]
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
