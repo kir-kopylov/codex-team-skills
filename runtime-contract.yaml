@@ -1,0 +1,48 @@
+schema_version: 1
+
+identity:
+  marketplace: codex-team-skills
+  plugin: team-skills
+
+shared:
+  plugin_root: plugins/team-skills
+  skills: plugins/team-skills/skills
+
+runtimes:
+  - id: codex
+    display_name: Codex
+    plugin_manifest: plugins/team-skills/.codex-plugin/plugin.json
+    marketplace_manifest: .agents/plugins/marketplace.json
+    marketplace_source:
+      kind: local_object
+      source: local
+      path: ./plugins/team-skills
+    skill_discovery:
+      kind: manifest_field
+      field: skills
+      value: ./skills/
+    version_policy: required_semver
+    delivery:
+      kind: signed_bundle
+      builder: scripts/build_release_bundle.py
+      ci_job: build-release-bundle
+
+  - id: claude_code
+    display_name: Claude Code
+    plugin_manifest: plugins/team-skills/.claude-plugin/plugin.json
+    marketplace_manifest: .claude-plugin/marketplace.json
+    marketplace_source:
+      kind: relative_path_string
+      value: ./plugins/team-skills
+    skill_discovery:
+      kind: plugin_root_convention
+      value: skills
+    version_policy: forbidden
+    delivery:
+      kind: native_marketplace_with_legacy_sync
+      legacy_sync:
+        script: scripts/pull-skills.sh
+        source_env: TEAM_SKILLS_SRC
+        destination_env: CLAUDE_SKILLS_DIR
+        default_destination: "~/.claude/skills/"
+        ci_job: claude-sync-smoke

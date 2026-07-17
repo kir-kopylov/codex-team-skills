@@ -36,6 +36,12 @@ NON_POWERSHELL_ASSETS = (
 
 def build_dist(tmp_path: Path) -> Path:
     dist = tmp_path / "dist"
+    commit = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     subprocess.run(
         [
             sys.executable,
@@ -45,7 +51,7 @@ def build_dist(tmp_path: Path) -> Path:
             "--dist",
             str(dist),
             "--commit",
-            "abcdef1234567890",
+            commit,
             "--run-number",
             "123",
             "--run-attempt",
@@ -55,6 +61,34 @@ def build_dist(tmp_path: Path) -> Path:
         check=True,
     )
     return dist
+
+
+def test_release_builder_rejects_unknown_commit_before_writing_dist(tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(BUILD_SCRIPT),
+            "--root",
+            str(ROOT),
+            "--dist",
+            str(dist),
+            "--commit",
+            "definitely-not-a-commit",
+            "--run-number",
+            "123",
+            "--run-attempt",
+            "2",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "Release commit не существует" in result.stderr
+    assert not dist.exists()
 
 
 def test_release_builder_writes_windows_ps1_assets_with_single_utf8_bom(tmp_path: Path) -> None:

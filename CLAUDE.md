@@ -5,13 +5,12 @@ Guidance for AI assistants (Claude Code, Codex, etc.) working in this repository
 ## What This Repository Is
 
 `codex-team-skills` is a **public, read-only team registry of reusable AI
-skills**, packaged as a single local Codex plugin named `team-skills`. The same
-skill folders are also synced into Claude Code, so one registry serves **two
-runtimes**. It is a *workflow*, not just a file store: a colleague finds the
-skill that fits their task, learns the plain-language phrase that triggers it,
-sees the owner / boundaries / examples, installs everything through one signed
-installer, and receives updates via signed releases with auto-update every two
-days.
+skills**. Its runtime topology and delivery entrypoints are declared in
+`runtime-contract.yaml`. It is a *workflow*, not just a file store: a colleague
+finds the skill that fits their task, learns the plain-language phrase that
+triggers it, sees the owner / boundaries / examples, connects through the
+declared delivery path, and receives updates through that runtime's update
+mechanism.
 
 There are two roles to keep in mind:
 
@@ -58,8 +57,6 @@ intentionally written in English for AI assistants.
 
 ```text
 plugins/team-skills/
-  .codex-plugin/plugin.json        # plugin manifest read by Codex
-  .claude-plugin/plugin.json       # plugin manifest read by Claude Code (no version field)
   skills/<skill-name>/
     SKILL.md                       # instructions the model reads (YAML frontmatter + body)
     skill.yaml                     # team registry card (owner, status, triggers, examples)
@@ -79,14 +76,18 @@ docs/                              # platform-overview.md, seed-skill-example.md
 installer/                         # signed user-mode install / update / status / uninstall
                                    #   + bootstrap-*, refresh-team-skills.command
 scripts/                           # install_plugin.sh, new_skill.py,
-                                   #   build_release_bundle.py, pull-skills.sh,
+                                   #   runtime delivery helpers,
                                    #   templates/log_usage_feedback.py (canonical copy)
 tests/                             # pytest suite (see Testing & CI)
-.agents/plugins/marketplace.json   # local marketplace entry pointing at the plugin (Codex)
-.claude-plugin/marketplace.json    # native Claude Code marketplace entry (codex-team-skills)
+runtime-contract.yaml              # machine-readable Codex/Claude topology
 .github/workflows/tests.yml        # CI: pytest + smoke tests + signed publish on main
 pyproject.toml                     # Python project (requires-python >=3.11)
 ```
+
+`runtime-contract.yaml` is the authoritative source for runtime identities,
+exact-case repo paths, manifest and marketplace locations, skill discovery,
+version policy, and delivery entrypoints. Documentation may explain that
+topology, but must not redefine it independently.
 
 The authoritative list of skills and their statuses lives in `catalog.md`
 (team-ready skills) and in each skill's `skill.yaml` (`status` field) — treat
@@ -159,8 +160,8 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 ```
 
 End users instead use the signed installers in `installer/` (documented in
-`quickstart.md`). `scripts/build_release_bundle.py` builds the validated
-release bundle that CI signs and publishes.
+`quickstart.md`). The contract-declared builder creates the validated release
+bundle that CI signs and publishes.
 
 ## Feedback-Learning System (known-exceptions + usage feedback)
 
@@ -252,40 +253,46 @@ language keys); a generic, interface-independent failure does not need one.
 - **`mac-app-uninstaller` scanner is scan-only**: its script must never contain
   deletion primitives (`rm -`, `.unlink(`, `rmtree`, `send2trash`, etc.) —
   enforced by `tests/test_mac_app_uninstaller.py`.
-- **Plugin manifest**: two manifests, two rules. The Codex manifest
-  (`.codex-plugin/plugin.json`, checked by `tests/test_plugin_manifest.py`) has
-  `name` = `team-skills`, a semver `version`, `skills` = `./skills/`, and an
-  `interface.defaultPrompt` list of 1–3 entries each ≤128 chars. The native
-  Claude Code plugin manifest (`.claude-plugin/plugin.json`, checked by
-  `tests/test_claude_manifest.py`) intentionally has **no** `version` field —
-  Claude Code decides a plugin updated by `version` before git SHA, so a pinned
-  version would stop `skills/` edits from reaching already-installed users.
-  Don't "fix" the Claude manifest by adding a semver version.
+- **Plugin manifests**: runtime-specific locations, discovery rules, and
+  version policies are generated from `runtime-contract.yaml` in the delivery
+  section below. The manifest tests enforce the remaining runtime-specific
+  interface fields.
 - A skill should be triggerable by a normal human phrase, not just by
   `$skill-name`.
 
 ## Delivery Pipeline (two runtimes)
 
-The same skill folders reach users two ways; both are covered by tests, so
-changes here must keep the tests and the Russian user-facing messages intact.
+The topology between the two runtimes is generated and checked byte-for-byte.
+Do not restate or edit these facts elsewhere in this document.
 
-- **Codex plugin** — the signed release bundle. `installer/` contains the full
-  install / update / status / uninstall set for macOS (`.command` / `.sh`) and
-  Windows (`.ps1` / `.cmd`), plus `bootstrap-team-skills.{sh,ps1}`. Auto-update
-  runs every two days via a macOS LaunchAgent
-  (`com.codex-team-skills.autoupdate`, interval `172800`) and a Windows
-  Scheduled Task (`-Daily -DaysInterval 2`). Updates are verified against a
-  signed `manifest.json` / `latest.json` using
-  `installer/team-skills-public-key.pem`. `installer/team-skills-registry.py`
-  idempotently manages the Codex `config.toml` marketplace/plugin stanzas
-  (touching only `codex-team-skills`-owned entries).
-- **Claude Code sync** — `scripts/pull-skills.sh` copies the repo's skill
-  folders into `~/.claude/skills/` (overridable via `CLAUDE_SKILLS_DIR` /
-  `TEAM_SKILLS_SRC`; `TEAM_SKILLS_PULL=0` skips the network `git pull`). It is
-  fail-closed on bad frontmatter, marks managed skills with a `.team-skill`
-  sentinel, and prunes only its own orphans — never a colleague's local-only
-  skill. `installer/refresh-team-skills.command` chains update + sync + a
-  detached app restart.
+<!-- BEGIN GENERATED CLAUDE RUNTIME CONTRACT -->
+The runtime facts below are generated from `runtime-contract.yaml`. Edit the
+contract, not this block.
+
+Both runtimes consume the same `plugins/team-skills/skills/` tree.
+
+| Concern | Codex | Claude Code |
+| --- | --- | --- |
+| Plugin manifest | `plugins/team-skills/.codex-plugin/plugin.json` | `plugins/team-skills/.claude-plugin/plugin.json` |
+| Marketplace metadata | `.agents/plugins/marketplace.json` | `.claude-plugin/marketplace.json` |
+| Skill discovery | manifest field `skills` = `./skills/` | plugin-root convention `skills/` |
+| Version policy | semver `version` is required | `version` is forbidden |
+| Delivery | signed bundle built by `scripts/build_release_bundle.py` | native marketplace; legacy folder sync through `scripts/pull-skills.sh` |
+| CI delivery job | `build-release-bundle` invokes the builder | `claude-sync-smoke` invokes the legacy sync |
+| Folder-sync destination | not applicable | `~/.claude/skills/` via `CLAUDE_SKILLS_DIR` |
+
+The legacy Claude Code sync reads `TEAM_SKILLS_SRC` as its source override.
+<!-- END GENERATED CLAUDE RUNTIME CONTRACT -->
+
+Operational guarantees outside the topology contract:
+
+- The signed-bundle installer set covers macOS and Windows, verifies release
+  metadata with the repository public key, updates on the established schedule,
+  and changes only registry entries owned by this project.
+- The legacy folder-sync path is fail-closed on malformed frontmatter, marks
+  only its own managed copies, and never prunes a colleague's local-only skill.
+- Changes to installers, sync mechanics, or release assets must preserve the
+  Russian user-facing messages and pass their dedicated delivery tests.
 
 ## Testing & CI
 
@@ -310,19 +317,21 @@ changes here must keep the tests and the Russian user-facing messages intact.
     `test_remont_smeta_builder.py`, `test_translate_daily_briefs.py`
   - delivery: `test_installer_architecture.py`, `test_release_assets.py`,
     `test_team_skills_delivery.py`, `test_claude_sync.py`,
-    `test_refresh_team_skills_command.py`
+    `test_refresh_team_skills_command.py`, `test_runtime_contract.py`,
+    `test_cross_runtime_delivery_parity.py`
 
 - CI (`.github/workflows/tests.yml`) runs on every PR and on push to `main`:
   1. `pytest` (includes language-policy and privacy checks) on Python 3.11;
-  2. builds the release bundle via `scripts/build_release_bundle.py`;
+  2. builds the release bundle through the contract-declared builder;
   3. a Windows PowerShell smoke test validating the `.ps1` release assets
      (UTF-8 BOM present, no double BOM, parseable, `-ValidateOnly` runs);
-  4. a `claude-sync-smoke` job exercising `scripts/pull-skills.sh`;
+  4. exercises the contract-declared legacy sync in its declared CI job;
   5. on push to `main` only: signs `latest.json` / `manifest.json` and
      publishes an immutable GitHub release.
 
-- If you touch `installer/`, `scripts/pull-skills.sh`, or the release bundle,
-  run the delivery tests above and keep the Russian user-facing messages intact.
+- If you touch `installer/`, the contract-declared legacy sync, or the release
+  bundle, run the delivery tests above and keep the Russian user-facing
+  messages intact.
 
 ## Git & PR Etiquette
 
