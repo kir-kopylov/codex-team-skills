@@ -177,6 +177,7 @@ def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     assert "tests\\\\fixtures\\\\windows-signature" in workflow_text
     assert "latest-tampered.json" in workflow_text
     assert "team-skills-public-key-tampered.pem" in workflow_text
+    assert "Production signature smoke passed: valid accepted, tampered payload and key rejected." in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "0xEF" in workflow_text
     assert "0xBB" in workflow_text

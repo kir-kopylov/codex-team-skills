@@ -204,6 +204,8 @@ jobs:
           if ($pinResult.ExitCode -eq 0) {
             throw "Tampered public key pin was accepted: $($pinResult.Output -join [Environment]::NewLine)"
           }
+          Write-Host "Production signature smoke passed: valid accepted, tampered payload and key rejected."
+          exit 0
 
   claude-sync-smoke:
     name: Claude skills folder sync smoke
