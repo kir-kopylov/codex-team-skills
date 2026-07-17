@@ -241,7 +241,10 @@ def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
     assert result["status"] == "target_not_found"
 
 
-def test_title_resolution_rejects_late_exact_user_message(tmp_path: Path) -> None:
+def test_title_resolution_rejects_late_exact_user_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     codex_home = tmp_path / "codex-home"
     sessions = codex_home / "sessions"
     sessions.mkdir(parents=True)
@@ -268,6 +271,15 @@ def test_title_resolution_rejects_late_exact_user_message(tmp_path: Path) -> Non
         + "\n",
         encoding="utf-8",
     )
+    parsed_lines = 0
+    original_loads = rescue.json.loads
+
+    def recording_loads(value: str | bytes, *args: object, **kwargs: object) -> object:
+        nonlocal parsed_lines
+        parsed_lines += 1
+        return original_loads(value, *args, **kwargs)
+
+    monkeypatch.setattr(rescue.json, "loads", recording_loads)
 
     result = rescue.resolve_session_target(
         codex_home,
@@ -276,6 +288,7 @@ def test_title_resolution_rejects_late_exact_user_message(tmp_path: Path) -> Non
     )
 
     assert result["status"] == "target_not_found"
+    assert parsed_lines == 2
 
 
 def test_title_resolution_skips_invalid_utf8_index_line(tmp_path: Path) -> None:
