@@ -347,7 +347,9 @@ def validate_runtime_contract(root: Path, contract: dict[str, Any]) -> None:
 
         expected_manifest_dir = ".codex-plugin" if runtime_id == "codex" else ".claude-plugin"
         _require(
-            manifest_path.parent.name == expected_manifest_dir and manifest_path.parent.parent == plugin_root,
+            manifest_path.name == "plugin.json"
+            and manifest_path.parent.name == expected_manifest_dir
+            and manifest_path.parent.parent == plugin_root,
             f"{runtime_id}.plugin_manifest должен лежать в {shared['plugin_root']}/{expected_manifest_dir}/plugin.json",
         )
 

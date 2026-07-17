@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import shutil
 from pathlib import Path
 
 import pytest
@@ -94,6 +95,24 @@ def test_runtime_contract_rejects_swapped_runtime_manifests() -> None:
     )
     with pytest.raises(validator.RuntimeContractError, match="plugin_manifest должен лежать"):
         validator.validate_runtime_contract(ROOT, contract)
+
+
+def test_runtime_contract_rejects_renamed_plugin_manifest(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shutil.copytree(
+        ROOT,
+        repo,
+        ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", "dist"),
+    )
+    original = repo / "plugins" / "team-skills" / ".codex-plugin" / "plugin.json"
+    renamed = original.with_name("renamed.json")
+    shutil.copy2(original, renamed)
+
+    contract = load_contract()
+    runtime(contract, "codex")["plugin_manifest"] = renamed.relative_to(repo).as_posix()
+
+    with pytest.raises(validator.RuntimeContractError, match=r"/plugin\.json"):
+        validator.validate_runtime_contract(repo, contract)
 
 
 @pytest.mark.parametrize(
