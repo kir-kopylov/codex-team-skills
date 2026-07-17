@@ -482,8 +482,10 @@ def inspect_session_identity(
     normalized_query = normalize_title(title_query) if title_query else None
     title_source: str | None = None
     observed_title: str | None = None
+    indexed_title: str | None = None
     if thread_id and thread_id.lower() in index_titles:
-        observed_title = index_titles[thread_id.lower()]
+        indexed_title = index_titles[thread_id.lower()]
+        observed_title = indexed_title
         if normalized_query and normalize_title(observed_title) == normalized_query:
             title_source = "session_index"
 
@@ -509,19 +511,24 @@ def inspect_session_identity(
                         indexed_title = index_titles.get(observed_id.lower())
                         if indexed_title:
                             observed_title = indexed_title
+                            title_source = None
                             if normalized_query and normalize_title(indexed_title) == normalized_query:
                                 title_source = "session_index"
+                        else:
+                            observed_title = None
+                            title_source = None
 
                 if (
                     normalized_query
+                    and indexed_title is None
                     and record.get("type") == "response_item"
                     and payload.get("type") == "message"
                     and payload.get("role") == "user"
                 ):
                     observed_message = normalize_title(message_text(payload))
-                    if normalized_query in observed_message:
+                    if normalized_query == observed_message:
                         observed_title = title_query
-                        title_source = title_source or "early_user_message"
+                        title_source = "early_user_message"
 
                 if thread_id and (not normalized_query or title_source):
                     break
@@ -686,6 +693,8 @@ def inventory_from_target_lock(
     *,
     max_records: int,
 ) -> tuple[dict[str, object], list[dict[str, object]]]:
+    if max_records < 1:
+        raise RescueError("max_records должен быть положительным")
     lock = load_target_lock(lock_path)
     target = lock["target"]
     assert isinstance(target, dict)

@@ -77,7 +77,14 @@ def write_target_lock(path: Path, session: Path, thread_id: str, *, archived: bo
     return path
 
 
-def write_sized_session(path: Path, thread_id: str, title: str, size_mib: str) -> Path:
+def write_sized_session(
+    path: Path,
+    thread_id: str,
+    title: str,
+    size_mib: str,
+    *,
+    message: str | None = None,
+) -> Path:
     prefix = (
         json.dumps(
             {"type": "session_meta", "payload": {"id": thread_id}},
@@ -90,7 +97,7 @@ def write_sized_session(path: Path, thread_id: str, title: str, size_mib: str) -
                 "payload": {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": f"Запусти {title}."}],
+                    "content": [{"type": "input_text", "text": message or title}],
                 },
             },
             ensure_ascii=False,
@@ -147,6 +154,57 @@ def test_resolver_uses_size_gate_before_locking_same_title_candidates(tmp_path: 
     assert resolved["status"] == "resolved"
     assert resolved["target"]["thread_id"] == target_id
     assert Path(resolved["target"]["session_file"]) == target.resolve()
+
+
+def test_resolver_rejects_message_fallback_when_indexed_title_mismatches(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000254"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        requested_title,
+        "2.53",
+    )
+    (codex_home / "session_index.jsonl").write_text(
+        json.dumps({"id": thread_id, "thread_name": "Different Session"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=requested_title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
+def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000255"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        requested_title,
+        "2.53",
+        message=f"Запусти {requested_title}.",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=requested_title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
 
 
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
@@ -315,6 +373,48 @@ def test_inventory_reports_invalid_utf8_as_structured_cli_error(
     assert exit_code == 2
     assert output["status"] == "error"
     assert str(session) in output["detail"]
+
+
+@pytest.mark.parametrize("max_records", [0, -1])
+def test_inventory_rejects_nonpositive_record_limits(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    max_records: int,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000005"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    lock = write_target_lock(
+        tmp_path / "target-lock.json",
+        session,
+        thread_id,
+        archived=False,
+    )
+
+    exit_code = rescue.main(
+        [
+            "inventory-session",
+            "--codex-home",
+            str(codex_home),
+            "--target-lock",
+            str(lock),
+            "--max-records",
+            str(max_records),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output == {
+        "status": "error",
+        "detail": "max_records должен быть положительным",
+    }
 
 
 def test_remote_url_sanitization_removes_credentials_and_tokens() -> None:
