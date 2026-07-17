@@ -110,6 +110,18 @@ def test_plugin_rollback_requires_confirmed_destination_removal_and_restore() ->
     assert '"plugin_rollback"' in rollback
 
 
+def test_plugin_swap_exposes_transaction_state_before_replacement_move() -> None:
+    update = read("update-team-skills.ps1")
+    start = update.split("function Start-PluginSwap", 1)[1].split("function Undo-PluginSwap", 1)[0]
+    backup_move = "Move-Item $PluginDest $backupDest -Force -ErrorAction Stop"
+    activate = "$Script:PluginSwapActive = $true"
+    replacement_move = "Move-Item $tmpDest $PluginDest -Force -ErrorAction Stop"
+    assert '[guid]::NewGuid().ToString("N")' in start
+    assert start.index(backup_move) < start.index(activate)
+    assert start.index(activate) < start.index(replacement_move)
+    assert "Undo-PluginSwap" in start
+
+
 def test_status_separates_task_success_repair_and_failure() -> None:
     status = read("team-skills-status.ps1")
     assert "Не удалось прочитать ${Path}:" in status

@@ -460,26 +460,38 @@ function Start-PluginSwap($SourceDir) {
     $destParent = Split-Path $PluginDest -Parent
     Ensure-Directory $destParent
 
-    $tmpDest = "$PluginDest.tmp.$PID"
-    $backupDest = "$PluginDest.previous.$PID"
-    if (Test-Path $tmpDest) { Remove-Item $tmpDest -Recurse -Force }
-    if (Test-Path $backupDest) { Remove-Item $backupDest -Recurse -Force }
-
-    Copy-Item $SourceDir $tmpDest -Recurse -Force
+    $swapId = [guid]::NewGuid().ToString("N")
+    $tmpDest = "$PluginDest.tmp.$swapId"
+    $backupDest = "$PluginDest.previous.$swapId"
 
     try {
+        Copy-Item $SourceDir $tmpDest -Recurse -Force -ErrorAction Stop
         $Script:PluginHadPrevious = Test-Path $PluginDest
-        if (Test-Path $PluginDest) {
-            Move-Item $PluginDest $backupDest -Force
-        }
-        Move-Item $tmpDest $PluginDest -Force
         $Script:PluginBackupPath = $backupDest
+        if (Test-Path $PluginDest) {
+            Move-Item $PluginDest $backupDest -Force -ErrorAction Stop
+        }
         $Script:PluginSwapActive = $true
+        Move-Item $tmpDest $PluginDest -Force -ErrorAction Stop
+        if (-not (Test-Path $PluginDest)) {
+            throw "Replacement plugin не появился после swap: $PluginDest"
+        }
     } catch {
-        if (Test-Path $PluginDest) { Remove-Item $PluginDest -Recurse -Force }
-        if (Test-Path $backupDest) { Move-Item $backupDest $PluginDest -Force }
-        if (Test-Path $tmpDest) { Remove-Item $tmpDest -Recurse -Force }
-        throw
+        $startError = $_
+        if ($Script:PluginSwapActive) {
+            try {
+                Undo-PluginSwap
+            } catch {
+                throw
+            }
+        } else {
+            $Script:PluginBackupPath = ""
+            $Script:PluginHadPrevious = $false
+        }
+        if (Test-Path $tmpDest) {
+            Remove-Item $tmpDest -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        throw (New-TeamSkillsException "INSTALL_FAILED" "plugin_swap" "Не удалось подготовить и подтвердить замену plugin; исходное состояние plugin восстановлено." $startError.Exception)
     }
 }
 
