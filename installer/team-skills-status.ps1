@@ -27,7 +27,7 @@ function Show-StateFile($Path, $Heading, $MissingMessage) {
     try {
         Get-Content $Path -ErrorAction Stop
     } catch {
-        Write-Host "[team-skills] Не удалось прочитать $Path: $($_.Exception.Message)"
+        Write-Host "[team-skills] Не удалось прочитать ${Path}: $($_.Exception.Message)"
     }
 }
 

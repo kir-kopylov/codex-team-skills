@@ -84,6 +84,8 @@ def test_repair_refreshes_support_and_schedule_without_plugin_swap() -> None:
 
 def test_status_separates_task_success_repair_and_failure() -> None:
     status = read("team-skills-status.ps1")
+    assert "Не удалось прочитать ${Path}:" in status
+    assert "Не удалось прочитать $Path:" not in status
     for marker in (
         "Автообновление: включено",
         "Автообновление: отсутствует",
