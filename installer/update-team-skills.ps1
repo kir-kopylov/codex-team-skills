@@ -487,14 +487,28 @@ function Undo-PluginSwap() {
     if (-not $Script:PluginSwapActive) {
         return
     }
-    if (Test-Path $PluginDest) {
-        Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    if ($Script:PluginHadPrevious -and (Test-Path $Script:PluginBackupPath)) {
-        Move-Item $Script:PluginBackupPath $PluginDest -Force
+    try {
+        if (Test-Path $PluginDest) {
+            Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop
+        }
+        if (Test-Path $PluginDest) {
+            throw "Новый plugin остался на месте после попытки удаления: $PluginDest"
+        }
+        if ($Script:PluginHadPrevious) {
+            if (-not (Test-Path $Script:PluginBackupPath)) {
+                throw "Backup прежнего plugin не найден: $($Script:PluginBackupPath)"
+            }
+            Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop
+            if (-not (Test-Path $PluginDest)) {
+                throw "Прежний plugin не появился после восстановления backup: $PluginDest"
+            }
+        }
+    } catch {
+        throw (New-TeamSkillsException "INSTALL_FAILED" "plugin_rollback" "Не удалось подтвердить восстановление прежнего plugin; transaction state сохранён для повторной попытки." $_.Exception)
     }
     $Script:PluginSwapActive = $false
     $Script:PluginBackupPath = ""
+    $Script:PluginHadPrevious = $false
 }
 
 function Complete-PluginSwap() {
@@ -503,6 +517,7 @@ function Complete-PluginSwap() {
     }
     $Script:PluginSwapActive = $false
     $Script:PluginBackupPath = ""
+    $Script:PluginHadPrevious = $false
 }
 
 function Install-SupportFiles($SupportDir) {

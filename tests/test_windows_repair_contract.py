@@ -91,6 +91,21 @@ def test_full_update_invalidates_cache_after_plugin_swap_before_success_state() 
     assert "Undo-PluginSwap" in full_update
 
 
+def test_plugin_rollback_requires_confirmed_destination_removal_and_restore() -> None:
+    update = read("update-team-skills.ps1")
+    rollback = update.split("function Undo-PluginSwap", 1)[1].split("function Complete-PluginSwap", 1)[0]
+    assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop" in rollback
+    assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue" not in rollback
+    removal_check = 'if (Test-Path $PluginDest) {'
+    restore = "Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop"
+    restored_check = 'if (-not (Test-Path $PluginDest)) {'
+    transaction_clear = "$Script:PluginSwapActive = $false"
+    assert rollback.rindex(removal_check) < rollback.index(restore)
+    assert rollback.index(restore) < rollback.index(restored_check)
+    assert rollback.index(restored_check) < rollback.index(transaction_clear)
+    assert '"plugin_rollback"' in rollback
+
+
 def test_status_separates_task_success_repair_and_failure() -> None:
     status = read("team-skills-status.ps1")
     assert "Не удалось прочитать ${Path}:" in status
