@@ -584,7 +584,18 @@ def resolve_session_target(
 
     index_titles = load_session_index(codex_home)
     candidates: list[dict[str, object]] = []
-    for path in all_session_files(codex_home):
+    session_files = all_session_files(codex_home)
+    if thread_id:
+        filename_matches = [
+            path
+            for path in session_files
+            if (match := THREAD_ID_SEARCH_RE.search(path.name))
+            and match.group(0).lower() == thread_id.lower()
+        ]
+        if filename_matches:
+            session_files = filename_matches
+
+    for path in session_files:
         identity = inspect_session_identity(
             path,
             index_titles,

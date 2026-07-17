@@ -234,6 +234,25 @@ def test_resolver_rejects_nonfinite_or_unquantizable_sizes_as_structured_error(
     }
 
 
+def test_thread_id_resolution_skips_unrelated_corrupt_sessions(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    (sessions / "000-unrelated.jsonl").write_bytes(b"\xff\n")
+    thread_id = "019f0000-0000-7000-8000-000000000256"
+    target = sessions / f"rollout-{thread_id}.jsonl"
+    target.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["thread_id"] == thread_id
+    assert Path(result["target"]["session_file"]) == target.resolve()
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
