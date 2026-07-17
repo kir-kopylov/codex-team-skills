@@ -241,6 +241,43 @@ def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
     assert result["status"] == "target_not_found"
 
 
+def test_title_resolution_rejects_late_exact_user_message(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000276"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+
+    def user_message(text: str) -> dict[str, object]:
+        return {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": text}],
+            },
+        }
+
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n"
+        + json.dumps(user_message("Different initial task"))
+        + "\n"
+        + json.dumps(user_message(title))
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
 def test_title_resolution_skips_invalid_utf8_index_line(tmp_path: Path) -> None:
     codex_home = tmp_path / "codex-home"
     archive = codex_home / "archived_sessions"

@@ -488,6 +488,7 @@ def inspect_session_identity(
     title_source: str | None = None
     observed_title: str | None = None
     indexed_title: str | None = None
+    user_message_seen = False
     if thread_id and thread_id.lower() in index_titles:
         indexed_title = index_titles[thread_id.lower()]
         observed_title = indexed_title
@@ -532,10 +533,12 @@ def inspect_session_identity(
                     and payload.get("type") == "message"
                     and payload.get("role") == "user"
                 ):
-                    observed_message = normalize_title(message_text(payload))
-                    if normalized_query == observed_message:
-                        observed_title = title_query
-                        title_source = "early_user_message"
+                    if not user_message_seen:
+                        observed_message = normalize_title(message_text(payload))
+                        if normalized_query == observed_message:
+                            observed_title = title_query
+                            title_source = "early_user_message"
+                    user_message_seen = True
 
                 if thread_id_source == "session_meta" and (
                     not normalized_query or indexed_title is not None or title_source
