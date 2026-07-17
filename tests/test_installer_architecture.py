@@ -38,13 +38,20 @@ def test_installer_files_exist() -> None:
 
 def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.ps1")
+    bootstrap = read(INSTALLER_DIR / "bootstrap-team-skills.ps1")
     update = read(INSTALLER_DIR / "update-team-skills.ps1")
     uninstall = read(INSTALLER_DIR / "uninstall-team-skills.ps1")
 
     assert "releases/latest/download" in install
-    assert "Register-ScheduledTask" in install
-    assert "New-ScheduledTaskTrigger -Daily -DaysInterval 2" in install
-    assert "Codex Team Skills Auto Update" in install
+    assert "& powershell.exe" in install
+    assert "Invoke-BootstrapProcess -RegisterAutoUpdate" in install
+    assert "Scheduled Task не создаётся" in install
+    assert "Register-ScheduledTask" not in install
+
+    assert "Register-ScheduledTask" in bootstrap
+    assert "New-ScheduledTaskTrigger -Daily -DaysInterval 2" in bootstrap
+    assert "Codex Team Skills Auto Update" in bootstrap
+    assert "RegisterAutoUpdate" in bootstrap
 
     assert "manifest.json" in update
     assert "latest.json" in update
@@ -57,6 +64,13 @@ def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
     assert "codex-team-skills" in update
     assert ".codex\\plugins\\cache\\codex-team-skills" in update
     assert "Invalidate-CodexPluginCache" in update
+    assert '$UpdaterVersion = "1.2.0"' in update
+    assert "last-failure.json" in update
+    assert "last-repair.json" in update
+    assert "CODEX_TEAM_SKILLS_DOWNLOAD_TIMEOUT_SEC" in update
+    assert "CODEX_TEAM_SKILLS_DOWNLOAD_MAX_ATTEMPTS" in update
+    assert "Start-PluginSwap" in update
+    assert "Undo-PluginSwap" in update
 
     assert "Unregister-ScheduledTask" in uninstall
     assert "marketplace.json" in uninstall
