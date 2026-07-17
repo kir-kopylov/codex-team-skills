@@ -1213,8 +1213,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = {
                 **lock_result,
                 "lock_file": str(args.lock_file.resolve()),
-                "target": lock["target"],
             }
+            if lock_result["status"] == "target_locked":
+                persisted_lock = load_target_lock(args.lock_file)
+                payload["target"] = persisted_lock["target"]
             print(json.dumps(payload, ensure_ascii=False, indent=2))
             return 0 if lock_result["status"] == "target_locked" else 4
 

@@ -313,6 +313,110 @@ def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     assert lock.read_bytes() == before
 
 
+def test_resolve_cli_reports_persisted_target_when_lock_is_reused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000258"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    persisted_target = {
+        "thread_id": thread_id,
+        "session_file": str(session.resolve()),
+        "archived": False,
+        "size_bytes": 999,
+        "size_mib": "0.00",
+        "title": "Persisted Title",
+        "title_source": "session_index",
+    }
+    lock = tmp_path / "target-lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "kind": "codex-session-target-lock",
+                "query": {"thread_id": thread_id},
+                "target": persisted_target,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--thread-id",
+            thread_id,
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert output["lock_state"] == "reused"
+    assert output["target"] == persisted_target
+
+
+def test_resolve_cli_omits_target_when_existing_lock_conflicts(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000259"
+    requested_session = sessions / f"rollout-{requested_id}.jsonl"
+    requested_session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": requested_id}}) + "\n",
+        encoding="utf-8",
+    )
+    active_target = {
+        "thread_id": "019f0000-0000-7000-8000-000000000260",
+        "session_file": str((sessions / "active.jsonl").resolve()),
+        "archived": False,
+    }
+    lock = tmp_path / "target-lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "kind": "codex-session-target-lock",
+                "query": {},
+                "target": active_target,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--thread-id",
+            requested_id,
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 4
+    assert output["status"] == "target_lock_conflict"
+    assert output["active_target"] == active_target
+    assert output["rejected_target"]["thread_id"] == requested_id
+    assert "target" not in output
+
+
 def test_inventory_reports_invalid_target_lock_utf8_as_structured_error(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

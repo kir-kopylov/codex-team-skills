@@ -29,7 +29,11 @@ Runtime output может содержать локальные paths, необ�
 
 Предпочитайте task/thread tools для title, `thread_id`, archive и pinned state. Session JSONL используйте как read-only fallback и читайте потоково. Не загружайте длинный файл целиком ради `session_meta`.
 
-CLI `inventory-session` сначала ищет `thread_id` в имени JSONL под `<CODEX_HOME>/sessions` и `<CODEX_HOME>/archived_sessions`, затем извлекает ограниченное число records, по умолчанию 10 000. Он учитывает, что tool arguments могут лежать не только как JSON в `arguments`, но и как JavaScript-like строка в `input`; из неё извлекаются только `cwd`, `workdir` и существующие absolute path hints. Неизвестную schema CLI возвращает как `schema_unconfirmed`, а не интерпретирует догадкой. Git repos внутри `<CODEX_HOME>` не включаются в artifact candidates. `records_truncated`, `path_hints_truncated` или `discovery_status=partial` запрещают отрицательный вывод о ненайденном worktree.
+CLI работает в два обязательных шага. Сначала `resolve-session` принимает либо точный `--thread-id` из native task/thread tool, либо точный `--title` вместе с `--expected-size-mib`/`--expected-bytes`. Название из `session_index.jsonl` имеет приоритет; fallback по раннему user message допустим только при отсутствии индексного названия и требует полного нормализованного совпадения. Неполная identity даёт `identity_incomplete`, несколько кандидатов — `ambiguous_target`, а повреждённые соседние JSONL перечисляются отдельно в `inspection_errors` и не могут стать target.
+
+Успешный resolution создаёт immutable `target-lock.json`. Существующий lock переиспользуется только для того же `thread_id + session_file + archive state`; попытка переключения возвращает `target_lock_conflict` и требует аннулировать прежний recovery run. Во втором шаге `inventory-session --target-lock <path>` читает только зафиксированную цель; свободный `--thread-id` этот subcommand не принимает.
+
+`inventory-session` извлекает ограниченное число records, по умолчанию 10 000, и отклоняет неположительный `--max-records`. Он учитывает, что tool arguments могут лежать не только как JSON в `arguments`, но и как JavaScript-like строка в `input`; из неё извлекаются только `cwd`, `workdir` и существующие absolute path hints. Неизвестную schema CLI возвращает как `schema_unconfirmed`, а не интерпретирует догадкой. Git repos внутри `<CODEX_HOME>` не включаются в artifact candidates. `records_truncated`, `path_hints_truncated` или `discovery_status=partial` запрещают отрицательный вывод о ненайденном worktree.
 
 ### Git И Worktrees
 
@@ -75,7 +79,8 @@ Remote URL выводите без userinfo, password, query и fragment. Пер
 
 - Session file найден, но `cwd` отсутствует: вернуть session evidence и `cwd_status=unknown`; не угадывать repo.
 - `cwd` больше не существует: искать worktree/commit только по дополнительным наблюдаемым clues; не сканировать весь диск без scope.
-- Несколько session files имеют один `thread_id`: показать все matches, archive state и timestamps; не выбирать молча.
+- Несколько session files удовлетворяют зафиксированной identity: вернуть `ambiguous_target` до создания lock; не выбирать молча.
+- Существующий target lock не совпадает с новым кандидатом: вернуть `target_lock_conflict`, сохранить `active_target` и не публиковать отклонённый кандидат как текущий `target`.
 - Dirty candidate worktree: ничего не stash/pop автоматически; отделить чужой WIP и вызвать git reality check.
 - Branch history mixed: clean branch от target tip плюс explicit allowlist; исходный checkpoint сохранить.
 - Manifest совпадает в index, но не working/checkout: проверить EOL/filter policy, не обновлять approved hashes от изменённых bytes.
