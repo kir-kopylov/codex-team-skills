@@ -1,4 +1,8 @@
 exceptions:
+  - symptom: "По названию длинной task начали разбирать соседнюю session, где то же название встречалось внутри raw chat; размер и thread ID сверили только после первых выводов."
+    root_cause: "Task identity разрешали эвристикой в ходе анализа, а не immutable target lock до inventory."
+    do_next_time: "Сначала выполнить `resolve-session` по native thread ID либо по точному title плюс наблюдаемому size; при `ambiguous_target` остановиться, создать target lock и передавать в inventory только его. При смене target аннулировать весь предыдущий recovery run."
+    source_example: "examples/good-04.md"
   - symptom: "Старая branch содержит полезный пакет вместе с локальными `.codex` и `.goal-runtime` файлами или предыдущей историей."
     root_cause: "Весь checkpoint commit приняли за publish scope вместо явного artifact allowlist."
     do_next_time: "Создать clean branch от доказанного target tip, перенести commit через `cherry-pick --no-commit`, исключить служебные paths и проверить полный allowlist через exact scope до commit."

@@ -58,6 +58,62 @@ def write_manifest(path: Path, relative_path: str, data: bytes) -> Path:
     return path
 
 
+def write_target_lock(path: Path, session: Path, thread_id: str, *, archived: bool) -> Path:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"thread_id": thread_id},
+        "target": {
+            "thread_id": thread_id,
+            "session_file": str(session.resolve()),
+            "archived": archived,
+            "size_bytes": session.stat().st_size,
+            "size_mib": rescue.size_mib_rounded(session.stat().st_size),
+            "title": None,
+            "title_source": None,
+        },
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def write_sized_session(
+    path: Path,
+    thread_id: str,
+    title: str,
+    size_mib: str,
+    *,
+    message: str | None = None,
+) -> Path:
+    prefix = (
+        json.dumps(
+            {"type": "session_meta", "payload": {"id": thread_id}},
+            separators=(",", ":"),
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": message or title}],
+                },
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n"
+    ).encode("utf-8")
+    target_size = int(float(size_mib) * 1024 * 1024)
+    padding_template = b'{"type":"padding","payload":{"text":""}}\n'
+    padding_size = target_size - len(prefix) - len(padding_template)
+    assert padding_size >= 0
+    path.write_bytes(prefix + b'{"type":"padding","payload":{"text":"' + b"x" * padding_size + b'"}}\n')
+    assert rescue.size_mib_rounded(path.stat().st_size) == size_mib
+    return path
+
+
 def test_skill_preserves_unique_session_forensics_boundary() -> None:
     content = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     for phrase in (
@@ -69,8 +125,795 @@ def test_skill_preserves_unique_session_forensics_boundary() -> None:
         "git-pr-lifecycle-safeguard",
         "auto-merge",
         "настоящий target не подтверждён",
+        "target_locked",
     ):
         assert phrase in content
+
+
+def test_resolver_uses_size_gate_before_locking_same_title_candidates(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    title = "Status Export Pass"
+    decoy_id = "019f0000-0000-7000-8000-000000000216"
+    target_id = "019f0000-0000-7000-8000-000000000253"
+    write_sized_session(archive / f"rollout-{decoy_id}.jsonl", decoy_id, title, "2.16")
+    target = write_sized_session(
+        archive / f"rollout-{target_id}.jsonl", target_id, title, "2.53"
+    )
+
+    incomplete = rescue.resolve_session_target(codex_home, title=title)
+    assert incomplete["status"] == "identity_incomplete"
+    assert incomplete["candidates"] == []
+
+    resolved = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_size_mib="2,53",
+    )
+    assert resolved["status"] == "resolved"
+    assert resolved["target"]["thread_id"] == target_id
+    assert Path(resolved["target"]["session_file"]) == target.resolve()
+
+
+def test_resolver_rejects_message_fallback_when_indexed_title_mismatches(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000254"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        requested_title,
+        "2.53",
+    )
+    (codex_home / "session_index.jsonl").write_text(
+        json.dumps({"id": thread_id, "thread_name": "Different Session"}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=requested_title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
+def test_indexed_title_mismatch_stops_after_session_meta(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000275"
+    session = tmp_path / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n"
+        + json.dumps({"type": "event_msg", "payload": {"message": "raw chat"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    parsed_lines = 0
+    original_loads = rescue.json.loads
+
+    def recording_loads(value: str | bytes, *args: object, **kwargs: object) -> object:
+        nonlocal parsed_lines
+        parsed_lines += 1
+        return original_loads(value, *args, **kwargs)
+
+    monkeypatch.setattr(rescue.json, "loads", recording_loads)
+
+    identity = rescue.inspect_session_identity(
+        session,
+        {thread_id.lower(): "Different Session"},
+        title_query=requested_title,
+    )
+
+    assert identity["title_source"] is None
+    assert parsed_lines == 1
+
+
+def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000255"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        requested_title,
+        "2.53",
+        message=f"Запусти {requested_title}.",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=requested_title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
+def test_title_resolution_rejects_late_exact_user_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000276"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+
+    def user_message(text: str) -> dict[str, object]:
+        return {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": text}],
+            },
+        }
+
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n"
+        + json.dumps(user_message("Different initial task"))
+        + "\n"
+        + json.dumps(user_message(title))
+        + "\n",
+        encoding="utf-8",
+    )
+    parsed_lines = 0
+    original_loads = rescue.json.loads
+
+    def recording_loads(value: str | bytes, *args: object, **kwargs: object) -> object:
+        nonlocal parsed_lines
+        parsed_lines += 1
+        return original_loads(value, *args, **kwargs)
+
+    monkeypatch.setattr(rescue.json, "loads", recording_loads)
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+    assert parsed_lines == 2
+
+
+def test_title_resolution_closes_fallback_after_corrupt_early_record(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000277"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    corrupt_user = (
+        b'{"type":"response_item","payload":{"type":"message",'
+        b'"role":"user","content":['
+    )
+    metadata = json.dumps(
+        {"type": "session_meta", "payload": {"id": thread_id}}
+    ).encode("utf-8")
+    late_user = json.dumps(
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": title}],
+            },
+        }
+    ).encode("utf-8")
+    session.write_bytes(corrupt_user + b"\n" + metadata + b"\n" + late_user + b"\n")
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "target_not_found"
+
+
+def test_title_resolution_skips_invalid_utf8_index_line(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000274"
+    session = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        title,
+        "2.53",
+    )
+    (codex_home / "session_index.jsonl").write_bytes(b"\xff\n")
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["title_source"] == "early_user_message"
+
+
+@pytest.mark.parametrize("raw_size", ["NaN", "Infinity", "-Infinity", "1e999999"])
+def test_resolver_rejects_nonfinite_or_unquantizable_sizes_as_structured_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    raw_size: str,
+) -> None:
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(tmp_path / "codex-home"),
+            "--title",
+            "Status Export Pass",
+            f"--expected-size-mib={raw_size}",
+            "--lock-file",
+            str(tmp_path / "target-lock.json"),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output == {
+        "status": "error",
+        "detail": "expected_size_mib должен быть конечным числом",
+    }
+
+
+def test_thread_id_resolution_skips_unrelated_corrupt_sessions(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    (sessions / "000-unrelated.jsonl").write_bytes(b"\xff\n")
+    thread_id = "019f0000-0000-7000-8000-000000000256"
+    target = sessions / f"rollout-{thread_id}.jsonl"
+    target.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["thread_id"] == thread_id
+    assert Path(result["target"]["session_file"]) == target.resolve()
+
+
+def test_title_resolution_skips_and_reports_unrelated_corrupt_sessions(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    archive = codex_home / "archived_sessions"
+    archive.mkdir(parents=True)
+    corrupt = archive / "000-unrelated.jsonl"
+    corrupt.write_bytes(b"\xff\n")
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000257"
+    target = write_sized_session(
+        archive / f"rollout-{thread_id}.jsonl",
+        thread_id,
+        title,
+        "2.53",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=target.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["thread_id"] == thread_id
+    assert result["inspection_errors"][0]["session_file"] == str(corrupt.resolve())
+    assert "Не удалось прочитать session identity" in result["inspection_errors"][0]["detail"]
+
+
+def test_title_resolution_rejects_candidate_without_valid_thread_id(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    session = sessions / "generic.jsonl"
+    session.write_text(
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": title}],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    lock = tmp_path / "target-lock.json"
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--title",
+            title,
+            "--expected-bytes",
+            str(session.stat().st_size),
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 3
+    assert output["status"] == "target_not_found"
+    assert output["inspection_errors"][0]["session_file"] == str(session.resolve())
+    assert "корректный thread_id" in output["inspection_errors"][0]["detail"]
+    assert not lock.exists()
+
+
+def test_title_resolution_preserves_early_message_before_session_meta(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000272"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps(
+            {
+                "type": "response_item",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": title}],
+                },
+            }
+        )
+        + "\n"
+        + json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(
+        codex_home,
+        title=title,
+        expected_bytes=session.stat().st_size,
+    )
+
+    assert result["status"] == "resolved"
+    assert result["target"]["title_source"] == "early_user_message"
+
+
+def test_thread_id_resolution_requires_matching_session_meta_after_filename_hint(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000262"
+    actual_id = "019f0000-0000-7000-8000-000000000263"
+    session = sessions / f"rollout-{requested_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "event_msg", "payload": {"message": "before metadata"}})
+        + "\n"
+        + json.dumps({"type": "session_meta", "payload": {"id": actual_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=requested_id)
+
+    assert result["status"] == "target_not_found"
+
+
+def test_thread_id_resolution_does_not_depend_on_session_index(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    (codex_home / "session_index.jsonl").write_bytes(b"\xff\n")
+    thread_id = "019f0000-0000-7000-8000-000000000270"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["session_file"] == str(session.resolve())
+
+
+def test_identity_reports_session_disappearing_before_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    thread_id = "019f0000-0000-7000-8000-000000000271"
+    session = tmp_path / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    original_stat = Path.stat
+
+    def disappearing_stat(path: Path, *args: object, **kwargs: object) -> os.stat_result:
+        if path == session:
+            raise FileNotFoundError(session)
+        return original_stat(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "stat", disappearing_stat)
+
+    with pytest.raises(rescue.RescueError, match="Не удалось прочитать session identity"):
+        rescue.inspect_session_identity(session, {}, title_query=None)
+
+
+def test_thread_id_resolution_falls_back_after_false_filename_hint(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000264"
+    stale_id = "019f0000-0000-7000-8000-000000000265"
+    stale = sessions / f"rollout-{requested_id}.jsonl"
+    stale.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": stale_id}}) + "\n",
+        encoding="utf-8",
+    )
+    valid = sessions / "renamed-session.jsonl"
+    valid.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": requested_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=requested_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["session_file"] == str(valid.resolve())
+
+
+def test_thread_id_resolution_reports_renamed_duplicate_as_ambiguous(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    archive = codex_home / "archived_sessions"
+    sessions.mkdir(parents=True)
+    archive.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000268"
+    active = sessions / f"rollout-{thread_id}.jsonl"
+    archived = archive / "renamed-copy.jsonl"
+    record = json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n"
+    active.write_text(record, encoding="utf-8")
+    archived.write_text(record, encoding="utf-8")
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "ambiguous_target"
+    assert {item["session_file"] for item in result["candidates"]} == {
+        str(active.resolve()),
+        str(archived.resolve()),
+    }
+
+
+def test_confirmed_filename_match_uses_lightweight_scan_for_unrelated_sessions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000269"
+    target = sessions / f"rollout-{thread_id}.jsonl"
+    unrelated = sessions / "unrelated.jsonl"
+    target.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    unrelated.write_text(
+        json.dumps({"type": "event_msg", "payload": {"message": "not metadata"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    inspected: list[Path] = []
+    original_inspect = rescue.inspect_session_identity
+
+    def recording_inspect(path: Path, *args: object, **kwargs: object) -> dict[str, object]:
+        inspected.append(path)
+        return original_inspect(path, *args, **kwargs)
+
+    monkeypatch.setattr(rescue, "inspect_session_identity", recording_inspect)
+
+    result = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert result["status"] == "resolved"
+    assert inspected == [target]
+
+
+def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
+    first = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000001",
+            "session_file": str((tmp_path / "first.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    second = {
+        **first,
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000002",
+            "session_file": str((tmp_path / "second.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    lock = tmp_path / "target-lock.json"
+
+    created = rescue.write_target_lock(lock, first)
+    before = lock.read_bytes()
+    conflict = rescue.write_target_lock(lock, second)
+
+    assert created == {"status": "target_locked", "lock_state": "created"}
+    assert conflict["status"] == "target_lock_conflict"
+    assert conflict["invalidation_required"] is True
+    assert lock.read_bytes() == before
+
+
+def test_target_lock_cannot_be_created_inside_git_worktree(tmp_path: Path) -> None:
+    repo = create_repo(tmp_path / "repo")
+    lock = repo / "private" / "target-lock.json"
+    lock.parent.mkdir()
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000261",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+
+    with pytest.raises(rescue.RescueError, match="внутри Git worktree"):
+        rescue.write_target_lock(lock, payload)
+
+    assert not lock.exists()
+
+
+def test_target_lock_requires_fixed_private_filename(tmp_path: Path) -> None:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000266",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+
+    with pytest.raises(rescue.RescueError, match="target-lock.json"):
+        rescue.write_target_lock(tmp_path / "session-lock.json", payload)
+
+
+def test_target_lock_is_created_with_private_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000267",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    requested_modes: list[int] = []
+    original_open = os.open
+
+    def recording_open(path: os.PathLike[str] | str, flags: int, mode: int = 0o777) -> int:
+        requested_modes.append(mode)
+        return original_open(path, flags, mode)
+
+    monkeypatch.setattr(rescue.os, "open", recording_open)
+    lock = tmp_path / "target-lock.json"
+
+    result = rescue.write_target_lock(lock, payload)
+
+    assert result == {"status": "target_locked", "lock_state": "created"}
+    assert requested_modes == [0o600]
+    if os.name != "nt":
+        assert lock.stat().st_mode & 0o777 == 0o600
+
+
+def test_symlinked_archive_keeps_consistent_lock_state(tmp_path: Path) -> None:
+    codex_home = tmp_path / "codex-home"
+    codex_home.mkdir()
+    external_archive = tmp_path / "external-store"
+    external_archive.mkdir()
+    archive_link = codex_home / "archived_sessions"
+    try:
+        archive_link.symlink_to(external_archive, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"directory symlinks unavailable: {exc}")
+    thread_id = "019f0000-0000-7000-8000-000000000273"
+    logical_session = archive_link / f"rollout-{thread_id}.jsonl"
+    (external_archive / logical_session.name).write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+
+    resolution = rescue.resolve_session_target(codex_home, thread_id=thread_id)
+
+    assert resolution["status"] == "resolved"
+    assert resolution["target"]["archived"] is True
+    assert resolution["target"]["session_file"] == str(logical_session.absolute())
+    lock = tmp_path / "target-lock.json"
+    rescue.write_target_lock(lock, rescue.target_lock_payload(resolution))
+
+    _, inventory = rescue.inventory_from_target_lock(codex_home, lock, max_records=200)
+
+    assert inventory[0]["archived"] is True
+
+
+def test_resolve_cli_reports_persisted_target_when_lock_is_reused(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000258"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    persisted_target = {
+        "thread_id": thread_id,
+        "session_file": str(session.resolve()),
+        "archived": False,
+        "size_bytes": 999,
+        "size_mib": "0.00",
+        "title": "Persisted Title",
+        "title_source": "session_index",
+    }
+    lock = tmp_path / "target-lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "kind": "codex-session-target-lock",
+                "query": {"thread_id": thread_id},
+                "target": persisted_target,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--thread-id",
+            thread_id,
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert output["lock_state"] == "reused"
+    assert output["target"] == persisted_target
+
+
+def test_resolve_cli_omits_target_when_existing_lock_conflicts(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000259"
+    requested_session = sessions / f"rollout-{requested_id}.jsonl"
+    requested_session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": requested_id}}) + "\n",
+        encoding="utf-8",
+    )
+    active_target = {
+        "thread_id": "019f0000-0000-7000-8000-000000000260",
+        "session_file": str((sessions / "active.jsonl").resolve()),
+        "archived": False,
+    }
+    lock = tmp_path / "target-lock.json"
+    lock.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "kind": "codex-session-target-lock",
+                "query": {},
+                "target": active_target,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exit_code = rescue.main(
+        [
+            "resolve-session",
+            "--codex-home",
+            str(codex_home),
+            "--thread-id",
+            requested_id,
+            "--lock-file",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 4
+    assert output["status"] == "target_lock_conflict"
+    assert output["active_target"] == active_target
+    assert output["rejected_target"]["thread_id"] == requested_id
+    assert "target" not in output
+
+
+def test_inventory_reports_invalid_target_lock_utf8_as_structured_error(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    lock = tmp_path / "target-lock.json"
+    lock.write_bytes(b'{"title":"\xff"}')
+
+    exit_code = rescue.main(
+        [
+            "inventory-session",
+            "--codex-home",
+            str(tmp_path / "codex-home"),
+            "--target-lock",
+            str(lock),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output["status"] == "error"
+    assert f"Не удалось прочитать target lock {lock}" in output["detail"]
 
 
 def test_inventory_finds_archived_session_and_git_worktree(tmp_path: Path) -> None:
@@ -192,14 +1035,15 @@ def test_inventory_reports_invalid_utf8_as_structured_cli_error(
         json.dumps({"type": "session_meta", "payload": {"id": thread_id}}).encode()
         + b"\n\xff\n"
     )
+    lock = write_target_lock(tmp_path / "target-lock.json", session, thread_id, archived=False)
 
     exit_code = rescue.main(
         [
             "inventory-session",
             "--codex-home",
             str(codex_home),
-            "--thread-id",
-            thread_id,
+            "--target-lock",
+            str(lock),
         ]
     )
     output = json.loads(capsys.readouterr().out)
@@ -207,6 +1051,48 @@ def test_inventory_reports_invalid_utf8_as_structured_cli_error(
     assert exit_code == 2
     assert output["status"] == "error"
     assert str(session) in output["detail"]
+
+
+@pytest.mark.parametrize("max_records", [0, -1])
+def test_inventory_rejects_nonpositive_record_limits(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    max_records: int,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    thread_id = "019f0000-0000-7000-8000-000000000005"
+    session = sessions / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}}) + "\n",
+        encoding="utf-8",
+    )
+    lock = write_target_lock(
+        tmp_path / "target-lock.json",
+        session,
+        thread_id,
+        archived=False,
+    )
+
+    exit_code = rescue.main(
+        [
+            "inventory-session",
+            "--codex-home",
+            str(codex_home),
+            "--target-lock",
+            str(lock),
+            "--max-records",
+            str(max_records),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output == {
+        "status": "error",
+        "detail": "max_records должен быть положительным",
+    }
 
 
 def test_remote_url_sanitization_removes_credentials_and_tokens() -> None:
@@ -469,6 +1355,8 @@ def test_working_source_hashes_symlink_itself_without_following_target(tmp_path:
         ".goal-runtime/active.json",
         "docs/.goal-runtime/active.json",
         ".git/config",
+        "target-lock.json",
+        "docs/target-lock.json",
         "rollout-2026-07-15-session.jsonl",
         "../outside.txt",
         ".env.local",
