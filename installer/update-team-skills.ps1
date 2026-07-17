@@ -488,6 +488,9 @@ function Undo-PluginSwap() {
         return
     }
     try {
+        if ($Script:PluginHadPrevious -and -not (Test-Path $Script:PluginBackupPath)) {
+            throw "Backup прежнего plugin не найден: $($Script:PluginBackupPath). Replacement сохранён на месте."
+        }
         if (Test-Path $PluginDest) {
             Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop
         }
@@ -495,9 +498,6 @@ function Undo-PluginSwap() {
             throw "Новый plugin остался на месте после попытки удаления: $PluginDest"
         }
         if ($Script:PluginHadPrevious) {
-            if (-not (Test-Path $Script:PluginBackupPath)) {
-                throw "Backup прежнего plugin не найден: $($Script:PluginBackupPath)"
-            }
             Move-Item $Script:PluginBackupPath $PluginDest -Force -ErrorAction Stop
             if (-not (Test-Path $PluginDest)) {
                 throw "Прежний plugin не появился после восстановления backup: $PluginDest"

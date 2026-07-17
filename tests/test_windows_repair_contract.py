@@ -94,6 +94,10 @@ def test_full_update_invalidates_cache_after_plugin_swap_before_success_state() 
 def test_plugin_rollback_requires_confirmed_destination_removal_and_restore() -> None:
     update = read("update-team-skills.ps1")
     rollback = update.split("function Undo-PluginSwap", 1)[1].split("function Complete-PluginSwap", 1)[0]
+    backup_check = "if ($Script:PluginHadPrevious -and -not (Test-Path $Script:PluginBackupPath))"
+    remove_replacement = "Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop"
+    assert backup_check in rollback
+    assert rollback.index(backup_check) < rollback.index(remove_replacement)
     assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction Stop" in rollback
     assert "Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue" not in rollback
     removal_check = 'if (Test-Path $PluginDest) {'
