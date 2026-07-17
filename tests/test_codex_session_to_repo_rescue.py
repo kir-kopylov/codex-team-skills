@@ -184,6 +184,40 @@ def test_resolver_rejects_message_fallback_when_indexed_title_mismatches(
     assert result["status"] == "target_not_found"
 
 
+def test_indexed_title_mismatch_stops_after_session_meta(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_title = "Status Export Pass"
+    thread_id = "019f0000-0000-7000-8000-000000000275"
+    session = tmp_path / f"rollout-{thread_id}.jsonl"
+    session.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": thread_id}})
+        + "\n"
+        + json.dumps({"type": "event_msg", "payload": {"message": "raw chat"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    parsed_lines = 0
+    original_loads = rescue.json.loads
+
+    def recording_loads(value: str | bytes, *args: object, **kwargs: object) -> object:
+        nonlocal parsed_lines
+        parsed_lines += 1
+        return original_loads(value, *args, **kwargs)
+
+    monkeypatch.setattr(rescue.json, "loads", recording_loads)
+
+    identity = rescue.inspect_session_identity(
+        session,
+        {thread_id.lower(): "Different Session"},
+        title_query=requested_title,
+    )
+
+    assert identity["title_source"] is None
+    assert parsed_lines == 1
+
+
 def test_resolver_requires_exact_message_fallback_title(tmp_path: Path) -> None:
     codex_home = tmp_path / "codex-home"
     archive = codex_home / "archived_sessions"

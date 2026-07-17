@@ -538,7 +538,7 @@ def inspect_session_identity(
                         title_source = "early_user_message"
 
                 if thread_id_source == "session_meta" and (
-                    not normalized_query or title_source
+                    not normalized_query or indexed_title is not None or title_source
                 ):
                     break
         size_bytes = path.stat().st_size
