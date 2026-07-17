@@ -30,6 +30,7 @@ from conftest import ROOT
 PUBLIC_KEY = ROOT / "installer" / "team-skills-public-key.pem"
 UPDATE_SH = ROOT / "installer" / "update-team-skills.sh"
 UPDATE_PS1 = ROOT / "installer" / "update-team-skills.ps1"
+ADMIN_GUIDE = ROOT / "admin-onboarding-guide.md"
 WINDOWS_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "windows-signature"
 WINDOWS_FIXTURE_PAYLOAD = WINDOWS_FIXTURE_DIR / "latest.json"
 WINDOWS_FIXTURE_SIGNATURE = WINDOWS_FIXTURE_DIR / "latest.json.sig"
@@ -102,6 +103,19 @@ def test_windows_pinned_rsa_parameters_match_shipped_public_key() -> None:
         "ImportParameters",
         'MapNameToOID("SHA256")',
         "VerifySignatureOnly",
+    ):
+        assert marker in content
+
+
+def test_key_rotation_runbook_updates_all_windows_trust_material() -> None:
+    content = ADMIN_GUIDE.read_text(encoding="utf-8")
+    for marker in (
+        "installer/team-skills-public-key.pem",
+        "EXPECTED_PUBLIC_KEY_SHA256",
+        "$PinnedPublicKeyModulusBase64",
+        "$PinnedPublicKeyExponentBase64",
+        "tests/fixtures/windows-signature/latest.json",
+        "PEM, оба pin, встроенные RSA-параметры и fixture должны меняться одним PR",
     ):
         assert marker in content
 
