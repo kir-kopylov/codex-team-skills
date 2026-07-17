@@ -765,19 +765,24 @@ try {
 
         $Script:CurrentStage = "registry_repair"
         Invoke-RegistryRepair
-        $Script:CurrentStage = "cache_invalidation"
-        Invoke-CacheInvalidation
 
         $Script:CurrentStage = "plugin_swap"
         try {
             Clear-FailureState
             Start-PluginSwap $pluginRoot
+            $Script:CurrentStage = "cache_invalidation"
+            Invoke-CacheInvalidation
+            $Script:CurrentStage = "success_state"
             $signatureState = if ($AllowUnsigned) { "unsigned-development" } else { "signed" }
             Write-State $manifest $bundleUrl $signatureState
             Complete-PluginSwap
         } catch {
+            $transactionError = $_
             Undo-PluginSwap
-            throw (New-TeamSkillsException "INSTALL_FAILED" "plugin_swap" "Не удалось атомарно заменить plugin и записать success state." $_.Exception)
+            if ($transactionError.Exception.Data.Contains("TeamSkillsCode")) {
+                throw $transactionError.Exception
+            }
+            throw (New-TeamSkillsException "INSTALL_FAILED" $Script:CurrentStage "Не удалось атомарно заменить plugin, инвалидировать cache и записать success state." $transactionError.Exception)
         }
 
         Write-LogSafe "Установлена проверенная версия team-skills: product=$($manifest.product_version) runtime=$($manifest.runtime_version) release=$($manifest.release_id)."

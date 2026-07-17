@@ -83,6 +83,14 @@ def test_repair_refreshes_support_and_schedule_without_plugin_swap() -> None:
     assert '"$dest.next"' in update
 
 
+def test_full_update_invalidates_cache_after_plugin_swap_before_success_state() -> None:
+    update = read("update-team-skills.ps1")
+    full_update = update.rsplit("if ($RepairInstall)", 1)[1]
+    assert full_update.index("Start-PluginSwap $pluginRoot") < full_update.index("Invoke-CacheInvalidation")
+    assert full_update.index("Invoke-CacheInvalidation") < full_update.index("Write-State $manifest")
+    assert "Undo-PluginSwap" in full_update
+
+
 def test_status_separates_task_success_repair_and_failure() -> None:
     status = read("team-skills-status.ps1")
     assert "Не удалось прочитать ${Path}:" in status
