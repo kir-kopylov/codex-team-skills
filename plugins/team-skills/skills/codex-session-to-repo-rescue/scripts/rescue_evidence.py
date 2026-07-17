@@ -593,6 +593,7 @@ def resolve_session_target(
     candidates: list[dict[str, object]] = []
     inspection_errors: list[dict[str, str]] = []
     session_files = all_session_files(codex_home)
+    session_file_groups = [session_files]
     if thread_id:
         filename_matches = [
             path
@@ -601,44 +602,49 @@ def resolve_session_target(
             and match.group(0).lower() == thread_id.lower()
         ]
         if filename_matches:
-            session_files = filename_matches
+            filename_match_set = set(filename_matches)
+            session_file_groups = [
+                filename_matches,
+                [path for path in session_files if path not in filename_match_set],
+            ]
 
-    for path in session_files:
-        try:
-            identity = inspect_session_identity(
-                path,
-                index_titles,
-                title_query=title,
-            )
-        except RescueError as exc:
-            inspection_errors.append(
-                {"session_file": str(path.resolve()), "detail": str(exc)}
-            )
-            continue
-        observed_id = identity.get("thread_id")
-        if (
-            not isinstance(observed_id, str)
-            or not THREAD_ID_RE.fullmatch(observed_id)
-            or identity.get("thread_id_source") != "session_meta"
-        ):
-            inspection_errors.append(
-                {
-                    "session_file": str(path.resolve()),
-                    "detail": "Session candidate не подтверждает корректный thread_id через session_meta",
-                }
-            )
-            continue
-        if thread_id and (
-            observed_id.lower() != thread_id.lower()
-        ):
-            continue
-        if title and not identity.get("title_source"):
-            continue
-        if expected_bytes is not None and identity["size_bytes"] != expected_bytes:
-            continue
-        if expected_mib is not None and Decimal(str(identity["size_mib"])) != expected_mib:
-            continue
-        candidates.append(identity)
+    for session_file_group in session_file_groups:
+        for path in session_file_group:
+            try:
+                identity = inspect_session_identity(
+                    path,
+                    index_titles,
+                    title_query=title,
+                )
+            except RescueError as exc:
+                inspection_errors.append(
+                    {"session_file": str(path.resolve()), "detail": str(exc)}
+                )
+                continue
+            observed_id = identity.get("thread_id")
+            if (
+                not isinstance(observed_id, str)
+                or not THREAD_ID_RE.fullmatch(observed_id)
+                or identity.get("thread_id_source") != "session_meta"
+            ):
+                inspection_errors.append(
+                    {
+                        "session_file": str(path.resolve()),
+                        "detail": "Session candidate не подтверждает корректный thread_id через session_meta",
+                    }
+                )
+                continue
+            if thread_id and observed_id.lower() != thread_id.lower():
+                continue
+            if title and not identity.get("title_source"):
+                continue
+            if expected_bytes is not None and identity["size_bytes"] != expected_bytes:
+                continue
+            if expected_mib is not None and Decimal(str(identity["size_mib"])) != expected_mib:
+                continue
+            candidates.append(identity)
+        if candidates:
+            break
 
     diagnostics = {"inspection_errors": inspection_errors} if inspection_errors else {}
     if not candidates:
@@ -721,6 +727,8 @@ def path_is_inside_git_worktree(path: Path) -> bool:
 
 
 def write_target_lock(path: Path, payload: dict[str, object]) -> dict[str, object]:
+    if path.name.lower() != "target-lock.json":
+        raise RescueError("Target lock должен называться target-lock.json")
     if path_is_inside_git_worktree(path):
         raise RescueError("Target lock нельзя размещать внутри Git worktree")
     if path.exists():
@@ -740,7 +748,8 @@ def write_target_lock(path: Path, payload: dict[str, object]) -> dict[str, objec
     if not path.parent.is_dir():
         raise RescueError(f"Каталог для target lock не существует: {path.parent}")
     try:
-        with path.open("x", encoding="utf-8", newline="\n") as stream:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
             json.dump(payload, stream, ensure_ascii=False, indent=2)
             stream.write("\n")
     except OSError as exc:

@@ -351,6 +351,32 @@ def test_thread_id_resolution_requires_matching_session_meta_after_filename_hint
     assert result["status"] == "target_not_found"
 
 
+def test_thread_id_resolution_falls_back_after_false_filename_hint(
+    tmp_path: Path,
+) -> None:
+    codex_home = tmp_path / "codex-home"
+    sessions = codex_home / "sessions"
+    sessions.mkdir(parents=True)
+    requested_id = "019f0000-0000-7000-8000-000000000264"
+    stale_id = "019f0000-0000-7000-8000-000000000265"
+    stale = sessions / f"rollout-{requested_id}.jsonl"
+    stale.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": stale_id}}) + "\n",
+        encoding="utf-8",
+    )
+    valid = sessions / "renamed-session.jsonl"
+    valid.write_text(
+        json.dumps({"type": "session_meta", "payload": {"id": requested_id}})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = rescue.resolve_session_target(codex_home, thread_id=requested_id)
+
+    assert result["status"] == "resolved"
+    assert result["target"]["session_file"] == str(valid.resolve())
+
+
 def test_existing_lock_refuses_silent_target_switch(tmp_path: Path) -> None:
     first = {
         "version": 1,
@@ -401,6 +427,54 @@ def test_target_lock_cannot_be_created_inside_git_worktree(tmp_path: Path) -> No
         rescue.write_target_lock(lock, payload)
 
     assert not lock.exists()
+
+
+def test_target_lock_requires_fixed_private_filename(tmp_path: Path) -> None:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000266",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+
+    with pytest.raises(rescue.RescueError, match="target-lock.json"):
+        rescue.write_target_lock(tmp_path / "session-lock.json", payload)
+
+
+def test_target_lock_is_created_with_private_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "version": 1,
+        "kind": "codex-session-target-lock",
+        "query": {"title": "Private Task"},
+        "target": {
+            "thread_id": "019f0000-0000-7000-8000-000000000267",
+            "session_file": str((tmp_path / "private-session.jsonl").resolve()),
+            "archived": True,
+        },
+    }
+    requested_modes: list[int] = []
+    original_open = os.open
+
+    def recording_open(path: os.PathLike[str] | str, flags: int, mode: int = 0o777) -> int:
+        requested_modes.append(mode)
+        return original_open(path, flags, mode)
+
+    monkeypatch.setattr(rescue.os, "open", recording_open)
+    lock = tmp_path / "target-lock.json"
+
+    result = rescue.write_target_lock(lock, payload)
+
+    assert result == {"status": "target_locked", "lock_state": "created"}
+    assert requested_modes == [0o600]
+    if os.name != "nt":
+        assert lock.stat().st_mode & 0o777 == 0o600
 
 
 def test_resolve_cli_reports_persisted_target_when_lock_is_reused(
