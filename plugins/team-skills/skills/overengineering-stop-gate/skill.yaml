@@ -1,0 +1,28 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Останавливает hardening до проверки, нужен ли сам механизм, и сводит решение к keep, simplify или delete."
+use_cases:
+  - "Проверить, нужен ли updater, scheduler, сервис, тестовая матрица или другой разросшийся механизм исходному outcome."
+  - "Свести спор о сложности к evidence, ownership cost и решению keep, simplify или delete."
+  - "После сокращения scope выбрать один surviving invariant и один следующий шаг вместо нового roadmap."
+do_not_use_for:
+  - "Автоматическое удаление security, data-safety или compliance controls без проверки риска и явного разрешения."
+  - "Обычное проектирование, где необходимость механизма уже доказана требованиями и согласованным complexity budget."
+  - "Удаление подсистемы после принятого решения: его безопасно проводит subsystem-retirement-safeguard."
+natural_triggers:
+  - "нахуя это вообще нужно?"
+  - "это просто библиотечка"
+  - "ты наворачиваешь"
+  - "какие изменения очевидно и неизбежно нужны?"
+  - "что оставить, упростить или удалить?"
+  - "стоит ли вообще писать этот regression test?"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-07-18"
+authors:
+  - "Пользователь Codex"
+source_asset: "Санитизированный workflow из диалога о сокращении updater и остановке преждевременного production-hardening небольшой библиотеки скиллов."
