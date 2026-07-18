@@ -20,14 +20,26 @@ $AllowedProcessScripts = @(
     "team-skills-auto-update-with-git-fallback.ps1"
 )
 $AllowedBinEntries = @(
+    "install-team-skills.cmd",
+    "install-team-skills.ps1",
+    "install-team-skills.command",
     "bootstrap-team-skills.ps1",
+    "bootstrap-team-skills.sh",
     "update-team-skills.ps1",
+    "update-team-skills.sh",
     "update-team-skills.ps1.next",
     "team-skills-auto-update-with-git-fallback.ps1",
     "team-skills-status.ps1",
+    "team-skills-status.command",
     "uninstall-team-skills.ps1",
+    "uninstall-team-skills.command",
+    "refresh-team-skills.command",
+    "pull-skills.sh",
+    "team-skills-registry.py",
     "team-skills-public-key.pem"
 )
+$AllowedBinDirectory = "__pycache__"
+$AllowedRegistryBytecodePattern = '^team-skills-registry\.cpython-\d+\.pyc$'
 $AllowedRootEntries = @("bin", "cache", "state", "logs")
 $MarkerScripts = @(
     "bootstrap-team-skills.ps1",
@@ -296,8 +308,26 @@ function Assert-OwnedLegacyRoot($InstallRoot, $ExpectedActionPath) {
         return @()
     }
     foreach ($entry in @(Get-ChildItem -LiteralPath $binPath -Force)) {
-        if ($entry.PSIsContainer -or $AllowedBinEntries -inotcontains $entry.Name) {
+        if (-not $entry.PSIsContainer) {
+            if ($AllowedBinEntries -inotcontains $entry.Name) {
+                throw "В bin обнаружен неизвестный объект: '$($entry.Name)'."
+            }
+            continue
+        }
+
+        if ($entry.Name -cne $AllowedBinDirectory -or -not ($entry -is [System.IO.DirectoryInfo])) {
             throw "В bin обнаружен неизвестный объект: '$($entry.Name)'."
+        }
+
+        foreach ($bytecode in @(Get-ChildItem -LiteralPath $entry.FullName -Force)) {
+            if (
+                $bytecode.PSIsContainer -or
+                -not ($bytecode -is [System.IO.FileInfo]) -or
+                (Test-ReparsePoint $bytecode) -or
+                $bytecode.Name -cnotmatch $AllowedRegistryBytecodePattern
+            ) {
+                throw "В __pycache__ обнаружен неизвестный объект: '$($bytecode.Name)'."
+            }
         }
     }
 

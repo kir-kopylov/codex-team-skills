@@ -58,6 +58,30 @@ def create_legacy_root(home: Path, *, custom: bool = False) -> Path:
     return root
 
 
+def add_full_historical_release_bin(root: Path) -> None:
+    bin_dir = root / "bin"
+    historical_names = {
+        "bootstrap-team-skills.ps1",
+        "install-team-skills.cmd",
+        "install-team-skills.command",
+        "install-team-skills.ps1",
+        "pull-skills.sh",
+        "refresh-team-skills.command",
+        "team-skills-public-key.pem",
+        "team-skills-registry.py",
+        "team-skills-status.command",
+        "team-skills-status.ps1",
+        "uninstall-team-skills.command",
+        "uninstall-team-skills.ps1",
+        "update-team-skills.ps1",
+    }
+    for name in historical_names:
+        (bin_dir / name).write_text("historical release asset\n", encoding="utf-8")
+    pycache = bin_dir / "__pycache__"
+    pycache.mkdir()
+    (pycache / "team-skills-registry.cpython-314.pyc").write_bytes(b"bytecode")
+
+
 def write_exact_plist(home: Path, root: Path, *, label: str = "com.codex-team-skills.autoupdate") -> Path:
     plist_path = home / "Library" / "LaunchAgents" / "com.codex-team-skills.autoupdate.plist"
     plist_path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,6 +176,36 @@ def test_apply_removes_exact_legacy_objects_and_preserves_protected_files(tmp_pa
     assert not stderr_log.exists()
     for path, content in protected.items():
         assert path.read_bytes() == content
+
+
+def test_full_historical_release_bin_is_accepted(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    root = create_legacy_root(home, custom=True)
+    add_full_historical_release_bin(root)
+    write_exact_plist(home, root)
+    fake_bin = make_fake_launchctl(tmp_path, loaded=True)
+
+    result = run_cleanup(home, fake_bin, "--dry-run")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Результат: DRY_RUN_SAFE" in result.stdout
+    assert root.is_dir()
+
+
+def test_unknown_registry_bytecode_is_refused(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    root = create_legacy_root(home, custom=True)
+    add_full_historical_release_bin(root)
+    (root / "bin" / "__pycache__" / "foreign.cpython-314.pyc").write_bytes(b"unknown")
+    plist = write_exact_plist(home, root)
+    fake_bin = make_fake_launchctl(tmp_path, loaded=True)
+
+    result = run_cleanup(home, fake_bin, "--apply")
+
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "Результат: REFUSED_UNSAFE" in result.stdout
+    assert root.exists()
+    assert plist.exists()
 
 
 def test_apply_is_idempotent_after_canonical_fallback_cleanup(tmp_path: Path) -> None:

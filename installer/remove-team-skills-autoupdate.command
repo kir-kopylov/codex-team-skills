@@ -252,6 +252,7 @@ import fnmatch
 import json
 import os
 import plistlib
+import re
 import stat
 import sys
 from pathlib import Path
@@ -290,17 +291,30 @@ protected = [
 state_protected = []
 
 allowed_bin_names = {
+    "bootstrap-team-skills.ps1",
     "bootstrap-team-skills.sh",
-    "update-team-skills.sh",
-    "update-team-skills.sh.next",
-    "uninstall-team-skills.command",
-    "team-skills-status.command",
+    "install-team-skills.cmd",
+    "install-team-skills.command",
+    "install-team-skills.ps1",
+    "pull-skills.sh",
     "refresh-team-skills.command",
     "refresh-team-skills.command.next",
-    "team-skills-registry.py",
     "team-skills-public-key.pem",
+    "team-skills-registry.py",
+    "team-skills-status.command",
+    "team-skills-status.ps1",
+    "uninstall-team-skills.command",
+    "uninstall-team-skills.ps1",
+    "update-team-skills.ps1",
+    "update-team-skills.ps1.next",
+    "update-team-skills.sh",
+    "update-team-skills.sh.next",
     "update-team-skills-with-cache-reset.sh",
 }
+allowed_bin_directory_names = {"__pycache__"}
+allowed_registry_bytecode = re.compile(
+    r"^team-skills-registry\.cpython-[0-9]+\.pyc$"
+)
 allowed_root_names = {"bin", "cache", "state", "logs"}
 scheduler_scripts = {"bootstrap-team-skills.sh", "update-team-skills.sh"}
 updater_markers = {
@@ -431,10 +445,26 @@ def validate_owned_tree(root):
     if not bin_path.is_dir() or bin_path.is_symlink():
         refusal("bin является symlink или не является директорией.", root)
     bin_names = {entry.name for entry in bin_path.iterdir()}
-    unknown_bin = sorted(bin_names - allowed_bin_names)
+    unknown_bin = sorted(
+        bin_names - allowed_bin_names - allowed_bin_directory_names
+    )
     if unknown_bin:
         refusal("неизвестные объекты в bin: " + ", ".join(unknown_bin), root)
     for entry in bin_path.iterdir():
+        if entry.name in allowed_bin_directory_names:
+            if not entry.is_dir() or entry.is_symlink():
+                refusal("__pycache__ не является обычной директорией.", root)
+            for child in entry.iterdir():
+                if (
+                    not child.is_file()
+                    or child.is_symlink()
+                    or not allowed_registry_bytecode.fullmatch(child.name)
+                ):
+                    refusal(
+                        "неизвестный объект в bin/__pycache__: " + child.name,
+                        root,
+                    )
+            continue
         if not entry.is_file() or entry.is_symlink():
             refusal("объект в bin не является обычным файлом: " + entry.name, root)
     return bin_names & updater_markers
