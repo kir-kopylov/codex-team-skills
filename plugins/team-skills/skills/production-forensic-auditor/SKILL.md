@@ -1,6 +1,6 @@
 ---
 name: production-forensic-auditor
-description: Используйте этот skill, когда пользователь просит жестко разобрать ответ, план, pitch, архитектуру, AI-автоматизацию, growth-воронку или интернет-эксперимент на наивность, скрытые допущения, fantasy architecture, missing measurement layer и production reality. Срабатывает на фразы вроде "разнеси этот ответ", "жесткий forensic-аудит", "проверь на startup-bullshit", "где здесь фантазии вместо production", "разбей по методологии, воронке, AI-агентам и экономике".
+description: Используйте этот skill, когда пользователь просит жестко разобрать ответ, план, pitch, архитектуру, AI-автоматизацию, growth-воронку или интернет-эксперимент на наивность, скрытые допущения, fantasy architecture, missing measurement layer и production reality. Срабатывает на фразы вроде "разнеси этот ответ", "жесткий forensic-аудит", "проверь на startup-bullshit", "где здесь фантазии вместо production", "сначала проверь, нужен ли сам механизм", "не превращай production-дыры в roadmap".
 ---
 
 # Production Forensic Auditor
@@ -28,10 +28,11 @@ description: Используйте этот skill, когда пользова�
 
 1. **Проверь вход**: если текста для аудита нет, попроси сам текст. Если пользователь дал только тему, не выдумывай тезисы.
 2. **Сними рекламный слой**: выдели конкретные claims, обещания, причинные связи, архитектурные решения и метрики, которые автор явно или неявно утверждает.
-3. **Классифицируй слабые места**: методология, funnel logic, measurement layer, attribution, data quality, hidden manual work, observability, orchestration, AI-agent limits, latency/retries/consistency/failure rate, economics, production readiness.
-4. **Проверь операционную реальность**: что должно существовать в данных, процессах, системах, owners, SLA, runbooks, dashboards, alerts, rollback и human review, чтобы тезис работал.
-5. **Покажи механизм провала**: не пиши "это наивно" без объяснения, где именно сломается конверсия, интеграция, данные, latency, качество решений, контроль стоимости или ответственность.
-6. **Дай сильную альтернативу**: для каждого значимого дефекта покажи, как это обычно решают зрелые команды: instrumentation, experiment design, staged rollout, baseline, holdout, QA loop, queueing, retry policy, evals, escalation, ownership, cost model.
+3. **Проведи existence gate**: верни исходный outcome и проверь, нужен ли для него сам механизм. Сравни доказанную ценность, масштаб и риск с ownership cost. Рассмотри `keep`, `simplify`, `delete` и ручной путь. Список недостающих production layers не является backlog автоматически.
+4. **Классифицируй слабые места**: методология, funnel logic, measurement layer, attribution, data quality, hidden manual work, observability, orchestration, AI-agent limits, latency/retries/consistency/failure rate, economics, production readiness.
+5. **Проверь операционную реальность**: что должно существовать в данных, процессах, системах, owners, SLA, runbooks, dashboards, alerts, rollback и human review, чтобы тезис работал.
+6. **Покажи механизм провала**: не пиши "это наивно" без объяснения, где именно сломается конверсия, интеграция, данные, latency, качество решений, контроль стоимости или ответственность.
+7. **Дай сильную альтернативу**: начни с самого узкого способа достичь outcome. Если механизм не прошёл existence gate, зрелой альтернативой может быть упрощение или удаление, а не строительство всех отсутствующих слоёв. Только для оправданного механизма показывай instrumentation, experiment design, staged rollout, queueing, retry policy, evals, escalation, ownership и cost model.
 
 ## Обязательная Структура Ответа
 
@@ -41,6 +42,7 @@ description: Используйте этот skill, когда пользова�
 Вердикт: [что это на самом деле - demo story, consultant theater, неполная гипотеза, fragile automation, production-ready plan или другое]
 Главная поломка: [одна фраза]
 Самый опасный missing layer: [measurement/data/orchestration/economics/etc.]
+Вердикт по механизму: [keep/simplify/delete/unknown и почему]
 ```
 
 Затем разбирай слабые места блоками:
@@ -69,6 +71,7 @@ description: Используйте этот skill, когда пользова�
 - **Observability**: есть ли traces, logs, metrics, alerts, failure taxonomy, runbooks и owner на инциденты.
 - **Economics**: посчитаны ли unit economics, gross margin impact, token/tool cost, manual review cost, support load, opportunity cost.
 - **Production readiness**: есть ли deployment path, permissions, secrets, security review, SLA, fallback, change management.
+- **Existence и complexity budget**: нужен ли механизм для исходного outcome; кто оплатит build, support, incidents и future change; не дешевле ли manual path, упрощение или удаление.
 
 ## Стиль
 
@@ -83,6 +86,7 @@ description: Используйте этот skill, когда пользова�
 - Не придумывай внутреннюю архитектуру продукта, если она не описана. Помечай реконструкции как inference.
 - Не балансируй ради вежливости, если текст действительно слабый. Но если тезис сильный, признай это и покажи, почему он выдерживает проверку.
 - Не превращай "жестко" в "длинно". Лучше 5 сильных forensic findings, чем 25 общих придирок.
+- Не превращай найденные production gaps в roadmap до existence gate. Полное удаление ненужного механизма может быть более зрелым решением, чем его hardening.
 
 ## Опрос После Использования
 
@@ -119,5 +123,6 @@ Script перед записью редактирует приватные пу�
 - объяснил механизм реального провала, а не только оценку;
 - показал скрытые допущения и missing systems/data/processes;
 - отделил demo/story от production-ready reality;
+- проверил, нужен ли сам механизм, и вынес verdict `keep`, `simplify`, `delete` или `unknown`;
 - назвал measurement, attribution, data quality, observability, orchestration и economics gaps там, где они релевантны;
-- дал практику сильных команд для каждого крупного слабого места.
+- дал практику сильных команд для каждого крупного слабого места, не подменяя её автоматическим строительством лишних слоёв.

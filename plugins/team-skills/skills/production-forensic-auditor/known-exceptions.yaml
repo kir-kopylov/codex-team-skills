@@ -1,1 +1,5 @@
-exceptions: []
+exceptions:
+  - symptom: "Аудит правильно находит production gaps, но превращает их в roadmap для механизма, который не нужен исходному outcome."
+    root_cause: "Паттерны зрелой системы приняли за обязательный дизайн и пропустили existence gate с ownership cost."
+    do_next_time: "Сначала сравнить ценность механизма с complexity budget и вынести verdict keep, simplify, delete или unknown; hardening предлагать только после keep."
+    source_example: "examples/anti-03-audit-becomes-roadmap.md"
