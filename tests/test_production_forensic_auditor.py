@@ -113,8 +113,9 @@ def test_known_exception_captures_audit_and_remediation_scope_confusion() -> Non
     data = yaml.safe_load((SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8"))
     exceptions = data["exceptions"]
 
-    assert len(exceptions) == 1
-    item = exceptions[0]
+    matches = [item for item in exceptions if "Audit scope" in item["root_cause"]]
+    assert matches, "Нет regression-карточки о смешении audit scope и remediation scope"
+    item = matches[0]
     assert "корпоративной платформы" in item["symptom"]
     assert "Audit scope" in item["root_cause"]
     assert "remediation scope" in item["root_cause"]
