@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Runtime удалён, но старые release assets, docs, fixtures или CI всё ещё обещают и поставляют подсистему."
+    root_cause: "Удаление выполнили по папке реализации, а не по полной карте shipped-поверхности."
+    do_next_time: "До правок составить inventory runtime, packaging, config, docs, tests и CI; после правок проверить фактический package и repo-wide negative scan."
+    source_example: "examples/good-01.md"
+  - symptom: "Repo чист, но на уже установленных машинах продолжает работать старая scheduled task или служба."
+    root_cause: "Исходники ошибочно приняли за единственный state и не выделили одноразовую миграцию развёрнутого legacy-следа."
+    do_next_time: "Сохранить узкий идемпотентный migrate once для точного owned identifier и отдельно проверить внешнее состояние; при unknown не удалять."
+    source_example: "examples/good-02.md"
+  - symptom: "После зелёного поиска ссылок оставшийся installer или CLI падает в реальном shell."
+    root_cause: "Статический negative scan выдали за runtime smoke остаточного контракта."
+    do_next_time: "Запустить поддерживаемый entrypoint целиком в заявленном runtime и только затем считать retirement завершённым."
+    source_example: "examples/good-03.md"
