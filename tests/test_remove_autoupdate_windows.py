@@ -150,7 +150,10 @@ def _run_windows_cleanup_fixture(home: Path) -> subprocess.CompletedProcess[str]
     )
 
 
-@pytest.mark.skipif(_powershell_executable() is None, reason="PowerShell недоступен")
+@pytest.mark.skipif(
+    os.name != "nt" or _powershell_executable() is None,
+    reason="Нужен Windows с PowerShell",
+)
 def test_full_official_legacy_bin_with_exact_pycache_is_accepted(tmp_path: Path) -> None:
     home = tmp_path / "home"
     root = _create_official_legacy_root(
@@ -165,7 +168,10 @@ def test_full_official_legacy_bin_with_exact_pycache_is_accepted(tmp_path: Path)
     assert root.is_dir()
 
 
-@pytest.mark.skipif(_powershell_executable() is None, reason="PowerShell недоступен")
+@pytest.mark.skipif(
+    os.name != "nt" or _powershell_executable() is None,
+    reason="Нужен Windows с PowerShell",
+)
 def test_unexpected_pycache_content_is_refused_without_mutation(tmp_path: Path) -> None:
     home = tmp_path / "home"
     root = _create_official_legacy_root(home, pycache_name="unrelated.cpython-311.pyc")
