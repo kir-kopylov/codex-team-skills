@@ -6,7 +6,7 @@
 
 Windows:
 
-Эта команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
+Эта команда скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
 
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
@@ -14,7 +14,7 @@ Windows:
 
 macOS:
 
-Эта команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
+Для этого пути нужен `Python 3.11+`; macOS не гарантирует его наличие. Проверьте `python3 --version` до запуска. Команда ниже скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
 
 ```bash
 curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.command && chmod +x /tmp/install-team-skills.command && /tmp/install-team-skills.command
@@ -34,26 +34,9 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 ## Обновление И Удаление
 
-Автообновление включается установщиком и запускается раз в двое суток. Если обновление не удалось, старая рабочая версия остаётся на месте. Runtime-видимость skill подтверждается только после перезапуска Codex; status-команда проверяет файлы, registry и состояние обновления.
+Автообновления нет. Чтобы получить новые skills, повторно запустите ту же команду установки из раздела `User Mode`, затем перезапустите Codex. Отдельных команд update, status и repair нет.
 
-Для проверки статуса:
-
-- Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\team-skills-status.ps1`
-- macOS: `~/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command`
-
-Для полного refresh на macOS: обновить локальные team-skills, синхронизировать Claude skills folder и перезапустить Codex/Claude:
-
-- macOS: `~/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command`
-
-Если plugin установлен, но Codex не видит новые skills, выполните one-time repair:
-
-- Windows: `%LOCALAPPDATA%\CodexTeamSkills\bin\update-team-skills.ps1 -RepairInstall`
-- macOS: `~/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh --repair-install`
-
-Если старый Windows updater падает на `ImportFromPem`, он не может безопасно
-обновить сам себя. Не отключайте проверку подписи и не копируйте plugin из Git.
-Один раз повторно запустите официальную Windows-команду установки из раздела
-`User Mode` выше, затем проверьте status и перезапустите Codex.
+Если после переустановки новые skills не появились, полностью закройте и снова откройте Codex, затем повторите проверочную фразу из раздела выше.
 
 Для удаления:
 
@@ -71,7 +54,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 Подробности и авто-раздача на всю команду — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
 
-Когда что выбирать: Codex → подписанный установщик (выше); `Claude Code` → нативный маркетплейс.
+Когда что выбирать: Codex → установщик подписанного release (выше); `Claude Code` → нативный маркетплейс.
 
 ## Author Mode: Добавить Новый Skill
 

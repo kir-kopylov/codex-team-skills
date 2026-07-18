@@ -17,26 +17,15 @@ SUPPORT_NAMES = (
     "install-team-skills.cmd",
     "install-team-skills.ps1",
     "install-team-skills.command",
-    "bootstrap-team-skills.ps1",
-    "bootstrap-team-skills.sh",
-    "update-team-skills.ps1",
-    "update-team-skills.sh",
     "uninstall-team-skills.ps1",
     "uninstall-team-skills.command",
-    "team-skills-status.ps1",
-    "team-skills-status.command",
-    "refresh-team-skills.command",
-    "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",
 )
 
 WINDOWS_POWERSHELL_ASSETS = {
     "install-team-skills.ps1",
-    "bootstrap-team-skills.ps1",
-    "update-team-skills.ps1",
     "uninstall-team-skills.ps1",
-    "team-skills-status.ps1",
 }
 
 
@@ -59,8 +48,6 @@ def copy_support_file(source: Path, destination: Path) -> None:
 
 
 def support_source_path(root: Path, name: str) -> Path:
-    if name == "pull-skills.sh":
-        return root / "scripts" / name
     return root / "installer" / name
 
 
@@ -119,8 +106,6 @@ def build_release_bundle(
         "release_tag": release_tag,
         "commit": commit,
         "channel": "stable",
-        "minimum_bootstrap_version": "1.0.0",
-        "minimum_updater_version": "1.0.0",
         "created_at": created_at,
         "plugin_bundle": plugin_bundle,
         "support_files": support_files,

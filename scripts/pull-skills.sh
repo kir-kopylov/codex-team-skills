@@ -128,7 +128,7 @@ for dest_dir in "$DEST"/*/; do
   log "  ✗ prune $dname (удалён из репозитория)"
 done
 
-# 5. Маркер свежести для team-skills-maintenance.
+# 5. Локальный маркер последней синхронизации Claude skills.
 printf '%s head=%s installed=%s skipped=%s pruned=%s\n' \
   "$(ts)" "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')" \
   "$count" "$skipped" "$pruned" > "$DEST/.last-sync" 2>/dev/null || true

@@ -7,6 +7,7 @@ BIN_DIR="$INSTALL_ROOT/bin"
 PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$HOME/.agents/plugins/marketplace.json}"
 CODEX_CONFIG_PATH="${CODEX_TEAM_SKILLS_CODEX_CONFIG:-$HOME/.codex/config.toml}"
+CODEX_PLUGIN_CACHE_DIR="${CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR:-$HOME/.codex/plugins/cache/codex-team-skills}"
 REGISTRY_HELPER="${CODEX_TEAM_SKILLS_REGISTRY_HELPER:-$BIN_DIR/team-skills-registry.py}"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.codex-team-skills.autoupdate.plist"
 
@@ -14,14 +15,37 @@ info() {
   printf '[team-skills] %s\n' "$1"
 }
 
-launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
-rm -f "$PLIST_PATH"
-info "Автообновление удалено из LaunchAgent."
+fail() {
+  info "$1"
+  exit 1
+}
 
-rm -rf "$PLUGIN_DEST"
+safe_remove_tree() {
+  local target_path="$1"
+  local resolved="${target_path:A}"
+  local home_resolved="${HOME:A}"
+  [[ -n "$resolved" && "$resolved" != "/" && "$resolved" != "$home_resolved" ]] || \
+    fail "Небезопасный путь для удаления: $target_path"
+  rm -rf -- "$target_path"
+}
+
+command -v python3 >/dev/null 2>&1 || fail "Для полного удаления нужен Python 3.11 или новее."
+python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' || \
+  fail "Для полного удаления нужен Python 3.11 или новее."
+
+LEGACY_LAUNCHD_SERVICE="gui/$UID/com.codex-team-skills.autoupdate"
+launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
+launchctl bootout "$LEGACY_LAUNCHD_SERVICE" >/dev/null 2>&1 || true
+rm -f "$PLIST_PATH"
+if launchctl print "$LEGACY_LAUNCHD_SERVICE" >/dev/null 2>&1; then
+  fail "Не удалось остановить старый LaunchAgent Team Skills."
+fi
+info "Старый LaunchAgent Team Skills удалён."
+
+safe_remove_tree "$PLUGIN_DEST"
 info "Локальный plugin team-skills удалён."
 
-if [[ -f "$MARKETPLACE_PATH" ]] && command -v python3 >/dev/null 2>&1; then
+if [[ -f "$MARKETPLACE_PATH" ]]; then
   python3 - "$MARKETPLACE_PATH" "$PLUGIN_NAME" <<'PY'
 import json
 import sys
@@ -36,10 +60,17 @@ PY
   info "Запись team-skills удалена из marketplace."
 fi
 
-if [[ -f "$REGISTRY_HELPER" ]] && command -v python3 >/dev/null 2>&1; then
-  python3 "$REGISTRY_HELPER" remove --config "$CODEX_CONFIG_PATH" >/dev/null || true
+if [[ -f "$CODEX_CONFIG_PATH" ]]; then
+  [[ -f "$REGISTRY_HELPER" ]] || fail "Не найден helper для удаления записи из Codex registry: $REGISTRY_HELPER"
+  python3 "$REGISTRY_HELPER" remove --config "$CODEX_CONFIG_PATH" >/dev/null
   info "Запись team-skills удалена из Codex registry."
 fi
 
-rm -rf "$INSTALL_ROOT"
+if [[ -d "$CODEX_PLUGIN_CACHE_DIR" ]]; then
+  safe_remove_tree "$CODEX_PLUGIN_CACHE_DIR"
+  info "Codex plugin cache team-skills удалён."
+fi
+
+safe_remove_tree "$INSTALL_ROOT"
+info "Локальные служебные файлы Team Skills удалены."
 info "Удаление завершено. Перезапустите Codex, чтобы он перечитал список plugin."

@@ -15,20 +15,12 @@ BUILD_SCRIPT = ROOT / "scripts" / "build_release_bundle.py"
 UTF8_BOM = b"\xef\xbb\xbf"
 WINDOWS_PS1_ASSETS = (
     "install-team-skills.ps1",
-    "bootstrap-team-skills.ps1",
-    "update-team-skills.ps1",
     "uninstall-team-skills.ps1",
-    "team-skills-status.ps1",
 )
 NON_POWERSHELL_ASSETS = (
     "install-team-skills.cmd",
     "install-team-skills.command",
-    "bootstrap-team-skills.sh",
-    "update-team-skills.sh",
     "uninstall-team-skills.command",
-    "team-skills-status.command",
-    "refresh-team-skills.command",
-    "pull-skills.sh",
     "team-skills-registry.py",
     "team-skills-public-key.pem",
 )
@@ -88,36 +80,23 @@ def test_release_manifest_hashes_final_bom_assets(tmp_path: Path) -> None:
         assert support_files[name]["size"] == len(data)
 
 
-def test_release_bundle_includes_claude_sync_script(tmp_path: Path) -> None:
+def test_release_bundle_does_not_ship_updater_runtime(tmp_path: Path) -> None:
     dist = build_dist(tmp_path)
-    sync_script = dist / "pull-skills.sh"
-    assert sync_script.exists()
-    assert "CLAUDE_SKILLS_DIR" in sync_script.read_text(encoding="utf-8")
-
+    obsolete = {
+        "bootstrap-team-skills.ps1",
+        "bootstrap-team-skills.sh",
+        "update-team-skills.ps1",
+        "update-team-skills.sh",
+        "team-skills-status.ps1",
+        "team-skills-status.command",
+        "refresh-team-skills.command",
+    }
     manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
-    support_files = {entry["name"]: entry for entry in manifest["support_files"]}
-    data = sync_script.read_bytes()
-    assert support_files["pull-skills.sh"]["sha256"] == hashlib.sha256(data).hexdigest()
-    assert support_files["pull-skills.sh"]["size"] == len(data)
+    support_names = {entry["name"] for entry in manifest["support_files"]}
 
-
-def test_release_bundle_includes_refresh_and_restart_automation(tmp_path: Path) -> None:
-    dist = build_dist(tmp_path)
-    refresh_script = dist / "refresh-team-skills.command"
-    assert refresh_script.exists()
-    content = refresh_script.read_text(encoding="utf-8")
-    assert "update-team-skills.sh" in content
-    assert "pull-skills.sh" in content
-    assert "CODEX_TEAM_SKILLS_RESTART_APPS" in content
-    assert "Codex,Claude" in content
-    assert "osascript" in content
-    assert "open -a" in content
-
-    manifest = json.loads((dist / "manifest.json").read_text(encoding="utf-8"))
-    support_files = {entry["name"]: entry for entry in manifest["support_files"]}
-    data = refresh_script.read_bytes()
-    assert support_files["refresh-team-skills.command"]["sha256"] == hashlib.sha256(data).hexdigest()
-    assert support_files["refresh-team-skills.command"]["size"] == len(data)
+    assert obsolete.isdisjoint(support_names)
+    for name in obsolete:
+        assert not (dist / name).exists()
 
 
 def test_windows_docs_rewrite_downloaded_installer_as_utf8_with_bom() -> None:
@@ -176,11 +155,8 @@ def test_workflow_gates_publish_on_windows_powershell_51_smoke() -> None:
     assert "-VerifySignatureOnly" in workflow_text
     assert "tests\\\\fixtures\\\\windows-signature" in workflow_text
     assert "latest-tampered.json" in workflow_text
-    assert "team-skills-public-key-tampered.pem" in workflow_text
-    assert "Production signature smoke passed: valid accepted, tampered payload and key rejected." in workflow_text
-    assert "Run Windows update and repair integration" in workflow_text
-    assert "windows-update-repair-integration.ps1" in workflow_text
-    assert "Get-Content $testPath -Raw -Encoding UTF8" in workflow_text
+    assert "Production signature smoke passed: valid accepted and tampered payload rejected." in workflow_text
+    assert "windows-update-repair-integration.ps1" not in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "0xEF" in workflow_text
     assert "0xBB" in workflow_text
