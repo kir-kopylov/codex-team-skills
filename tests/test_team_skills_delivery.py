@@ -208,32 +208,26 @@ def test_status_reports_managed_state_before_and_after(tmp_path: Path) -> None:
     assert after_remove["toml_valid"] is True
 
 
-def test_manual_installer_replaces_updater_and_invalidates_codex_cache() -> None:
+def test_manual_installer_is_self_contained_and_invalidates_codex_cache() -> None:
     content = INSTALL_COMMAND.read_text(encoding="utf-8")
     assert ".codex/plugins/cache/$MARKETPLACE_NAME" in content
-    assert "CODEX_TEAM_SKILLS_ALLOW_UNSIGNED" not in content
     assert "sys.version_info >= (3, 11)" in content
-    assert "launchctl unload" in content
-    assert "launchctl load" not in content
+    assert "team-skills-registry.py" not in content
+    assert "launchctl" not in content
+    assert "latest.json" not in content
     assert "Автообновления нет" in content
-    assert "--repair-install" not in content
     assert "state.json" not in content
 
 
-def test_release_workflow_contains_signed_immutable_schema() -> None:
+def test_release_workflow_contains_manual_immutable_schema() -> None:
     content = WORKFLOW.read_text(encoding="utf-8")
     build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
-    for marker in ("latest.json", "manifest.json.sig", "latest.json.sig", "TEAM_SKILLS_SIGNING_KEY_PEM"):
+    for marker in ("manifest.json", "windows-powershell-smoke", "macos-one-shot-smoke"):
         assert marker in content
-    for marker in ("runtime_version", "release_id", "team-skills-v"):
+    for marker in ("schema_version", "plugin_version", "team-skills-v"):
         assert marker in build_script
-    assert "windows-powershell-smoke" in content
     assert "claude-sync-smoke" in content
     assert "pull-skills.sh" in content
     assert "CLAUDE_SKILLS_DIR" in content
-
-
-def test_public_key_is_valid_pem() -> None:
-    public_key = (ROOT / "installer" / "team-skills-public-key.pem").read_text(encoding="utf-8")
-    assert public_key.startswith("-----BEGIN PUBLIC KEY-----")
-    assert public_key.rstrip().endswith("-----END PUBLIC KEY-----")
+    for forbidden in ("latest.json", "manifest.json.sig", "TEAM_SKILLS_SIGNING_KEY_PEM"):
+        assert forbidden not in content

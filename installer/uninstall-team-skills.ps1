@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $PluginName = "team-skills"
 $TaskName = "Codex Team Skills Auto Update"
-$InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } else { Join-Path $env:LOCALAPPDATA "CodexTeamSkills" }
+$LegacyInstallRoot = Join-Path $env:LOCALAPPDATA "CodexTeamSkills"
 $PluginDest = if ($env:CODEX_TEAM_SKILLS_PLUGIN_DIR) { $env:CODEX_TEAM_SKILLS_PLUGIN_DIR } else { Join-Path $HOME "plugins\team-skills" }
 $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT } else { $HOME }
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
@@ -26,12 +26,22 @@ function Assert-SafeRemovalPath($Path) {
     if ([string]::IsNullOrWhiteSpace($Path)) {
         throw "Небезопасный пустой путь для удаления."
     }
+
     $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd([char[]]"\/")
     $rootPath = [System.IO.Path]::GetPathRoot($fullPath).TrimEnd([char[]]"\/")
     $homePath = [System.IO.Path]::GetFullPath($HOME).TrimEnd([char[]]"\/")
     if ($fullPath -eq $rootPath -or $fullPath -eq $homePath) {
         throw "Небезопасный путь для удаления: $Path"
     }
+}
+
+function New-BackupPath($Path) {
+    return "$Path.codex-team-skills.bak.$((Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssfffZ"))"
+}
+
+function Write-Utf8File($Path, $Text) {
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Text, $encoding)
 }
 
 function Remove-ManagedCodexBlock($Text) {
@@ -41,39 +51,45 @@ function Remove-ManagedCodexBlock($Text) {
     $lines = @($Text -split "`r?`n")
     $kept = New-Object System.Collections.Generic.List[string]
     $rescued = New-Object System.Collections.Generic.List[string]
-    $i = 0
-    while ($i -lt $lines.Count) {
-        $trimmed = $lines[$i].Trim()
+    $index = 0
+
+    while ($index -lt $lines.Count) {
+        $trimmed = $lines[$index].Trim()
         if ($trimmed -eq $begin) {
-            $i++
-            while ($i -lt $lines.Count -and $lines[$i].Trim() -ne $end) {
-                $header = $lines[$i].Trim()
+            $index++
+            while ($index -lt $lines.Count -and $lines[$index].Trim() -ne $end) {
+                $header = $lines[$index].Trim()
                 if ($header.StartsWith("[") -and -not ($targets -contains $header)) {
-                    $rescued.Add($lines[$i])
-                    $i++
+                    $rescued.Add($lines[$index])
+                    $index++
                     while (
-                        $i -lt $lines.Count -and
-                        $lines[$i].Trim() -ne $end -and
-                        -not $lines[$i].TrimStart().StartsWith("[")
+                        $index -lt $lines.Count -and
+                        $lines[$index].Trim() -ne $end -and
+                        -not $lines[$index].TrimStart().StartsWith("[")
                     ) {
-                        $rescued.Add($lines[$i])
-                        $i++
+                        $rescued.Add($lines[$index])
+                        $index++
                     }
                 } else {
-                    $i++
+                    $index++
                 }
             }
-            if ($i -lt $lines.Count) { $i++ }
+            if ($index -lt $lines.Count) { $index++ }
             continue
         }
+
         if ($targets -contains $trimmed) {
-            $i++
-            while ($i -lt $lines.Count -and -not $lines[$i].TrimStart().StartsWith("[")) { $i++ }
+            $index++
+            while ($index -lt $lines.Count -and -not $lines[$index].TrimStart().StartsWith("[")) {
+                $index++
+            }
             continue
         }
-        $kept.Add($lines[$i])
-        $i++
+
+        $kept.Add($lines[$index])
+        $index++
     }
+
     while ($rescued.Count -gt 0 -and -not $rescued[$rescued.Count - 1].Trim()) {
         $rescued.RemoveAt($rescued.Count - 1)
     }
@@ -85,61 +101,72 @@ function Remove-ManagedCodexBlock($Text) {
 }
 
 try {
-    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($task) {
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-        Write-Info "Старая задача Team Skills удалена из Windows Task Scheduler."
-    }
+    $legacyTask = Get-ScheduledTask -TaskPath "\" -TaskName $TaskName -ErrorAction SilentlyContinue
 } catch {
-    throw "Не удалось удалить старую Scheduled Task: $($_.Exception.Message)"
+    throw "Не удалось проверить старую Scheduled Task: $($_.Exception.Message)"
 }
-try {
-    if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
-        throw "старая Scheduled Task осталась зарегистрирована"
+$legacyMarkers = @(
+    "bootstrap-team-skills.ps1",
+    "update-team-skills.ps1",
+    "team-skills-auto-update-with-git-fallback.ps1"
+)
+$legacyMarkerFound = @(
+    $legacyMarkers | Where-Object {
+        Test-Path -LiteralPath (Join-Path (Join-Path $LegacyInstallRoot "bin") $_) -PathType Leaf
     }
-} catch {
-    throw "Не удалось подтвердить удаление старой Scheduled Task: $($_.Exception.Message)"
+).Count -gt 0
+if ($legacyTask -or $legacyMarkerFound) {
+    throw "Сначала запустите remove-team-skills-autoupdate.ps1 -DryRun, затем -Apply. Полный uninstall не удаляет legacy updater."
 }
 
-if (Test-Path $PluginDest) {
-    Assert-SafeRemovalPath $PluginDest
-    Remove-Item $PluginDest -Recurse -Force
-    Write-Info "Локальный plugin team-skills удалён."
-}
-
-if (Test-Path $MarketplacePath) {
-    $data = Get-Content $MarketplacePath -Raw | ConvertFrom-Json
+if (Test-Path -LiteralPath $MarketplacePath) {
+    $originalBytes = [System.IO.File]::ReadAllBytes($MarketplacePath)
+    $data = [System.Text.Encoding]::UTF8.GetString($originalBytes).TrimStart([char]0xFEFF) | ConvertFrom-Json
     if ($data.PSObject.Properties.Name -contains "plugins") {
         $data.plugins = @($data.plugins | Where-Object { $_.name -ne $PluginName })
-        $data | ConvertTo-Json -Depth 10 | Set-Content -Path $MarketplacePath -Encoding UTF8
+        $next = $data | ConvertTo-Json -Depth 20
+        $backup = New-BackupPath $MarketplacePath
+        Copy-Item -LiteralPath $MarketplacePath -Destination $backup -Force
+        try {
+            Write-Utf8File $MarketplacePath ($next + "`n")
+        } catch {
+            Copy-Item -LiteralPath $backup -Destination $MarketplacePath -Force
+            throw
+        }
         Write-Info "Запись team-skills удалена из marketplace."
     }
 }
 
-if (Test-Path $CodexConfigPath) {
-    $text = Get-Content $CodexConfigPath -Raw
+if (Test-Path -LiteralPath $CodexConfigPath) {
+    $text = [System.IO.File]::ReadAllText($CodexConfigPath)
     $next = Remove-ManagedCodexBlock $text
-    $backup = "$CodexConfigPath.codex-team-skills.bak.$((Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ"))"
-    Copy-Item $CodexConfigPath $backup -Force
+    $backup = New-BackupPath $CodexConfigPath
+    Copy-Item -LiteralPath $CodexConfigPath -Destination $backup -Force
     try {
-        Set-Content -Path $CodexConfigPath -Value $next -Encoding UTF8
+        Write-Utf8File $CodexConfigPath $next
     } catch {
-        Copy-Item $backup $CodexConfigPath -Force
+        Copy-Item -LiteralPath $backup -Destination $CodexConfigPath -Force
         throw
     }
     Write-Info "Запись team-skills удалена из Codex registry."
 }
 
-if (Test-Path $CodexPluginCacheDir) {
-    Assert-SafeRemovalPath $CodexPluginCacheDir
-    Remove-Item $CodexPluginCacheDir -Recurse -Force
-    Write-Info "Codex plugin cache team-skills удалён."
+if (Test-Path -LiteralPath $PluginDest) {
+    Assert-SafeRemovalPath $PluginDest
+    Remove-Item -LiteralPath $PluginDest -Recurse -Force
+    if (Test-Path -LiteralPath $PluginDest) {
+        throw "Не удалось удалить локальный plugin team-skills."
+    }
+    Write-Info "Локальный plugin team-skills удалён."
 }
 
-if (Test-Path $InstallRoot) {
-    Assert-SafeRemovalPath $InstallRoot
-    Remove-Item $InstallRoot -Recurse -Force -ErrorAction Stop
-    Write-Info "Локальные служебные файлы Team Skills удалены."
+if (Test-Path -LiteralPath $CodexPluginCacheDir) {
+    Assert-SafeRemovalPath $CodexPluginCacheDir
+    Remove-Item -LiteralPath $CodexPluginCacheDir -Recurse -Force
+    if (Test-Path -LiteralPath $CodexPluginCacheDir) {
+        throw "Не удалось удалить Codex plugin cache team-skills."
+    }
+    Write-Info "Codex plugin cache team-skills удалён."
 }
 
 Write-Info "Удаление завершено. Перезапустите Codex, чтобы он перечитал список plugin."

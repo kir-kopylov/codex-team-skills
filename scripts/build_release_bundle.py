@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the validated team-skills release assets."""
+"""Build the immutable one-shot team-skills release assets."""
 
 from __future__ import annotations
 
@@ -9,46 +9,120 @@ import json
 import os
 import shutil
 import zipfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 
-SUPPORT_NAMES = (
+RELEASE_ASSET_NAMES = (
     "install-team-skills.cmd",
     "install-team-skills.ps1",
     "install-team-skills.command",
     "uninstall-team-skills.ps1",
     "uninstall-team-skills.command",
-    "team-skills-registry.py",
-    "team-skills-public-key.pem",
+    "remove-team-skills-autoupdate.ps1",
+    "remove-team-skills-autoupdate.command",
 )
 
 WINDOWS_POWERSHELL_ASSETS = {
     "install-team-skills.ps1",
     "uninstall-team-skills.ps1",
+    "remove-team-skills-autoupdate.ps1",
 }
 
+RELEASE_TAG_PLACEHOLDER = "__TEAM_SKILLS_RELEASE_TAG__"
 
-def asset_metadata(name: str, path: Path, release_base: str) -> dict[str, str | int]:
-    return {
-        "name": name,
-        "url": f"{release_base}/{name}",
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "size": path.stat().st_size,
-    }
+BUNDLE_TRANSIENT_DIR_NAMES = {
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+}
+BUNDLE_TRANSIENT_FILE_NAMES = {".DS_Store"}
+BUNDLE_TRANSIENT_FILE_SUFFIXES = {".pyc", ".pyo"}
+BUNDLE_FORBIDDEN_FILE_NAMES = {
+    "latest.json",
+    "latest.json.sig",
+    "manifest.json.sig",
+    "team-skills-auto-update-with-git-fallback.ps1",
+    "team-skills-public-key.pem",
+    "team-skills-registry.py",
+}
+BUNDLE_FORBIDDEN_FILE_PREFIXES = (
+    "bootstrap-team-skills",
+    "refresh-team-skills",
+    "update-team-skills",
+)
 
 
-def copy_support_file(source: Path, destination: Path) -> None:
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def is_transient_bundle_path(path: Path) -> bool:
+    return (
+        any(part in BUNDLE_TRANSIENT_DIR_NAMES for part in path.parts)
+        or path.name in BUNDLE_TRANSIENT_FILE_NAMES
+        or path.suffix.lower() in BUNDLE_TRANSIENT_FILE_SUFFIXES
+    )
+
+
+def validate_plugin_bundle_source(plugin_root: Path) -> None:
+    for path in plugin_root.rglob("*"):
+        relative = path.relative_to(plugin_root)
+        if is_transient_bundle_path(relative):
+            continue
+        if path.is_symlink():
+            raise ValueError(f"plugin bundle source contains a symlink: {relative}")
+        if not path.is_file():
+            continue
+        name = path.name.lower()
+        if (
+            name in BUNDLE_FORBIDDEN_FILE_NAMES
+            or name.endswith(".sig")
+            or name.startswith(BUNDLE_FORBIDDEN_FILE_PREFIXES)
+        ):
+            raise ValueError(f"plugin bundle source contains forbidden runtime: {relative}")
+
+
+def ignore_transient_bundle_entries(directory: str, names: list[str]) -> set[str]:
+    root = Path(directory)
+    ignored: set[str] = set()
+    for name in names:
+        path = root / name
+        if (
+            name in BUNDLE_TRANSIENT_DIR_NAMES
+            or name in BUNDLE_TRANSIENT_FILE_NAMES
+            or path.suffix.lower() in BUNDLE_TRANSIENT_FILE_SUFFIXES
+        ):
+            ignored.add(name)
+    return ignored
+
+
+def copy_release_asset(source: Path, destination: Path, replacements: dict[str, str]) -> None:
+    if not source.is_file():
+        raise FileNotFoundError(f"release asset source is missing: {source}")
+
+    if source.name.startswith("install-team-skills"):
+        content = source.read_text(encoding="utf-8-sig")
+        for placeholder, value in replacements.items():
+            content = content.replace(placeholder, value)
+        unresolved = {
+            placeholder for placeholder in replacements if placeholder in content
+        }
+        if unresolved:
+            names = ", ".join(sorted(unresolved))
+            raise ValueError(f"release installer contains unresolved placeholders: {names}")
+        encoding = "utf-8-sig" if source.name in WINDOWS_POWERSHELL_ASSETS else "utf-8"
+        destination.write_text(content, encoding=encoding)
+        shutil.copymode(source, destination)
+        return
+
     if source.name in WINDOWS_POWERSHELL_ASSETS:
         content = source.read_text(encoding="utf-8-sig")
         destination.write_text(content, encoding="utf-8-sig")
+        shutil.copymode(source, destination)
         return
 
     shutil.copy2(source, destination)
-
-
-def support_source_path(root: Path, name: str) -> Path:
-    return root / "installer" / name
 
 
 def build_release_bundle(
@@ -63,23 +137,36 @@ def build_release_bundle(
     dist.mkdir(parents=True, exist_ok=True)
 
     plugin_root = root / "plugins" / "team-skills"
-    manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
-    plugin_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validate_plugin_bundle_source(plugin_root)
+    source_manifest_path = plugin_root / ".codex-plugin" / "plugin.json"
+    source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
+
     short_sha = commit[:7]
     release_id = f"r{run_number}.{run_attempt}-{short_sha}"
     release_tag = f"team-skills-v{release_id}"
-    product_version = plugin_manifest["version"]
-    runtime_version = f"{product_version}-r.{run_number}.{run_attempt}.{short_sha}"
-    release_base = f"https://github.com/kir-kopylov/codex-team-skills/releases/download/{release_tag}"
-
+    product_version = source_manifest["version"]
+    plugin_version = f"{product_version}-r.{run_number}.{run_attempt}.{short_sha}"
+    release_base = (
+        "https://github.com/kir-kopylov/codex-team-skills/releases/download/"
+        f"{release_tag}"
+    )
     release_plugin_root = dist / "bundle-root" / "team-skills"
-    shutil.copytree(plugin_root, release_plugin_root)
+    shutil.copytree(
+        plugin_root,
+        release_plugin_root,
+        ignore=ignore_transient_bundle_entries,
+    )
     release_manifest_path = release_plugin_root / ".codex-plugin" / "plugin.json"
     release_plugin_manifest = json.loads(release_manifest_path.read_text(encoding="utf-8"))
-    release_plugin_manifest["product_version"] = product_version
-    release_plugin_manifest["version"] = runtime_version
-    release_plugin_manifest["release_id"] = release_id
-    release_plugin_manifest["commit"] = commit
+    release_plugin_manifest.update(
+        {
+            "product_version": product_version,
+            "version": plugin_version,
+            "release_id": release_id,
+            "release_tag": release_tag,
+            "commit": commit,
+        }
+    )
     release_manifest_path.write_text(
         json.dumps(release_plugin_manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -89,45 +176,42 @@ def build_release_bundle(
     with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(release_plugin_root.rglob("*")):
             if path.is_file():
-                archive.write(path, Path("team-skills") / path.relative_to(release_plugin_root))
+                archive.write(
+                    path,
+                    Path("team-skills") / path.relative_to(release_plugin_root),
+                )
     shutil.rmtree(dist / "bundle-root", ignore_errors=True)
 
-    for name in SUPPORT_NAMES:
-        copy_support_file(support_source_path(root, name), dist / name)
-
-    plugin_bundle = asset_metadata("team-skills-bundle.zip", bundle_path, release_base)
-    support_files = [asset_metadata(name, dist / name, release_base) for name in SUPPORT_NAMES]
-    created_at = datetime.now(timezone.utc).isoformat()
     manifest = {
-        "name": "team-skills",
-        "product_version": product_version,
-        "runtime_version": runtime_version,
-        "release_id": release_id,
+        "schema_version": 1,
         "release_tag": release_tag,
         "commit": commit,
-        "channel": "stable",
-        "created_at": created_at,
-        "plugin_bundle": plugin_bundle,
-        "support_files": support_files,
+        "plugin_version": plugin_version,
+        "bundle": {
+            "url": f"{release_base}/team-skills-bundle.zip",
+            "size": bundle_path.stat().st_size,
+            "sha256": sha256(bundle_path),
+        },
     }
     (dist / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    latest = {
-        "name": "team-skills",
-        "channel": "stable",
-        "release_id": release_id,
-        "release_tag": release_tag,
-        "runtime_version": runtime_version,
-        "commit": commit,
-        "manifest_url": f"{release_base}/manifest.json",
-        "created_at": created_at,
+
+    replacements = {RELEASE_TAG_PLACEHOLDER: release_tag}
+    for name in RELEASE_ASSET_NAMES:
+        copy_release_asset(root / "installer" / name, dist / name, replacements)
+
+    expected = {
+        "manifest.json",
+        "team-skills-bundle.zip",
+        *RELEASE_ASSET_NAMES,
     }
-    (dist / "latest.json").write_text(
-        json.dumps(latest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    actual = {path.name for path in dist.iterdir()}
+    if actual != expected:
+        extra = ", ".join(sorted(actual - expected)) or "none"
+        missing = ", ".join(sorted(expected - actual)) or "none"
+        raise RuntimeError(f"unexpected dist contents; extra={extra}; missing={missing}")
 
 
 def env_or_default(name: str, default: str) -> str:
@@ -138,11 +222,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--dist", type=Path)
-    parser.add_argument("--commit", default=env_or_default("GITHUB_SHA_VALUE", env_or_default("GITHUB_SHA", "dev0000")))
-    parser.add_argument("--run-number", default=env_or_default("GITHUB_RUN_NUMBER_VALUE", env_or_default("GITHUB_RUN_NUMBER", "0")))
+    parser.add_argument(
+        "--commit",
+        default=env_or_default(
+            "GITHUB_SHA_VALUE", env_or_default("GITHUB_SHA", "dev0000")
+        ),
+    )
+    parser.add_argument(
+        "--run-number",
+        default=env_or_default(
+            "GITHUB_RUN_NUMBER_VALUE", env_or_default("GITHUB_RUN_NUMBER", "0")
+        ),
+    )
     parser.add_argument(
         "--run-attempt",
-        default=env_or_default("GITHUB_RUN_ATTEMPT_VALUE", env_or_default("GITHUB_RUN_ATTEMPT", "0")),
+        default=env_or_default(
+            "GITHUB_RUN_ATTEMPT_VALUE", env_or_default("GITHUB_RUN_ATTEMPT", "0")
+        ),
     )
     args = parser.parse_args()
 

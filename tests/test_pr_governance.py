@@ -45,7 +45,8 @@ def hard_check_body() -> str:
 ## Жёсткая Проверка installer/release
 
 - [x] Windows PowerShell 5.1 ValidateOnly проверен.
-- [x] `manifest.json` и `latest.json` остаются валидными для release bundle.
+- [x] `manifest.json` и SHA-256 bundle проверены.
+- [x] Legacy cleanup в dry-run не меняет систему.
 - [x] Откат и повторная установка проверены повторным запуском installer.
 """
 

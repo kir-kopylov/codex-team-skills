@@ -33,7 +33,7 @@ The repository intentionally serves two different runtimes from the same
 | --- | --- | --- |
 | Plugin manifest | `plugins/team-skills/.codex-plugin/plugin.json` | `.claude-plugin/plugin.json` |
 | Marketplace metadata | `.agents/plugins/marketplace.json` | `.claude-plugin/marketplace.json` |
-| Delivery | signed bundle and installers in `installer/` | sync through `scripts/pull-skills.sh` |
+| Delivery | immutable bundle and one-shot tools in `installer/` | sync through `scripts/pull-skills.sh` |
 | Local skill destination | managed by the Codex plugin installer | `~/.claude/skills/` |
 
 The Claude Code manifest intentionally has no `version` field. The Codex

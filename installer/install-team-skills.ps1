@@ -1,108 +1,181 @@
 param(
     [string]$ManifestUrl = $env:CODEX_TEAM_SKILLS_MANIFEST_URL,
-    [string]$LatestUrl = $env:CODEX_TEAM_SKILLS_LATEST_URL,
-    [switch]$ValidateOnly,
-    [switch]$VerifySignatureOnly,
-    [string]$PayloadPath,
-    [string]$SignaturePath
+    [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $PluginName = "team-skills"
-$RepoReleaseBase = "https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
-$InstallRoot = if ($env:CODEX_TEAM_SKILLS_HOME) { $env:CODEX_TEAM_SKILLS_HOME } else { Join-Path $env:LOCALAPPDATA "CodexTeamSkills" }
-$BinDir = Join-Path $InstallRoot "bin"
+$MarketplaceName = "codex-team-skills"
+$BakedReleaseTag = "__TEAM_SKILLS_RELEASE_TAG__"
 $PluginDest = if ($env:CODEX_TEAM_SKILLS_PLUGIN_DIR) { $env:CODEX_TEAM_SKILLS_PLUGIN_DIR } else { Join-Path $HOME "plugins\team-skills" }
 $MarketplaceRoot = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT) { $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT } else { $HOME }
 $MarketplacePath = if ($env:CODEX_TEAM_SKILLS_MARKETPLACE) { $env:CODEX_TEAM_SKILLS_MARKETPLACE } else { Join-Path $MarketplaceRoot ".agents\plugins\marketplace.json" }
 $CodexConfigPath = if ($env:CODEX_TEAM_SKILLS_CODEX_CONFIG) { $env:CODEX_TEAM_SKILLS_CODEX_CONFIG } else { Join-Path $HOME ".codex\config.toml" }
-$CodexPluginCacheDir = if ($env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR) { $env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR } else { Join-Path $HOME ".codex\plugins\cache\codex-team-skills" }
-
-# Закреплённый public key для Windows PowerShell 5.1. ImportFromPem здесь недоступен,
-# поэтому подпись проверяется через совместимые RSA parameters.
-$PinnedPublicKeyModulusBase64 = "5XeHpCkSYFOrpk717iXbEM7Pf7UWajm5zor6C8eX0+wSXq2dOQGk2VKW217gtFLQXtnEmVIeB3VRiU1lmltnOJVpNoLxoayTSiBUYoNUSRrMxb5WqPLLT9LiHk2GtNx/VLhwMJxvbR2cidTcYmnQyNBcsSCEV+BWeY0ExCaRzLAxoh9ulDcdnhEASL7Lp/BrxR6rJz2hRboBgPEVh8bC0ZTv+DGjuF4XJPmBtj3RC8nt307s3sKHIn/rcqK9qY9bUsU4Tp6HarNId7EoaPC6SEvTndy/CjYXcLJp/oLzcy6b0RPRI7qJFX8MhqnvyBdinYZTk2VO6bqGQR0rJkvN2g7eYRhThPHKiIMGXMM8QedZZW6Sqjvk8PjLLupy44VHUn5OH0verJMGe0gkMW664AnY5laFIYMxR+OHD/4cLB+bwwoBYfiZf9o4r4PkIwbzb1KLA0AnXXmEiF/oT8Bgu/mpmFCSPxe3jzoN6UDgQ3g4pr2kV0rbe19+iNbIUItx"
-$PinnedPublicKeyExponentBase64 = "AQAB"
-
-if (-not $LatestUrl) {
-    $LatestUrl = "$RepoReleaseBase/latest.json"
-}
+$CodexPluginCacheDir = if ($env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR) { $env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR } else { Join-Path $HOME ".codex\plugins\cache\$MarketplaceName" }
 
 function Write-Info($Message) {
     Write-Host "[team-skills] $Message"
 }
 
+if ($ValidateOnly) {
+    Write-Info "ValidateOnly: install-team-skills.ps1 разобран без выполнения установки."
+    exit 0
+}
+
+if ([string]::IsNullOrWhiteSpace($ManifestUrl)) {
+    if ($BakedReleaseTag.StartsWith("__TEAM_SKILLS_")) {
+        throw "Запущен исходный installer без release tag. Используйте release-asset."
+    }
+    $ManifestUrl = "https://github.com/kir-kopylov/codex-team-skills/releases/download/$BakedReleaseTag/manifest.json"
+}
+
 function Ensure-Directory($Path) {
-    if (-not (Test-Path $Path)) {
+    if (-not (Test-Path -LiteralPath $Path)) {
         New-Item -ItemType Directory -Path $Path -Force | Out-Null
     }
 }
 
+function Get-ReleaseTagFromManifestUrl($Url) {
+    try {
+        $uri = [System.Uri]$Url
+    } catch {
+        throw "Некорректный ManifestUrl."
+    }
+    if (
+        -not $uri.IsAbsoluteUri -or
+        $uri.Scheme -ne "https" -or
+        $uri.Host -ne "github.com" -or
+        -not $uri.IsDefaultPort -or
+        $uri.UserInfo -or
+        $uri.Query -or
+        $uri.Fragment
+    ) {
+        throw "ManifestUrl должен быть immutable HTTPS URL официального GitHub release."
+    }
+    $match = [regex]::Match(
+        $uri.AbsolutePath,
+        "^/kir-kopylov/codex-team-skills/releases/download/(?<tag>team-skills-v[A-Za-z0-9._-]+)/manifest\.json$"
+    )
+    if (-not $match.Success) {
+        throw "ManifestUrl должен указывать на manifest.json конкретного GitHub release."
+    }
+    return $match.Groups["tag"].Value
+}
+
+function Download-File($Url, $Destination) {
+    $lastMessage = ""
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+            Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Destination -TimeoutSec 60
+            if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+                throw "скачанный файл не найден"
+            }
+            return
+        } catch {
+            $lastMessage = $_.Exception.Message
+            if ($attempt -lt 3) {
+                Start-Sleep -Seconds ([math]::Pow(2, $attempt - 1))
+            }
+        }
+    }
+    throw "Не удалось скачать release-asset после трёх попыток: $lastMessage"
+}
+
 function Get-Sha256($Path) {
-    return (Get-FileHash -Algorithm SHA256 $Path).Hash.ToLowerInvariant()
+    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
 }
 
 function Verify-Sha256($Path, $Expected) {
     if ((Get-Sha256 $Path) -ne $Expected.ToLowerInvariant()) {
-        throw "Checksum mismatch для $(Split-Path $Path -Leaf)."
+        throw "SHA-256 файла $(Split-Path $Path -Leaf) не совпадает с manifest."
     }
 }
 
-function New-PinnedRsaProvider() {
-    $rsa = $null
-    try {
-        $cspParameters = New-Object System.Security.Cryptography.CspParameters
-        $cspParameters.ProviderType = 24
-        $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider -ArgumentList $cspParameters
-        $rsa.PersistKeyInCsp = $false
-
-        $rsaParameters = New-Object System.Security.Cryptography.RSAParameters
-        $rsaParameters.Modulus = [Convert]::FromBase64String($PinnedPublicKeyModulusBase64)
-        $rsaParameters.Exponent = [Convert]::FromBase64String($PinnedPublicKeyExponentBase64)
-        $rsa.ImportParameters($rsaParameters)
-        return $rsa
-    } catch {
-        if ($rsa) { $rsa.Dispose() }
-        throw "Не удалось подготовить проверку подписи в Windows PowerShell 5.1: $($_.Exception.Message)"
+function Verify-FileSize($Path, $Expected) {
+    $actual = (Get-Item -LiteralPath $Path).Length
+    if ($actual -ne [int64]$Expected) {
+        throw "Размер файла $(Split-Path $Path -Leaf) не совпадает с manifest: ожидалось $Expected, получено $actual."
     }
 }
 
-function Verify-Signature($Payload, $Signature) {
-    $rsa = New-PinnedRsaProvider
+function Assert-SafeManagedPath($Path, $ExpectedLeaf, $Label) {
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        throw "Пустой путь $Label."
+    }
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd([char[]]"\/")
+    $rootPath = [System.IO.Path]::GetPathRoot($fullPath).TrimEnd([char[]]"\/")
+    $homePath = [System.IO.Path]::GetFullPath($HOME).TrimEnd([char[]]"\/")
+    if ($fullPath -eq $rootPath -or $fullPath -eq $homePath -or (Split-Path $fullPath -Leaf) -ne $ExpectedLeaf) {
+        throw "Небезопасный путь $Label`: $Path"
+    }
+    if (Test-Path -LiteralPath $fullPath) {
+        $item = Get-Item -LiteralPath $fullPath -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "$Label не должен быть reparse point: $Path"
+        }
+    }
+    return $fullPath
+}
+
+function Write-Utf8NoBomAtomic($Path, $Text) {
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    Ensure-Directory (Split-Path $fullPath -Parent)
+    $temporary = "$fullPath.tmp.$PID.$([guid]::NewGuid().ToString('N'))"
     try {
-        $payloadBytes = [System.IO.File]::ReadAllBytes($Payload)
-        $signatureBytes = [System.IO.File]::ReadAllBytes($Signature)
-        $sha256Oid = [System.Security.Cryptography.CryptoConfig]::MapNameToOID("SHA256")
-        $valid = $rsa.VerifyData($payloadBytes, $sha256Oid, $signatureBytes)
+        $encoding = New-Object System.Text.UTF8Encoding($false)
+        [System.IO.File]::WriteAllText($temporary, $Text, $encoding)
+        if (Test-Path -LiteralPath $fullPath) {
+            [System.IO.File]::Replace($temporary, $fullPath, $null)
+        } else {
+            [System.IO.File]::Move($temporary, $fullPath)
+        }
     } finally {
-        $rsa.Dispose()
-    }
-    if (-not $valid) {
-        throw "Подпись $(Split-Path $Payload -Leaf) недействительна."
+        Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
     }
 }
 
-function Download-File($Url, $Destination) {
-    Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Destination
+function Save-OptionalFile($Path, $Snapshot) {
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $false
+    }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Ожидался файл, но найден другой объект: $Path"
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Файл не должен быть reparse point: $Path"
+    }
+    Copy-Item -LiteralPath $Path -Destination $Snapshot -Force
+    return $true
 }
 
-function Download-Signed($Url, $Destination) {
-    Download-File $Url $Destination
-    $signature = "$Destination.sig"
-    Download-File "$Url.sig" $signature
-    Verify-Signature $Destination $signature
-}
-
-function Update-Marketplace($PluginPath) {
-    Ensure-Directory (Split-Path $MarketplacePath -Parent)
-    if (Test-Path $MarketplacePath) {
-        $data = Get-Content $MarketplacePath -Raw | ConvertFrom-Json
+function Restore-OptionalFile($Path, $Snapshot, $Existed) {
+    if ($Existed) {
+        Ensure-Directory (Split-Path $Path -Parent)
+        Copy-Item -LiteralPath $Snapshot -Destination $Path -Force
     } else {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function New-MarketplaceText($OriginalText, $PluginPath) {
+    if ([string]::IsNullOrWhiteSpace($OriginalText)) {
         $data = [pscustomobject]@{
             name = "local-team-skills"
             interface = [pscustomobject]@{ displayName = "Локальные командные skills" }
             plugins = @()
+        }
+    } else {
+        try {
+            $data = $OriginalText | ConvertFrom-Json
+        } catch {
+            throw "Marketplace JSON невалиден; установка ничего не изменила: $($_.Exception.Message)"
+        }
+        if ($null -eq $data -or $data -is [System.Array]) {
+            throw "Marketplace JSON должен содержать объект верхнего уровня."
         }
     }
     if (-not ($data.PSObject.Properties.Name -contains "plugins")) {
@@ -111,7 +184,7 @@ function Update-Marketplace($PluginPath) {
     if (-not ($data.PSObject.Properties.Name -contains "interface")) {
         $data | Add-Member -MemberType NoteProperty -Name interface -Value ([pscustomobject]@{ displayName = "Локальные командные skills" })
     }
-    $kept = @($data.plugins | Where-Object { $_.name -ne $PluginName })
+    $kept = @($data.plugins | Where-Object { $null -eq $_ -or $_.name -ne $PluginName })
     $entry = [pscustomobject]@{
         name = $PluginName
         source = [pscustomobject]@{ source = "local"; path = $PluginPath.Replace("\", "/") }
@@ -119,7 +192,7 @@ function Update-Marketplace($PluginPath) {
         category = "Productivity"
     }
     $data.plugins = @($kept + $entry)
-    $data | ConvertTo-Json -Depth 10 | Set-Content -Path $MarketplacePath -Encoding UTF8
+    return (($data | ConvertTo-Json -Depth 20) + "`n")
 }
 
 function Remove-ManagedCodexBlock($Text) {
@@ -172,10 +245,8 @@ function Remove-ManagedCodexBlock($Text) {
     return (($kept -join "`n").TrimEnd() + "`n")
 }
 
-function Update-CodexRegistry() {
-    Ensure-Directory (Split-Path $CodexConfigPath -Parent)
-    $original = if (Test-Path $CodexConfigPath) { Get-Content $CodexConfigPath -Raw } else { "" }
-    $next = Remove-ManagedCodexBlock $original
+function New-CodexConfigText($OriginalText) {
+    $next = Remove-ManagedCodexBlock $OriginalText
     if ($next.Trim()) {
         $next = $next.TrimEnd() + "`n`n"
     }
@@ -192,144 +263,70 @@ source = "$source"
 enabled = true
 # END codex-team-skills managed block
 "@
-    $backup = $null
-    if (Test-Path $CodexConfigPath) {
-        $backup = "$CodexConfigPath.codex-team-skills.bak.$((Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ"))"
-        Copy-Item $CodexConfigPath $backup -Force
+    return ($next.TrimEnd() + "`n")
+}
+
+function Assert-MinimalManifest($Manifest, $ExpectedReleaseTag) {
+    $expectedTopLevel = @("schema_version", "release_tag", "commit", "plugin_version", "bundle")
+    $actualTopLevel = @($Manifest.PSObject.Properties.Name)
+    $unexpected = @($actualTopLevel | Where-Object { $expectedTopLevel -notcontains $_ })
+    $missing = @($expectedTopLevel | Where-Object { $actualTopLevel -notcontains $_ })
+    if ($unexpected.Count -gt 0 -or $missing.Count -gt 0) {
+        throw "Manifest не соответствует минимальной schema_version=1."
+    }
+    if ([int]$Manifest.schema_version -ne 1 -or $Manifest.release_tag -ne $ExpectedReleaseTag) {
+        throw "Release tag или schema_version в manifest не совпадает с installer."
+    }
+    if ($Manifest.commit -notmatch "^[0-9a-fA-F]{7,64}$" -or [string]::IsNullOrWhiteSpace($Manifest.plugin_version)) {
+        throw "Manifest содержит некорректные commit или plugin_version."
+    }
+    $expectedBundle = @("url", "size", "sha256")
+    $actualBundle = @($Manifest.bundle.PSObject.Properties.Name)
+    if (
+        @($actualBundle | Where-Object { $expectedBundle -notcontains $_ }).Count -gt 0 -or
+        @($expectedBundle | Where-Object { $actualBundle -notcontains $_ }).Count -gt 0 -or
+        $Manifest.bundle.sha256 -notmatch "^[0-9a-fA-F]{64}$" -or
+        [int64]$Manifest.bundle.size -le 0
+    ) {
+        throw "Manifest содержит некорректные метаданные plugin bundle."
+    }
+}
+
+function Assert-PluginIdentity($PluginRoot, $Manifest) {
+    $pluginManifestPath = Join-Path $PluginRoot ".codex-plugin\plugin.json"
+    if (-not (Test-Path -LiteralPath $pluginManifestPath -PathType Leaf)) {
+        throw "В bundle не найден manifest plugin team-skills."
+    }
+    $pluginManifest = Get-Content -LiteralPath $pluginManifestPath -Raw | ConvertFrom-Json
+    if (
+        $pluginManifest.name -ne $PluginName -or
+        $pluginManifest.version -ne $Manifest.plugin_version -or
+        $pluginManifest.release_tag -ne $Manifest.release_tag -or
+        $pluginManifest.commit -ne $Manifest.commit -or
+        $pluginManifest.skills -ne "./skills/"
+    ) {
+        throw "Идентичность plugin в bundle не совпадает с manifest."
+    }
+}
+
+function Replace-Plugin($StagedPlugin, $Destination, $PreviousPlugin, $HadPlugin) {
+    if ($HadPlugin) {
+        Move-Item -LiteralPath $Destination -Destination $PreviousPlugin
     }
     try {
-        Set-Content -Path $CodexConfigPath -Value $next -Encoding UTF8
+        Move-Item -LiteralPath $StagedPlugin -Destination $Destination
     } catch {
-        if ($backup -and (Test-Path $backup)) {
-            Copy-Item $backup $CodexConfigPath -Force
+        if ($HadPlugin -and (Test-Path -LiteralPath $PreviousPlugin)) {
+            Move-Item -LiteralPath $PreviousPlugin -Destination $Destination -Force
         }
         throw
     }
 }
 
-function Invalidate-CodexPluginCache() {
-    if ([string]::IsNullOrWhiteSpace($CodexPluginCacheDir) -or -not (Test-Path $CodexPluginCacheDir)) {
-        return
-    }
-    $fullPath = [System.IO.Path]::GetFullPath($CodexPluginCacheDir)
-    if ($fullPath -eq [System.IO.Path]::GetPathRoot($fullPath) -or $fullPath -eq [System.IO.Path]::GetFullPath($HOME)) {
-        throw "Небезопасный путь Codex plugin cache: $CodexPluginCacheDir"
-    }
-    $stale = "$CodexPluginCacheDir.stale.$((Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')).$PID"
-    Move-Item $CodexPluginCacheDir $stale -Force
-}
-
-function Find-PluginRoot($ExpandedDir) {
-    foreach ($candidate in @(
-        (Join-Path $ExpandedDir "team-skills"),
-        (Join-Path $ExpandedDir "plugins\team-skills"),
-        $ExpandedDir
-    )) {
-        if (Test-Path (Join-Path $candidate ".codex-plugin\plugin.json")) {
-            return $candidate
-        }
-    }
-    throw "В bundle не найден plugin team-skills."
-}
-
-function Replace-Plugin($SourceDir) {
-    Ensure-Directory (Split-Path $PluginDest -Parent)
-    $id = [guid]::NewGuid().ToString("N")
-    $temporary = "$PluginDest.tmp.$id"
-    $backup = "$PluginDest.previous.$id"
-    Copy-Item $SourceDir $temporary -Recurse -Force
-    $hadPrevious = Test-Path $PluginDest
-    if ($hadPrevious) {
-        Move-Item $PluginDest $backup -Force
-    }
-    try {
-        Move-Item $temporary $PluginDest -Force
-        if ($hadPrevious -and (Test-Path $backup)) {
-            Remove-Item $backup -Recurse -Force
-        }
-    } catch {
-        Remove-Item $PluginDest -Recurse -Force -ErrorAction SilentlyContinue
-        if ($hadPrevious -and (Test-Path $backup)) {
-            Move-Item $backup $PluginDest -Force
-        }
-        Remove-Item $temporary -Recurse -Force -ErrorAction SilentlyContinue
-        throw
-    }
-}
-
-function Remove-LegacyUpdater() {
-    $cleanupErrors = New-Object System.Collections.Generic.List[string]
-    try {
-        $task = Get-ScheduledTask -TaskName "Codex Team Skills Auto Update" -ErrorAction SilentlyContinue
-        if ($task) {
-            Unregister-ScheduledTask -TaskName "Codex Team Skills Auto Update" -Confirm:$false
-        }
-    } catch {
-        $cleanupErrors.Add("Scheduled Task: $($_.Exception.Message)")
-    }
-
-    foreach ($name in @(
-        "bootstrap-team-skills.ps1",
-        "update-team-skills.ps1",
-        "update-team-skills.ps1.next",
-        "team-skills-status.ps1"
-    )) {
-        $path = Join-Path $BinDir $name
-        if (Test-Path $path) {
-            try {
-                Remove-Item $path -Force
-            } catch {
-                $cleanupErrors.Add("$path`: $($_.Exception.Message)")
-            }
-        }
-    }
-    foreach ($name in @("cache", "state", "logs")) {
-        $path = Join-Path $InstallRoot $name
-        if (Test-Path $path) {
-            Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-
-    try {
-        if (Get-ScheduledTask -TaskName "Codex Team Skills Auto Update" -ErrorAction SilentlyContinue) {
-            $cleanupErrors.Add("Scheduled Task осталась зарегистрирована")
-        }
-    } catch {
-        $cleanupErrors.Add("не удалось подтвердить удаление Scheduled Task: $($_.Exception.Message)")
-    }
-    foreach ($name in @(
-        "bootstrap-team-skills.ps1",
-        "update-team-skills.ps1",
-        "update-team-skills.ps1.next",
-        "team-skills-status.ps1"
-    )) {
-        $path = Join-Path $BinDir $name
-        if (Test-Path $path) {
-            $cleanupErrors.Add("старый файл остался: $path")
-        }
-    }
-    if ($cleanupErrors.Count -gt 0) {
-        throw "Не удалось полностью удалить старое автообновление: $($cleanupErrors -join '; ')"
-    }
-}
-
-if ($ValidateOnly) {
-    Write-Info "ValidateOnly: install-team-skills.ps1 parsed and initialized."
-    exit 0
-}
-
-if ($VerifySignatureOnly) {
-    if ([string]::IsNullOrWhiteSpace($PayloadPath) -or [string]::IsNullOrWhiteSpace($SignaturePath)) {
-        Write-Error "Для VerifySignatureOnly нужны PayloadPath и SignaturePath."
-        exit 1
-    }
-    try {
-        Verify-Signature $PayloadPath $SignaturePath
-        Write-Info "Подпись проверена: $PayloadPath"
-        exit 0
-    } catch {
-        Write-Error $_.Exception.Message
-        exit 1
+function Invalidate-CodexPluginCache($Path) {
+    $safePath = Assert-SafeManagedPath $Path $MarketplaceName "Codex plugin cache"
+    if (Test-Path -LiteralPath $safePath) {
+        Remove-Item -LiteralPath $safePath -Recurse -Force -ErrorAction Stop
     }
 }
 
@@ -338,61 +335,100 @@ $failed = $false
 
 try {
     Ensure-Directory $workDir
-    Remove-LegacyUpdater
-
-    $latestPath = Join-Path $workDir "latest.json"
-    $manifestPath = Join-Path $workDir "manifest.json"
-    if (-not $ManifestUrl) {
-        Write-Info "Скачиваю подписанный указатель release."
-        Download-Signed $LatestUrl $latestPath
-        $latest = Get-Content $latestPath -Raw | ConvertFrom-Json
-        $ManifestUrl = $latest.manifest_url
+    $expectedReleaseTag = Get-ReleaseTagFromManifestUrl $ManifestUrl
+    if (-not $BakedReleaseTag.StartsWith("__TEAM_SKILLS_") -and $expectedReleaseTag -ne $BakedReleaseTag) {
+        throw "ManifestUrl не совпадает с release tag, встроенным в installer."
     }
+    $releaseBase = "https://github.com/kir-kopylov/codex-team-skills/releases/download/$expectedReleaseTag"
 
-    Write-Info "Скачиваю подписанный manifest."
-    Download-Signed $ManifestUrl $manifestPath
-    $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-    if (-not $manifest.plugin_bundle.url -or -not $manifest.plugin_bundle.sha256) {
-        throw "Manifest не содержит plugin bundle."
+    $manifestPath = Join-Path $workDir "manifest.json"
+    Write-Info "Скачиваю manifest конкретного GitHub release."
+    Download-File $ManifestUrl $manifestPath
+    try {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    } catch {
+        throw "Manifest JSON невалиден: $($_.Exception.Message)"
+    }
+    Assert-MinimalManifest $manifest $expectedReleaseTag
+    if ($manifest.bundle.url -ne "$releaseBase/team-skills-bundle.zip") {
+        throw "Bundle URL должен указывать на тот же immutable GitHub release, что и installer."
     }
 
     $bundlePath = Join-Path $workDir "team-skills-bundle.zip"
     $expandedDir = Join-Path $workDir "expanded"
     Write-Info "Скачиваю plugin bundle."
-    Download-File $manifest.plugin_bundle.url $bundlePath
-    Verify-Sha256 $bundlePath $manifest.plugin_bundle.sha256
-    Expand-Archive -Path $bundlePath -DestinationPath $expandedDir -Force
-    $pluginRoot = Find-PluginRoot $expandedDir
-    $pluginManifest = Get-Content (Join-Path $pluginRoot ".codex-plugin\plugin.json") -Raw | ConvertFrom-Json
-    if ($pluginManifest.version -ne $manifest.runtime_version) {
-        throw "runtime_version в bundle не совпадает с manifest."
+    Download-File $manifest.bundle.url $bundlePath
+    Verify-FileSize $bundlePath $manifest.bundle.size
+    Verify-Sha256 $bundlePath $manifest.bundle.sha256
+    Expand-Archive -LiteralPath $bundlePath -DestinationPath $expandedDir -Force
+    $pluginRoot = Join-Path $expandedDir "team-skills"
+    Assert-PluginIdentity $pluginRoot $manifest
+
+    $PluginDest = Assert-SafeManagedPath $PluginDest $PluginName "plugin destination"
+    $CodexPluginCacheDir = Assert-SafeManagedPath $CodexPluginCacheDir $MarketplaceName "Codex plugin cache"
+    if (Test-Path -LiteralPath $PluginDest -PathType Leaf) {
+        throw "Plugin destination должен быть каталогом: $PluginDest"
+    }
+    if (Test-Path -LiteralPath $CodexPluginCacheDir -PathType Leaf) {
+        throw "Codex plugin cache должен быть каталогом: $CodexPluginCacheDir"
     }
 
-    $uninstallerEntry = @($manifest.support_files | Where-Object { $_.name -eq "uninstall-team-skills.ps1" }) | Select-Object -First 1
-    if (-not $uninstallerEntry) {
-        throw "Manifest не содержит Windows uninstaller."
+    $marketplaceSnapshot = Join-Path $workDir "marketplace.original"
+    $configSnapshot = Join-Path $workDir "config.original"
+    $marketplaceExisted = Save-OptionalFile $MarketplacePath $marketplaceSnapshot
+    $configExisted = Save-OptionalFile $CodexConfigPath $configSnapshot
+    $marketplaceOriginal = if ($marketplaceExisted) { [System.IO.File]::ReadAllText($marketplaceSnapshot) } else { "" }
+    $configOriginal = if ($configExisted) { [System.IO.File]::ReadAllText($configSnapshot) } else { "" }
+    $marketplaceNext = New-MarketplaceText $marketplaceOriginal $PluginDest
+    $configNext = New-CodexConfigText $configOriginal
+
+    Ensure-Directory (Split-Path $PluginDest -Parent)
+    $transactionId = [guid]::NewGuid().ToString("N")
+    $stagedPlugin = "$PluginDest.tmp.$transactionId"
+    $previousPlugin = "$PluginDest.previous.$transactionId"
+    Copy-Item -LiteralPath $pluginRoot -Destination $stagedPlugin -Recurse -Force
+    $hadPlugin = Test-Path -LiteralPath $PluginDest
+    $pluginActivated = $false
+    try {
+        Replace-Plugin $stagedPlugin $PluginDest $previousPlugin $hadPlugin
+        $pluginActivated = $true
+        Write-Utf8NoBomAtomic $MarketplacePath $marketplaceNext
+        Write-Utf8NoBomAtomic $CodexConfigPath $configNext
+        Assert-PluginIdentity $PluginDest $manifest
+        Invalidate-CodexPluginCache $CodexPluginCacheDir
+        if ($hadPlugin -and (Test-Path -LiteralPath $previousPlugin)) {
+            Remove-Item -LiteralPath $previousPlugin -Recurse -Force -ErrorAction Stop
+        }
+    } catch {
+        $originalError = $_.Exception.Message
+        $rollbackErrors = New-Object System.Collections.Generic.List[string]
+        if ($pluginActivated) {
+            try { Remove-Item -LiteralPath $PluginDest -Recurse -Force -ErrorAction Stop } catch { $rollbackErrors.Add($_.Exception.Message) }
+        }
+        try {
+            if ($hadPlugin -and (Test-Path -LiteralPath $previousPlugin)) {
+                Move-Item -LiteralPath $previousPlugin -Destination $PluginDest -Force
+            }
+        } catch { $rollbackErrors.Add($_.Exception.Message) }
+        try { Restore-OptionalFile $MarketplacePath $marketplaceSnapshot $marketplaceExisted } catch { $rollbackErrors.Add($_.Exception.Message) }
+        try { Restore-OptionalFile $CodexConfigPath $configSnapshot $configExisted } catch { $rollbackErrors.Add($_.Exception.Message) }
+        if ($rollbackErrors.Count -gt 0) {
+            throw "Установка не завершена: $originalError Откат также завершился ошибкой: $($rollbackErrors -join '; ')"
+        }
+        throw "Установка не завершена; прежний plugin и registry восстановлены: $originalError"
+    } finally {
+        Remove-Item -LiteralPath $stagedPlugin -Recurse -Force -ErrorAction SilentlyContinue
     }
-    $uninstallerPath = Join-Path $workDir "uninstall-team-skills.ps1"
-    Download-File $uninstallerEntry.url $uninstallerPath
-    Verify-Sha256 $uninstallerPath $uninstallerEntry.sha256
 
-    Update-Marketplace $PluginDest
-    Update-CodexRegistry
-    Replace-Plugin $pluginRoot
-    Invalidate-CodexPluginCache
-
-    Ensure-Directory $BinDir
-    Copy-Item $uninstallerPath (Join-Path $BinDir "uninstall-team-skills.ps1") -Force
-
-    Write-Info "Установлена проверенная версия team-skills: product=$($manifest.product_version) runtime=$($manifest.runtime_version) release=$($manifest.release_id)."
-    Write-Info "Автообновления нет: для новой версии повторно запустите эту же команду установки."
+    Write-Info "Установлена версия team-skills $($manifest.plugin_version) из release $($manifest.release_tag)."
+    Write-Info "Автообновления нет: для новой версии вручную запустите новый installer."
     Write-Info "Перезапустите Codex, чтобы он перечитал plugin."
 } catch {
     Write-Error $_.Exception.Message -ErrorAction Continue
     $failed = $true
 } finally {
-    if (Test-Path $workDir) {
-        Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path -LiteralPath $workDir) {
+        Remove-Item -LiteralPath $workDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 

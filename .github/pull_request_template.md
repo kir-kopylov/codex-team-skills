@@ -12,7 +12,8 @@
 Заполнять и отмечать только если менялись `installer/`, `scripts/build_release_bundle.py`, `scripts/pull-skills.sh` или `.github/workflows/tests.yml`.
 
 - [ ] Windows PowerShell 5.1 / `ValidateOnly` проверены.
-- [ ] `manifest.json` / `latest.json` / подпись release metadata проверены.
+- [ ] `manifest.json`, размер и SHA-256 bundle проверены.
+- [ ] Legacy cleanup в `dry-run` ничего не меняет, повторный `apply` возвращает `NOT_FOUND`.
 - [ ] Откат или повторная установка проверены.
 
 ## Проверки
