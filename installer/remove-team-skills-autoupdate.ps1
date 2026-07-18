@@ -457,7 +457,7 @@ function Get-ExactUpdaterProcesses($InstallRoot) {
             })
         }
     }
-    return @($result)
+    return $result.ToArray()
 }
 
 function Wait-ForExactUpdaterProcesses($InstallRoot, [int]$TimeoutSeconds) {

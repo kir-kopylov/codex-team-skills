@@ -127,17 +127,9 @@ def _run_windows_cleanup_fixture(home: Path) -> subprocess.CompletedProcess[str]
     assert executable is not None
     runtime_script = _runtime_script()
     assert runtime_script.is_file()
-    literal_path = str(runtime_script).replace("'", "''")
-    command = (
-        "Set-Variable -Name HOME -Value $env:TEAM_SKILLS_TEST_HOME -Scope Global -Force; "
-        "function Get-ScheduledTask { [CmdletBinding()] param() return @() }; "
-        "function Get-CimInstance { [CmdletBinding()] param([string]$ClassName) return @() }; "
-        f"& '{literal_path}' -DryRun"
-    )
     environment = os.environ.copy()
     environment["HOME"] = str(home)
     environment["USERPROFILE"] = str(home)
-    environment["TEAM_SKILLS_TEST_HOME"] = str(home)
     environment["LOCALAPPDATA"] = str(home / "AppData" / "Local")
     for name in (
         "CODEX_TEAM_SKILLS_PLUGIN_DIR",
@@ -148,7 +140,15 @@ def _run_windows_cleanup_fixture(home: Path) -> subprocess.CompletedProcess[str]
     ):
         environment.pop(name, None)
     return subprocess.run(
-        [executable, "-NoProfile", "-Command", command],
+        [
+            executable,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(runtime_script),
+            "-DryRun",
+        ],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -204,6 +204,7 @@ def test_windows_cleanup_measures_protected_artifacts_and_exact_processes() -> N
         "Get-TextSha256",
         "Get-CimInstance Win32_Process",
         "Get-FileArgumentFromCommandLine",
+        "return $result.ToArray()",
         "Wait-ForExactUpdaterProcesses $discovery.Root 10",
         "Stop-Process -Id $candidate.Id -Force",
     ):
