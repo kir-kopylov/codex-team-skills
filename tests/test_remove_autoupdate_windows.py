@@ -144,6 +144,7 @@ def _run_windows_cleanup_fixture(home: Path) -> subprocess.CompletedProcess[str]
         [executable, "-NoProfile", "-Command", command],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=20,
         check=False,
         env=environment,
@@ -271,6 +272,7 @@ def test_windows_cleanup_parses_in_available_powershell() -> None:
         [executable, "-NoProfile", "-Command", command],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=20,
         check=False,
     )
