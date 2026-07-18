@@ -2,43 +2,43 @@
 
 Если вы просто хотите пользоваться командными skills, начните с [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md). Codex определит вашу систему и даст одну команду для установки.
 
-## User Mode: Установить Готовый Plugin
+## User Mode: Подключить Или Перевести Старую Установку
 
 Windows:
 
-Эта команда скачивает одноразовый установщик из последнего проверенного GitHub Release и ставит `team-skills`.
+Эта команда запускает одноразовый migrator. Он безопасно удаляет только доказанное старое автообновление, ставит проверенный release и ничего не оставляет работать в фоне.
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/migrate-team-skills.cmd"; $p=Join-Path $env:TEMP ("migrate-team-skills-"+[guid]::NewGuid().ToString("N")+".cmd"); $c=1; try{(New-Object System.Net.WebClient).DownloadFile($u,$p); & $p; $c=$LASTEXITCODE}finally{Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue}; exit $c
 ```
 
 macOS:
 
-Для этого пути нужен `Python 3.11+`; macOS не гарантирует его наличие. Проверьте `python3 --version` до запуска. Команда ниже скачивает одноразовый установщик из последнего проверенного GitHub Release и ставит `team-skills`.
+Migrator до изменений сам проверяет `Python 3.11+`, права и доступность release.
 
 ```bash
-curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.command && chmod +x /tmp/install-team-skills.command && /tmp/install-team-skills.command
+( p="$(mktemp -t migrate-team-skills.XXXXXX)" && trap 'rm -f "$p"' EXIT && curl -fsSL -o "$p" https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/migrate-team-skills.command && chmod +x "$p" && "$p" )
 ```
 
-Установщик привязан к конкретному release tag, берёт из него `manifest.json` и bundle, сверяет размер и SHA-256, регистрирует локальный marketplace в Codex config и просит перезапустить Codex. Доверие строится на GitHub Releases и HTTPS; SHA-256 обнаруживает повреждение файла, но не является независимой подписью.
+Migrator привязан к конкретному release tag и принимает решения по стабильным результатам cleanup и installer. Успешный результат — `MIGRATED_RESTART_REQUIRED`. Доверие строится на GitHub Releases и HTTPS; SHA-256 обнаруживает повреждение bundle, но не является независимой подписью.
 
 ## Проверить Установку
 
 После перезапуска Codex напишите:
 
 ```text
-Покажи, какие командные skills доступны.
+Проверь только по списку skills этой новой сессии: доступен ли `team-skills:production-forensic-auditor`? Не ищи файлы на диске. Ответь «да» или «нет».
 ```
 
-Ожидаемое поведение: Codex видит plugin `team-skills`, кратко объясняет доступные skills и показывает первую фразу для запуска каждого готового skill.
+Ожидаемый ответ — `да`. Это проверяет, что новая сессия увидела plugin; exact release на диске до перезапуска уже проверил migrator.
 
 ## Обновление И Удаление
 
-Автообновления нет. Чтобы получить новые skills, повторно запустите ту же команду установки из раздела `User Mode`, затем перезапустите Codex. Отдельных команд update, status и repair нет.
+Автообновления нет. Чтобы получить новые skills, повторно запустите ту же команду migrator для своей системы и перезапустите Codex. Отдельных пользовательских команд update, status и repair нет.
 
 Если после переустановки новые skills не появились, полностью закройте и снова откройте Codex, затем повторите проверочную фразу из раздела выше.
 
-Для удаления скачайте из последнего Release одноразовый `uninstall-team-skills.ps1` или `uninstall-team-skills.command`. Если сохранилось старое автообновление, uninstaller остановится и потребует сначала выполнить legacy cleanup из [admin-onboarding-guide.md](admin-onboarding-guide.md).
+Для удаления скачайте из последнего Release одноразовый `uninstall-team-skills.ps1` или `uninstall-team-skills.command`. Если сохранилось старое автообновление, сначала запустите обычную команду migrator, затем повторите uninstaller.
 
 ## Claude Code: Подключить Через Маркетплейс
 
@@ -51,7 +51,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 Подробности и авто-раздача на всю команду — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
 
-Когда что выбирать: Codex → одноразовый установщик GitHub Release (выше); `Claude Code` → нативный маркетплейс.
+Когда что выбирать: Codex → одноразовый migrator GitHub Release (выше); `Claude Code` → нативный маркетплейс.
 
 ## Author Mode: Добавить Новый Skill
 

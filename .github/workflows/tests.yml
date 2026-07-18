@@ -130,6 +130,11 @@ jobs:
         env:
           TEAM_SKILLS_WINDOWS_CLEANUP_SCRIPT: ${{ github.workspace }}/dist/remove-team-skills-autoupdate.ps1
 
+      - name: Test Windows one-shot migrator orchestration
+        run: python -m pytest tests/test_migrate_team_skills_windows.py
+        env:
+          TEAM_SKILLS_WINDOWS_MIGRATOR_SCRIPT: ${{ github.workspace }}/dist/migrate-team-skills.ps1
+
       - name: Parse and validate Windows PowerShell assets
         shell: powershell
         run: |
@@ -137,6 +142,7 @@ jobs:
           $dist = Join-Path $PWD "dist"
           $assets = @(
             "install-team-skills.ps1",
+            "migrate-team-skills.ps1",
             "uninstall-team-skills.ps1",
             "remove-team-skills-autoupdate.ps1"
           )
@@ -170,6 +176,16 @@ jobs:
             }
           }
 
+          foreach ($launcher in @("install-team-skills.cmd", "migrate-team-skills.cmd")) {
+            $launcherPath = Join-Path $dist $launcher
+            $launcherOutput = & cmd.exe /d /c "`"$launcherPath`" -ValidateOnly" 2>&1
+            $launcherExit = $LASTEXITCODE
+            $launcherOutput | Write-Host
+            if ($launcherExit -ne 0 -or ($launcherOutput -join "`n") -notmatch "=VALIDATED") {
+              throw "Built launcher validation failed: $launcher"
+            }
+          }
+
       - name: Install and reinstall on Windows PowerShell 5.1
         shell: powershell
         run: |
@@ -187,6 +203,7 @@ jobs:
           $env:CODEX_TEAM_SKILLS_CODEX_CONFIG = Join-Path $testRoot ".codex\config.toml"
           $env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR = Join-Path $testRoot ".codex\plugins\cache\codex-team-skills"
           $env:TEAM_SKILLS_FIXTURE_DIR = $dist
+          $tasksBefore = @(Get-ScheduledTask | ForEach-Object { "$($_.TaskPath)$($_.TaskName)" } | Sort-Object)
 
           $wrapper = Join-Path $env:RUNNER_TEMP "invoke-team-skills-installer.ps1"
           @'
@@ -223,9 +240,13 @@ jobs:
           if (Get-ScheduledTask -TaskPath "\" -TaskName "Codex Team Skills Auto Update" -ErrorAction SilentlyContinue) {
               throw "Installer registered a legacy Scheduled Task."
           }
+          $tasksAfter = @(Get-ScheduledTask | ForEach-Object { "$($_.TaskPath)$($_.TaskName)" } | Sort-Object)
+          if (Compare-Object $tasksBefore $tasksAfter) {
+              throw "Installer changed the Scheduled Task set."
+          }
 
   macos-one-shot-smoke:
-    name: macOS one-shot installer and cleanup smoke
+    name: macOS one-shot migrator, installer and cleanup smoke
     runs-on: macos-latest
     if: needs.build-release-bundle.result == 'success'
     needs: build-release-bundle
@@ -237,15 +258,61 @@ jobs:
           name: team-skills-installable-bundle
           path: dist
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Parse and validate macOS assets
         run: |
           set -euo pipefail
-          for asset in install-team-skills.command uninstall-team-skills.command remove-team-skills-autoupdate.command; do
+          for asset in install-team-skills.command migrate-team-skills.command uninstall-team-skills.command remove-team-skills-autoupdate.command; do
             test -f "dist/$asset"
             zsh -n "dist/$asset"
           done
           zsh "dist/install-team-skills.command" --validate-only
+          zsh "dist/migrate-team-skills.command" --validate-only
           zsh "dist/remove-team-skills-autoupdate.command" --dry-run
+
+      - name: Run the built macOS migrator end to end
+        run: |
+          set -euo pipefail
+          fake_bin="$(mktemp -d -t team-skills-migrate-bin.XXXXXX)"
+          fixture_dir="$PWD/dist"
+          launch_agents_before="$(find "$HOME/Library/LaunchAgents" -maxdepth 1 -type f -print 2>/dev/null | LC_ALL=C sort || true)"
+
+          cat > "$fake_bin/curl" <<'SH'
+          #!/bin/sh
+          set -eu
+          output=""
+          url=""
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              --output) output="$2"; shift 2 ;;
+              *) url="$1"; shift ;;
+            esac
+          done
+          name="${url##*/}"
+          case "$name" in
+            remove-team-skills-autoupdate.command|install-team-skills.command|manifest.json|team-skills-bundle.zip)
+              cp "$TEAM_SKILLS_FIXTURE_DIR/$name" "$output"
+              ;;
+            *) exit 64 ;;
+          esac
+          SH
+          chmod +x "$fake_bin/curl"
+
+          export PATH="$fake_bin:$PATH"
+          export TEAM_SKILLS_FIXTURE_DIR="$fixture_dir"
+          output="$(zsh "dist/migrate-team-skills.command" 2>&1)"
+          printf '%s\n' "$output"
+          printf '%s\n' "$output" | grep -qx 'TEAM_SKILLS_MIGRATION_RESULT=MIGRATED_RESTART_REQUIRED'
+          test -f "$HOME/plugins/team-skills/.codex-plugin/plugin.json"
+          test ! -e "$HOME/.codex/plugins/cache/codex-team-skills"
+          test ! -e "$HOME/Library/Application Support/CodexTeamSkills"
+          test ! -e "$HOME/Library/LaunchAgents/com.codex-team-skills.autoupdate.plist"
+          launch_agents_after="$(find "$HOME/Library/LaunchAgents" -maxdepth 1 -type f -print 2>/dev/null | LC_ALL=C sort || true)"
+          test "$launch_agents_before" = "$launch_agents_after"
 
       - name: Install, reinstall and prove rollback on macOS
         run: |
@@ -355,5 +422,5 @@ jobs:
           gh release create "$RELEASE_TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "Team Skills $RELEASE_TAG" \
-            --notes "Проверенная CI версия plugin team-skills. Установка выполняется вручную одноразовым installer." \
+            --notes "Проверенная CI версия plugin team-skills. Пользователь запускает одну команду одноразового migrator." \
             --latest

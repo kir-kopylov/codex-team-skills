@@ -82,6 +82,7 @@ function Write-Info($Message) {
 function Exit-WithUsageError($Message) {
     Write-Host "[team-skills] ОШИБКА ВЫЗОВА: $Message"
     Write-Host "[team-skills] Использование: .\remove-team-skills-autoupdate.ps1 -DryRun | -Apply"
+    Write-Host "TEAM_SKILLS_RESULT=INVALID_INVOCATION"
     exit 2
 }
 
@@ -394,15 +395,7 @@ function Get-Discovery() {
         $markers -icontains "team-skills-auto-update-with-git-fallback.ps1"
     )
     if ($markers.Count -eq 0) {
-        return [pscustomobject]@{
-            Found = $false
-            Source = "not-found"
-            Task = $null
-            TaskCount = 0
-            Root = $canonicalRoot
-            ActionScript = $null
-            Markers = @()
-        }
+        throw "Canonical updater-root существует, но updater-маркеры отсутствуют; автоматически удалять его нельзя."
     }
     if (-not $hasUpdate -or -not $hasLauncher) {
         throw "Canonical updater-root содержит неполный или неоднозначный набор updater-маркеров."
@@ -498,6 +491,7 @@ function Write-Report($Before, $After, $Outcome, $Reason) {
     Write-Host ("{0,-24} {1,-66} {2,-66}" -f "Active cache hash", $Before.Protected.Cache, $After.Protected.Cache)
     Write-Host ""
     Write-Host "[team-skills] Результат: $Outcome"
+    Write-Host "TEAM_SKILLS_RESULT=$Outcome"
     if ($Reason) {
         Write-Host "[team-skills] Причина: $Reason"
     }
@@ -533,25 +527,32 @@ try {
 if (-not $discovery.Found) {
     $rootBefore = Test-Path -LiteralPath $discovery.Root
     try {
+        $processesBefore = @(Get-ExactUpdaterProcesses $discovery.Root)
+        $taskCountBefore = @(Get-TargetTasks).Count
         $protectedAfter = Get-ProtectedFingerprints
+        $processesAfter = @(Get-ExactUpdaterProcesses $discovery.Root)
+        $taskCountAfter = @(Get-TargetTasks).Count
         $rootAfter = Test-Path -LiteralPath $discovery.Root
     } catch {
         $unknown = Get-UnknownEvidence $protectedBefore
         Write-Report $unknown $unknown "REFUSED_UNSAFE" "Не удалось завершить повторное измерение: $($_.Exception.Message)"
         exit 3
     }
-    $before = New-Evidence 0 0 $rootBefore $protectedBefore
-    $after = New-Evidence 0 0 $rootAfter $protectedAfter
-    if (-not (Test-ProtectedFingerprintsEqual $protectedBefore $protectedAfter)) {
-        Write-Report $before $after "REFUSED_UNSAFE" "Защищённые артефакты изменились во время проверки."
+    $before = New-Evidence $taskCountBefore $processesBefore.Count $rootBefore $protectedBefore
+    $after = New-Evidence $taskCountAfter $processesAfter.Count $rootAfter $protectedAfter
+    if (
+        -not (Test-ProtectedFingerprintsEqual $protectedBefore $protectedAfter) -or
+        $taskCountBefore -ne 0 -or
+        $taskCountAfter -ne 0 -or
+        $processesBefore.Count -ne 0 -or
+        $processesAfter.Count -ne 0 -or
+        $rootBefore -or
+        $rootAfter
+    ) {
+        Write-Report $before $after "REFUSED_UNSAFE" "NOT_FOUND допустим только при полном отсутствии scheduler, updater-процессов и canonical root."
         exit 3
     }
-    $notFoundReason = if ($rootBefore) {
-        "Scheduled Task отсутствует, а канонический путь не содержит полного набора updater-маркеров; путь не удалён."
-    } else {
-        "Legacy Scheduled Task и канонический updater-root отсутствуют."
-    }
-    Write-Report $before $after "NOT_FOUND" $notFoundReason
+    Write-Report $before $after "NOT_FOUND" "Legacy Scheduled Task, updater-процессы и canonical updater-root отсутствуют."
     exit 0
 }
 

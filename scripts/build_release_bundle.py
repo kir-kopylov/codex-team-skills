@@ -16,6 +16,9 @@ RELEASE_ASSET_NAMES = (
     "install-team-skills.cmd",
     "install-team-skills.ps1",
     "install-team-skills.command",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.ps1",
+    "migrate-team-skills.command",
     "uninstall-team-skills.ps1",
     "uninstall-team-skills.command",
     "remove-team-skills-autoupdate.ps1",
@@ -24,8 +27,23 @@ RELEASE_ASSET_NAMES = (
 
 WINDOWS_POWERSHELL_ASSETS = {
     "install-team-skills.ps1",
+    "migrate-team-skills.ps1",
     "uninstall-team-skills.ps1",
     "remove-team-skills-autoupdate.ps1",
+}
+
+WINDOWS_CMD_ASSETS = {
+    "install-team-skills.cmd",
+    "migrate-team-skills.cmd",
+}
+
+RELEASE_BOUND_ASSETS = {
+    "install-team-skills.cmd",
+    "install-team-skills.ps1",
+    "install-team-skills.command",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.ps1",
+    "migrate-team-skills.command",
 }
 
 RELEASE_TAG_PLACEHOLDER = "__TEAM_SKILLS_RELEASE_TAG__"
@@ -101,7 +119,7 @@ def copy_release_asset(source: Path, destination: Path, replacements: dict[str, 
     if not source.is_file():
         raise FileNotFoundError(f"release asset source is missing: {source}")
 
-    if source.name.startswith("install-team-skills"):
+    if source.name in RELEASE_BOUND_ASSETS:
         content = source.read_text(encoding="utf-8-sig")
         for placeholder, value in replacements.items():
             content = content.replace(placeholder, value)
@@ -111,8 +129,12 @@ def copy_release_asset(source: Path, destination: Path, replacements: dict[str, 
         if unresolved:
             names = ", ".join(sorted(unresolved))
             raise ValueError(f"release installer contains unresolved placeholders: {names}")
-        encoding = "utf-8-sig" if source.name in WINDOWS_POWERSHELL_ASSETS else "utf-8"
-        destination.write_text(content, encoding=encoding)
+        if source.name in WINDOWS_CMD_ASSETS:
+            normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+            destination.write_bytes(normalized.replace("\n", "\r\n").encode("utf-8"))
+        else:
+            encoding = "utf-8-sig" if source.name in WINDOWS_POWERSHELL_ASSETS else "utf-8"
+            destination.write_text(content, encoding=encoding)
         shutil.copymode(source, destination)
         return
 

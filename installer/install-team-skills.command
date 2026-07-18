@@ -39,11 +39,13 @@ info() {
 
 fail() {
   info "$1" >&2
+  printf 'TEAM_SKILLS_RESULT=INSTALL_FAILED\n' >&2
   exit 1
 }
 
 if [[ "$VALIDATE_ONLY" == "1" ]]; then
   info "ValidateOnly: install-team-skills.command разобран без выполнения установки."
+  printf 'TEAM_SKILLS_RESULT=VALIDATED\n'
   exit 0
 fi
 
@@ -507,3 +509,6 @@ fi
 info "Установлена версия team-skills $PLUGIN_VERSION из release $RELEASE_TAG."
 info "Автообновления нет: для новой версии вручную запустите новый installer."
 info "Перезапустите Codex, чтобы он перечитал plugin."
+printf 'TEAM_SKILLS_RESULT=INSTALLED\n'
+printf 'TEAM_SKILLS_RELEASE=%s\n' "$RELEASE_TAG"
+printf 'TEAM_SKILLS_PLUGIN_VERSION=%s\n' "$PLUGIN_VERSION"

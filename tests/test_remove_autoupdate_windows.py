@@ -210,6 +210,16 @@ def test_windows_cleanup_measures_protected_artifacts_and_exact_processes() -> N
     ):
         assert expected in text
 
+    not_found_branch = text[
+        text.index("if (-not $discovery.Found)") : text.index(
+            'Write-Report $before $after "NOT_FOUND"',
+            text.index("if (-not $discovery.Found)"),
+        )
+    ]
+    assert "Get-ExactUpdaterProcesses $discovery.Root" in not_found_branch
+    assert "$processesBefore.Count -ne 0" in not_found_branch
+    assert "$rootBefore" in not_found_branch
+
 
 def test_protected_overrides_are_additive_to_default_paths() -> None:
     text = script_text()
@@ -262,6 +272,7 @@ def test_windows_cleanup_has_contract_outcomes_and_exit_codes() -> None:
     for exit_code in ("exit 0", "exit 2", "exit 3", "exit 4"):
         assert exit_code in text
     assert 'Write-Host "[team-skills] Результат: $Outcome"' in text
+    assert 'Write-Host "TEAM_SKILLS_RESULT=$Outcome"' in text
 
 
 @pytest.mark.skipif(_powershell_executable() is None, reason="PowerShell недоступен")

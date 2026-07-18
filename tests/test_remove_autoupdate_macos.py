@@ -17,7 +17,12 @@ SCRIPT = ROOT / "installer" / "remove-team-skills-autoupdate.command"
 pytestmark = pytest.mark.skipif(shutil.which("zsh") is None, reason="для проверки нужен zsh")
 
 
-def make_fake_launchctl(tmp_path: Path, *, loaded: bool = False) -> Path:
+def make_fake_launchctl(
+    tmp_path: Path,
+    *,
+    loaded: bool = False,
+    process_script: Path | None = None,
+) -> Path:
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
     state = tmp_path / "launchctl-loaded"
@@ -36,7 +41,12 @@ def make_fake_launchctl(tmp_path: Path, *, loaded: bool = False) -> Path:
     )
     launchctl.chmod(0o755)
     ps = fake_bin / "ps"
-    ps.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    process_output = (
+        f"printf '%s\\n' '4242 /bin/zsh {process_script}'\n"
+        if process_script is not None
+        else ""
+    )
+    ps.write_text(f"#!/bin/sh\n{process_output}exit 0\n", encoding="utf-8")
     ps.chmod(0o755)
     return fake_bin
 
@@ -147,6 +157,7 @@ def test_dry_run_is_read_only_and_reports_exact_objects(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Результат: DRY_RUN_SAFE" in result.stdout
+    assert "TEAM_SKILLS_RESULT=DRY_RUN_SAFE" in result.stdout
     assert f"LaunchAgent: {plist}" in result.stdout
     assert f"Updater root: {root}" in result.stdout
     assert root.is_dir()
@@ -170,6 +181,7 @@ def test_apply_removes_exact_legacy_objects_and_preserves_protected_files(tmp_pa
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Результат: CLEANED" in result.stdout
+    assert "TEAM_SKILLS_RESULT=CLEANED" in result.stdout
     assert not root.exists()
     assert not plist.exists()
     assert not stdout_log.exists()
@@ -280,9 +292,22 @@ def test_canonical_root_without_updater_markers_is_not_removed(tmp_path: Path) -
 
     result = run_cleanup(home, fake_bin, "--apply")
 
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert "Результат: NOT_FOUND" in result.stdout
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "Результат: REFUSED_UNSAFE" in result.stdout
     assert one_shot_support.is_file()
+
+
+def test_process_only_state_is_not_reported_as_not_found(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    updater_script = legacy_root(home) / "bin" / "update-team-skills.sh"
+    fake_bin = make_fake_launchctl(tmp_path, process_script=updater_script)
+
+    result = run_cleanup(home, fake_bin, "--dry-run")
+
+    assert result.returncode == 3, result.stdout + result.stderr
+    assert "Updater processes" in result.stdout
+    assert "Результат: REFUSED_UNSAFE" in result.stdout
+    assert "Результат: NOT_FOUND" not in result.stdout
 
 
 def test_state_path_is_only_additional_protection_not_a_deletion_target(tmp_path: Path) -> None:
