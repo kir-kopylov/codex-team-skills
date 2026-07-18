@@ -46,6 +46,11 @@ def _powershell_executable() -> str | None:
     return shutil.which("powershell.exe") or shutil.which("pwsh")
 
 
+def _runtime_script() -> Path:
+    override = os.environ.get("TEAM_SKILLS_WINDOWS_CLEANUP_SCRIPT")
+    return Path(override) if override else SCRIPT
+
+
 def test_windows_cleanup_exposes_only_dry_run_and_apply() -> None:
     text = script_text()
 
@@ -120,7 +125,9 @@ def _create_official_legacy_root(home: Path, *, pycache_name: str) -> Path:
 def _run_windows_cleanup_fixture(home: Path) -> subprocess.CompletedProcess[str]:
     executable = _powershell_executable()
     assert executable is not None
-    literal_path = str(SCRIPT).replace("'", "''")
+    runtime_script = _runtime_script()
+    assert runtime_script.is_file()
+    literal_path = str(runtime_script).replace("'", "''")
     command = (
         "Set-Variable -Name HOME -Value $env:TEAM_SKILLS_TEST_HOME -Scope Global -Force; "
         "function Get-ScheduledTask { [CmdletBinding()] param() return @() }; "
@@ -260,7 +267,9 @@ def test_windows_cleanup_has_contract_outcomes_and_exit_codes() -> None:
 def test_windows_cleanup_parses_in_available_powershell() -> None:
     executable = _powershell_executable()
     assert executable is not None
-    literal_path = str(SCRIPT).replace("'", "''")
+    runtime_script = _runtime_script()
+    assert runtime_script.is_file()
+    literal_path = str(runtime_script).replace("'", "''")
     command = (
         "$tokens = $null; $errors = $null; "
         f"[System.Management.Automation.Language.Parser]::ParseFile('{literal_path}', "
