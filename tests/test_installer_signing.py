@@ -6,10 +6,10 @@
    powershell-smoke, которая парсит `.ps1`. Ловит синтаксический регресс до
    того, как он дойдёт до пользователя.
 2. Целостность якоря доверия: sha256 закреплённого `team-skills-public-key.pem`
-   совпадает с pin'ом в ОБОИХ апдейтерах (.sh и .ps1). Расхождение ключа и
-   pin'а молча запрещает любое обновление.
+   совпадает с pin'ом в macOS installer, а Windows installer содержит те же
+   RSA parameters для PowerShell 5.1.
 3. End-to-end проверка подписи тем же примитивом openssl, что использует
-   апдейтер (`openssl dgst -sha256 -verify`): корректная подпись принимается,
+   installer (`openssl dgst -sha256 -verify`): корректная подпись принимается,
    подделанный payload отвергается.
 """
 
@@ -28,8 +28,8 @@ from conftest import ROOT
 
 
 PUBLIC_KEY = ROOT / "installer" / "team-skills-public-key.pem"
-UPDATE_SH = ROOT / "installer" / "update-team-skills.sh"
-UPDATE_PS1 = ROOT / "installer" / "update-team-skills.ps1"
+INSTALL_COMMAND = ROOT / "installer" / "install-team-skills.command"
+INSTALL_PS1 = ROOT / "installer" / "install-team-skills.ps1"
 ADMIN_GUIDE = ROOT / "admin-onboarding-guide.md"
 WINDOWS_FIXTURE_DIR = ROOT / "tests" / "fixtures" / "windows-signature"
 WINDOWS_FIXTURE_PAYLOAD = WINDOWS_FIXTURE_DIR / "latest.json"
@@ -54,7 +54,7 @@ def test_shell_script_set_is_non_empty() -> None:
     # защита от тихого «0 скриптов» из-за опечатки в glob
     assert SHELL_SCRIPTS, "не найдено ни одного shell-скрипта для проверки"
     names = {p.name for p in SHELL_SCRIPTS}
-    assert "update-team-skills.sh" in names
+    assert "install-team-skills.command" in names
     assert "pull-skills.sh" in names
 
 
@@ -63,26 +63,22 @@ def test_shell_script_set_is_non_empty() -> None:
 def _extract_pin(text: str) -> str:
     # bash: EXPECTED_PUBLIC_KEY_SHA256="..."  /  ps1: $ExpectedPublicKeySha256 = "..."
     match = re.search(r'(?:EXPECTED_PUBLIC_KEY_SHA256|ExpectedPublicKeySha256)\s*=\s*"([0-9a-f]{64})"', text)
-    assert match, "не найден pinned sha256 public key в апдейтере"
+    assert match, "не найден pinned sha256 public key в installer"
     return match.group(1)
 
 
-def test_public_key_pin_matches_shipped_key_in_both_updaters() -> None:
+def test_macos_installer_public_key_pin_matches_shipped_key() -> None:
     actual = hashlib.sha256(PUBLIC_KEY.read_bytes()).hexdigest()
-    sh_pin = _extract_pin(UPDATE_SH.read_text(encoding="utf-8"))
-    ps1_pin = _extract_pin(UPDATE_PS1.read_text(encoding="utf-8"))
-
-    assert sh_pin == actual, "pin в update-team-skills.sh разошёлся с реальным public key"
-    assert ps1_pin == actual, "pin в update-team-skills.ps1 разошёлся с реальным public key"
-    assert sh_pin == ps1_pin, "pin'ы в .sh и .ps1 апдейтерах должны совпадать"
+    installer_pin = _extract_pin(INSTALL_COMMAND.read_text(encoding="utf-8"))
+    assert installer_pin == actual, "pin в macOS installer разошёлся с реальным public key"
 
 
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="нужен openssl для чтения RSA public key")
 def test_windows_pinned_rsa_parameters_match_shipped_public_key() -> None:
-    content = UPDATE_PS1.read_text(encoding="utf-8")
+    content = INSTALL_PS1.read_text(encoding="utf-8")
     modulus_match = re.search(r'PinnedPublicKeyModulusBase64\s*=\s*"([A-Za-z0-9+/=]+)"', content)
     exponent_match = re.search(r'PinnedPublicKeyExponentBase64\s*=\s*"([A-Za-z0-9+/=]+)"', content)
-    assert modulus_match and exponent_match, "в Windows updater не найдены закреплённые RSA parameters"
+    assert modulus_match and exponent_match, "в Windows installer не найдены закреплённые RSA parameters"
 
     result = subprocess.run(
         ["openssl", "rsa", "-pubin", "-in", str(PUBLIC_KEY), "-modulus", "-noout"],
@@ -115,7 +111,7 @@ def test_key_rotation_runbook_updates_all_windows_trust_material() -> None:
         "$PinnedPublicKeyModulusBase64",
         "$PinnedPublicKeyExponentBase64",
         "tests/fixtures/windows-signature/latest.json",
-        "PEM, оба pin, встроенные RSA-параметры и fixture должны меняться одним PR",
+        "PEM, macOS pin, встроенные RSA-параметры и fixture должны меняться одним PR",
         "openssl dgst -sha256 -sign",
         "scripts/build_release_bundle.py --dist <candidate-dist>",
         "До merge этим же PR соберите candidate metadata",
@@ -190,13 +186,13 @@ def test_openssl_signature_primitive_accepts_valid_and_rejects_tampered(tmp_path
 
     payload.write_text('{"runtime_version": "1.2.3", "release_id": "team-skills-v1.2.3"}', encoding="utf-8")
 
-    # подпись тем же алгоритмом, что и в CI/апдейтере: RSA + SHA256
+    # подпись тем же алгоритмом, что и в CI/installer: RSA + SHA256
     subprocess.run(
         ["openssl", "dgst", "-sha256", "-sign", str(private_key), "-out", str(signature), str(payload)],
         check=True, capture_output=True,
     )
 
-    # та же команда проверки, что в verify_signature() апдейтера
+    # та же команда проверки, что в verify_signature() installer
     def verify() -> int:
         return subprocess.run(
             ["openssl", "dgst", "-sha256", "-verify", str(public_key), "-signature", str(signature), str(payload)],
@@ -212,7 +208,7 @@ def test_openssl_signature_primitive_accepts_valid_and_rejects_tampered(tmp_path
 
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="нужен openssl для e2e проверки подписи")
 def test_shipped_public_key_loads_as_rsa(tmp_path: Path) -> None:
-    # апдейтеры используют RSA + PKCS1 — ключ обязан читаться как RSA public key
+    # installer использует RSA + PKCS1 — ключ обязан читаться как RSA public key
     result = subprocess.run(
         ["openssl", "rsa", "-pubin", "-in", str(PUBLIC_KEY), "-noout", "-text"],
         capture_output=True, text=True,

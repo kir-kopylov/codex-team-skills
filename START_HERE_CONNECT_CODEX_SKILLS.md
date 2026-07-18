@@ -12,7 +12,7 @@
 https://github.com/kir-kopylov/codex-team-skills
 ```
 
-Codex, твоя задача — подключить коллеге plugin `team-skills` в режиме пользователя. Коллега может быть не инженером и не должен вручную выбирать способ установки, обновления или удаления.
+Codex, твоя задача — подключить коллеге plugin `team-skills` в режиме пользователя. Коллега может быть не инженером и не должен вручную выбирать способ установки.
 
 ## Главная Цель
 
@@ -45,7 +45,7 @@ GitHub аккаунт не нужен для чтения и установки 
 
 Эту команду запускаешь ТЫ сам в окне PowerShell, а не Codex. Codex её не выполняет — он только подсказывает шаги.
 
-Команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
+Команда скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
 
 Дай одну команду для PowerShell:
 
@@ -53,7 +53,7 @@ GitHub аккаунт не нужен для чтения и установки 
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
 ```
 
-Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, включил автообновление через Windows Task Scheduler и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, и просит перезапустить Codex.
 
 В конце ты должен увидеть строку про готовность и просьбу перезапустить Codex, чтобы он перечитал plugin `team-skills`.
 
@@ -61,9 +61,11 @@ GitHub аккаунт не нужен для чтения и установки 
 
 Сначала открой оболочку: нажми Spotlight (лупа в углу или Cmd+Пробел), набери «Terminal» и открой его.
 
+Сначала выполни `python3 --version`. Нужен Python 3.11 или новее; macOS не гарантирует, что он уже установлен. Если версия ниже или команда не найдена, остановись и помоги коллеге отдельно установить актуальный Python — не обещай, что основной installer сработает без него.
+
 Эту команду запускаешь ТЫ сам в окне Terminal, а не Codex. Codex её не выполняет — он только подсказывает шаги.
 
-Команда скачивает официальный установщик, ставит подписанную проверенную версию `team-skills` и включает автообновление, чтобы дальше всё обновлялось само.
+Команда скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
 
 Дай одну команду для Terminal:
 
@@ -73,9 +75,9 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 Скопируй и вставь эту команду целиком; не скачивай файл через браузер.
 
-Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, включил автообновление через LaunchAgent и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, и просит перезапустить Codex.
 
-В самом конце ты должен увидеть строку: «Готово. Перезапустите Codex, чтобы он перечитал plugin team-skills.»
+В самом конце ты должен увидеть просьбу перезапустить Codex, чтобы он перечитал plugin `team-skills`.
 
 ## Если Другая Система
 
@@ -97,19 +99,13 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 ## Обновление
 
-Объясни одной фразой:
+Если коллега хочет получить новые skills, объясни одной фразой:
 
 ```text
-Система сама раз в двое суток ставит последнюю подписанную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте. После обновления нужен перезапуск Codex, чтобы новая runtime-версия стала видна.
+Повторно запусти ту же команду установки для своей системы, затем перезапусти Codex.
 ```
 
-Если коллега хочет обновить вручную и сразу перечитать новые skills в desktop apps, попроси его написать:
-
-```text
-Обнови локальные team-skills и перезапусти Codex/Claude.
-```
-
-На macOS Codex должен использовать `~/Library/Application Support/CodexTeamSkills/bin/refresh-team-skills.command`: команда обновляет локальный plugin, синхронизирует Claude skills folder и перезапускает Codex/Claude.
+Автообновления и отдельной update-команды нет. Для Claude Code действует отдельный нативный marketplace workflow из инструкции выше.
 
 ## Удаление
 
@@ -118,7 +114,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 - Windows: запусти `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`;
 - macOS: запусти `~/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command`.
 
-Удаление убирает plugin, автообновление, локальные support files и записи из marketplace/Codex registry.
+Удаление убирает plugin, локальные support files и записи из marketplace/Codex registry.
 
 ## Режим Автора
 
@@ -127,7 +123,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 Скажи:
 
 ```text
-Использование skills уже подключается автоматическим установщиком. Для добавления своих skills нужен режим автора: GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
+Использование skills подключается одной командой установки. Для добавления своих skills нужен режим автора: GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
 ```
 
 ## Постоянное Правило

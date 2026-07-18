@@ -123,10 +123,7 @@ jobs:
           $dist = Join-Path $PWD "dist"
           $assets = @(
             "install-team-skills.ps1",
-            "bootstrap-team-skills.ps1",
-            "update-team-skills.ps1",
-            "uninstall-team-skills.ps1",
-            "team-skills-status.ps1"
+            "uninstall-team-skills.ps1"
           )
 
           foreach ($name in $assets) {
@@ -158,21 +155,18 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
-          $updater = Join-Path $PWD "dist\update-team-skills.ps1"
-          $publicKey = Join-Path $PWD "dist\team-skills-public-key.pem"
+          $installer = Join-Path $PWD "dist\install-team-skills.ps1"
           $fixtureDir = Join-Path $PWD "tests\fixtures\windows-signature"
           $payload = Join-Path $fixtureDir "latest.json"
           $signature = Join-Path $fixtureDir "latest.json.sig"
           $work = Join-Path $env:RUNNER_TEMP "team-skills-signature-smoke"
           New-Item -ItemType Directory -Path $work -Force | Out-Null
-          Remove-Item Env:\CODEX_TEAM_SKILLS_ALLOW_UNSIGNED -ErrorAction SilentlyContinue
-          $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $publicKey
 
           function Invoke-SignatureCheck($PayloadPath) {
             $previousPreference = $ErrorActionPreference
             try {
               $ErrorActionPreference = "Continue"
-              $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater `
+              $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer `
                 -VerifySignatureOnly -PayloadPath $PayloadPath -SignaturePath $signature 2>&1
               $exitCode = $LASTEXITCODE
               return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
@@ -195,30 +189,8 @@ jobs:
             throw "Tampered production payload was accepted: $($tamperedResult.Output -join [Environment]::NewLine)"
           }
 
-          $tamperedKey = Join-Path $work "team-skills-public-key-tampered.pem"
-          $keyBytes = [System.IO.File]::ReadAllBytes($publicKey)
-          $keyBytes[0] = $keyBytes[0] -bxor 1
-          [System.IO.File]::WriteAllBytes($tamperedKey, $keyBytes)
-          $env:CODEX_TEAM_SKILLS_PUBLIC_KEY = $tamperedKey
-          $pinResult = Invoke-SignatureCheck $payload
-          if ($pinResult.ExitCode -eq 0) {
-            throw "Tampered public key pin was accepted: $($pinResult.Output -join [Environment]::NewLine)"
-          }
-          Write-Host "Production signature smoke passed: valid accepted, tampered payload and key rejected."
+          Write-Host "Production signature smoke passed: valid accepted and tampered payload rejected."
           exit 0
-
-      - name: Set up Python for local HTTP repair fixture
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Run Windows update and repair integration
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $testPath = Join-Path $PWD "tests\windows\windows-update-repair-integration.ps1"
-          $testSource = Get-Content $testPath -Raw -Encoding UTF8
-          & ([scriptblock]::Create($testSource))
 
   claude-sync-smoke:
     name: Claude skills folder sync smoke

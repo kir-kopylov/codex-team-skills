@@ -46,7 +46,7 @@ def hard_check_body() -> str:
 
 - [x] Windows PowerShell 5.1 ValidateOnly проверен.
 - [x] `manifest.json` и `latest.json` остаются валидными для release bundle.
-- [x] Откат и повторная установка проверены через install/update path.
+- [x] Откат и повторная установка проверены повторным запуском installer.
 """
 
 
@@ -72,7 +72,7 @@ def test_russian_pr_metadata_passes_with_allowed_technical_terms() -> None:
 
 def test_protected_paths_require_hard_check_section() -> None:
     event = pr_event(title="Усилить release gate", body=valid_body())
-    errors = check_pr_governance.check_protected_paths(event, ["installer/update-team-skills.sh"])
+    errors = check_pr_governance.check_protected_paths(event, ["installer/install-team-skills.command"])
     assert any("защищённые installer/release пути" in error for error in errors)
     assert any("Жёсткая проверка installer/release" in error for error in errors)
 

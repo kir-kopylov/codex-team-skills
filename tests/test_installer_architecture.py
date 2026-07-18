@@ -19,14 +19,8 @@ def test_installer_files_exist() -> None:
         "install-team-skills.cmd",
         "install-team-skills.ps1",
         "install-team-skills.command",
-        "bootstrap-team-skills.ps1",
-        "bootstrap-team-skills.sh",
-        "update-team-skills.ps1",
-        "update-team-skills.sh",
         "uninstall-team-skills.ps1",
         "uninstall-team-skills.command",
-        "team-skills-status.ps1",
-        "team-skills-status.command",
         "team-skills-registry.py",
         "team-skills-public-key.pem",
     ]
@@ -36,75 +30,91 @@ def test_installer_files_exist() -> None:
         assert path.stat().st_size > 0, f"installer file is empty: {path}"
 
 
-def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
+def test_windows_installer_is_one_shot_and_has_no_updater() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.ps1")
-    bootstrap = read(INSTALLER_DIR / "bootstrap-team-skills.ps1")
-    update = read(INSTALLER_DIR / "update-team-skills.ps1")
     uninstall = read(INSTALLER_DIR / "uninstall-team-skills.ps1")
 
     assert "releases/latest/download" in install
-    assert "& powershell.exe" in install
-    assert "Invoke-BootstrapProcess -RegisterAutoUpdate" in install
-    assert "Scheduled Task не создаётся" in install
-    assert "Register-ScheduledTask" not in install
+    assert "manifest.json" in install
+    assert "latest.json" in install
+    assert "team-skills-bundle.zip" in install
+    assert "Get-FileHash -Algorithm SHA256" in install
+    assert ".codex-plugin\\plugin.json" in install
+    assert "Verify-Signature" in install
+    assert "runtime_version" in install
+    assert "Invalidate-CodexPluginCache" in install
+    assert "Replace-Plugin" in install
+    assert "Автообновления нет" in install
+    assert "Unregister-ScheduledTask" in install
+    assert "codex-team-skills.bak" in install
+    assert "CODEX_TEAM_SKILLS_ALLOW_UNSIGNED" not in install
+    assert "$rescued" in install
 
-    assert "Register-ScheduledTask" in bootstrap
-    assert "New-ScheduledTaskTrigger -Daily -DaysInterval 2" in bootstrap
-    assert "Codex Team Skills Auto Update" in bootstrap
-    assert "RegisterAutoUpdate" in bootstrap
+    for forbidden in (
+        "Register-ScheduledTask",
+        "New-ScheduledTaskTrigger",
+        "RepairInstall",
+        "last-failure.json",
+        "last-repair.json",
+        "$UpdaterVersion",
+    ):
+        assert forbidden not in install
 
-    assert "manifest.json" in update
-    assert "latest.json" in update
-    assert "team-skills-bundle.zip" in update
-    assert "Get-FileHash -Algorithm SHA256" in update
-    assert ".codex-plugin\\plugin.json" in update
-    assert "previous" in update
-    assert "Verify-Signature" in update
-    assert "runtime_version" in update
-    assert "codex-team-skills" in update
-    assert ".codex\\plugins\\cache\\codex-team-skills" in update
-    assert "Invalidate-CodexPluginCache" in update
-    assert '$UpdaterVersion = "1.2.0"' in update
-    assert "last-failure.json" in update
-    assert "last-repair.json" in update
-    assert "CODEX_TEAM_SKILLS_DOWNLOAD_TIMEOUT_SEC" in update
-    assert "CODEX_TEAM_SKILLS_DOWNLOAD_MAX_ATTEMPTS" in update
-    assert "Start-PluginSwap" in update
-    assert "Undo-PluginSwap" in update
+    for obsolete in (
+        "bootstrap-team-skills.ps1",
+        "update-team-skills.ps1",
+        "team-skills-status.ps1",
+    ):
+        assert not (INSTALLER_DIR / obsolete).exists()
 
     assert "Unregister-ScheduledTask" in uninstall
     assert "marketplace.json" in uninstall
     assert "codex-team-skills managed block" in uninstall
+    assert "Assert-SafeRemovalPath" in uninstall
+    assert "$rescued" in uninstall
 
 
-def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
+def test_macos_installer_is_one_shot_and_has_no_updater() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.command")
-    update = read(INSTALLER_DIR / "update-team-skills.sh")
     uninstall = read(INSTALLER_DIR / "uninstall-team-skills.command")
 
     assert "releases/latest/download" in install
-    assert "com.codex-team-skills.autoupdate" in install
-    assert "<integer>172800</integer>" in install
-    assert "launchctl load" in install
-    assert "bootstrap-team-skills.sh" in install
+    assert "manifest.json" in install
+    assert "latest.json" in install
+    assert "team-skills-bundle.zip" in install
+    assert "verify_signature" in install
+    assert "runtime_version" in install
+    assert "team-skills-registry.py" in install
+    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in install
+    assert "Автообновления нет" in install
+    assert "launchctl unload" in install
+    assert "launchctl print" in install
+    assert "sys.version_info >= (3, 11)" in install
+    assert "CODEX_TEAM_SKILLS_ALLOW_UNSIGNED" not in install
 
-    assert "manifest.json" in update
-    assert "latest.json" in update
-    assert "team-skills-bundle.zip" in update
-    assert "hashlib.sha256" in update
-    assert ".codex-plugin/plugin.json" in update
-    assert "previous" in update
-    assert "verify_signature" in update
-    assert "runtime_version" in update
-    assert "team-skills-registry.py" in update
-    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in update
-    assert "invalidate_codex_plugin_cache" in update
-    assert '"refresh-team-skills.command"' in update
-    assert "$support_dest.next" in update
+    for forbidden in (
+        "launchctl load",
+        "<key>StartInterval</key>",
+        "--repair-install",
+        "state.json",
+    ):
+        assert forbidden not in install
+
+    for obsolete in (
+        "bootstrap-team-skills.sh",
+        "update-team-skills.sh",
+        "team-skills-status.command",
+        "refresh-team-skills.command",
+    ):
+        assert not (INSTALLER_DIR / obsolete).exists()
 
     assert "launchctl unload" in uninstall
+    assert "launchctl print" in uninstall
     assert "marketplace.json" in uninstall
     assert "Codex registry" in uninstall
+    assert "safe_remove_tree" in uninstall
+    assert "sys.version_info >= (3, 11)" in uninstall
+    assert 'local path=' not in uninstall  # `path` is zsh's PATH-tied special array.
 
 
 def test_user_docs_do_not_require_github_desktop() -> None:
