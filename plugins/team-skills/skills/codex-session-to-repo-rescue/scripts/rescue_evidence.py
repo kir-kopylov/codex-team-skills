@@ -947,7 +947,9 @@ def load_manifest(path: Path) -> list[dict[str, object]]:
 
 def resolve_working_path(repo: Path, relative_path: str) -> Path:
     repo_resolved = repo.resolve()
-    candidate = Path(os.path.abspath(repo / Path(*PurePosixPath(relative_path).parts)))
+    candidate = Path(
+        os.path.abspath(repo_resolved / Path(*PurePosixPath(relative_path).parts))
+    )
     try:
         candidate.relative_to(repo_resolved)
     except ValueError as exc:

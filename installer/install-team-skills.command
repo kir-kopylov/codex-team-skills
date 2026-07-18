@@ -3,27 +3,23 @@ set -euo pipefail
 
 PLUGIN_NAME="team-skills"
 MARKETPLACE_NAME="codex-team-skills"
-RELEASE_BASE="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download"
-LATEST_URL="${CODEX_TEAM_SKILLS_LATEST_URL:-$RELEASE_BASE/latest.json}"
+BAKED_RELEASE_TAG="__TEAM_SKILLS_RELEASE_TAG__"
 MANIFEST_URL="${CODEX_TEAM_SKILLS_MANIFEST_URL:-}"
-INSTALL_ROOT="${CODEX_TEAM_SKILLS_HOME:-$HOME/Library/Application Support/CodexTeamSkills}"
-BIN_DIR="$INSTALL_ROOT/bin"
 PLUGIN_DEST="${CODEX_TEAM_SKILLS_PLUGIN_DIR:-$HOME/plugins/team-skills}"
 MARKETPLACE_ROOT="${CODEX_TEAM_SKILLS_MARKETPLACE_ROOT:-$HOME}"
 MARKETPLACE_PATH="${CODEX_TEAM_SKILLS_MARKETPLACE:-$MARKETPLACE_ROOT/.agents/plugins/marketplace.json}"
 CODEX_CONFIG_PATH="${CODEX_TEAM_SKILLS_CODEX_CONFIG:-$HOME/.codex/config.toml}"
 CODEX_PLUGIN_CACHE_DIR="${CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR:-$HOME/.codex/plugins/cache/$MARKETPLACE_NAME}"
-EXPECTED_PUBLIC_KEY_SHA256="6303efaa119fef81c5c40a281e85998351aa5c7a81100e00e4921198403371a6"
 VALIDATE_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --manifest-url)
-      MANIFEST_URL="${2:-}"
-      shift 2
-      ;;
-    --latest-url)
-      LATEST_URL="${2:-}"
+      [[ $# -ge 2 && -n "$2" ]] || {
+        printf '[team-skills] Для --manifest-url нужен URL.\n' >&2
+        exit 2
+      }
+      MANIFEST_URL="$2"
       shift 2
       ;;
     --validate-only)
@@ -42,238 +38,472 @@ info() {
 }
 
 fail() {
-  info "$1"
+  info "$1" >&2
   exit 1
 }
 
 if [[ "$VALIDATE_ONLY" == "1" ]]; then
-  info "ValidateOnly: install-team-skills.command parsed and initialized."
+  info "ValidateOnly: install-team-skills.command разобран без выполнения установки."
   exit 0
+fi
+
+if [[ -z "$MANIFEST_URL" ]]; then
+  [[ "$BAKED_RELEASE_TAG" != __TEAM_SKILLS_* ]] || \
+    fail "Запущен исходный installer без release tag. Используйте release-asset."
+  MANIFEST_URL="https://github.com/kir-kopylov/codex-team-skills/releases/download/$BAKED_RELEASE_TAG/manifest.json"
 fi
 
 for command_name in curl python3 unzip; do
   command -v "$command_name" >/dev/null 2>&1 || fail "Для установки нужен $command_name."
 done
-command -v openssl >/dev/null 2>&1 || fail "Для проверки подписи нужен openssl."
 python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' || \
   fail "Для установки нужен Python 3.11 или новее."
 
-remove_legacy_updater() {
-  local legacy_plist="$HOME/Library/LaunchAgents/com.codex-team-skills.autoupdate.plist"
-  local legacy_service="gui/$UID/com.codex-team-skills.autoupdate"
-  launchctl unload "$legacy_plist" >/dev/null 2>&1 || true
-  launchctl bootout "$legacy_service" >/dev/null 2>&1 || true
-  rm -f "$legacy_plist" \
-    "$HOME/Library/Logs/codex-team-skills-autoupdate.log" \
-    "$HOME/Library/Logs/codex-team-skills-autoupdate.err" \
-    "$BIN_DIR/bootstrap-team-skills.sh" \
-    "$BIN_DIR/update-team-skills.sh" \
-    "$BIN_DIR/update-team-skills.sh.next" \
-    "$BIN_DIR/team-skills-status.command" \
-    "$BIN_DIR/refresh-team-skills.command" \
-    "$BIN_DIR/refresh-team-skills.command.next"
-  rm -rf "$INSTALL_ROOT/cache" "$INSTALL_ROOT/state" "$INSTALL_ROOT/logs"
-  if launchctl print "$legacy_service" >/dev/null 2>&1; then
-    fail "Не удалось остановить старый LaunchAgent Team Skills."
-  fi
+EXPECTED_RELEASE_TAG="$(python3 - "$MANIFEST_URL" <<'PY'
+import re
+import sys
+from urllib.parse import urlparse
+
+url = urlparse(sys.argv[1])
+match = re.fullmatch(
+    r"/kir-kopylov/codex-team-skills/releases/download/"
+    r"(?P<tag>team-skills-v[A-Za-z0-9._-]+)/manifest\.json",
+    url.path,
+)
+if (
+    url.scheme != "https"
+    or url.hostname != "github.com"
+    or url.port not in (None, 443)
+    or url.username is not None
+    or url.password is not None
+    or url.params
+    or url.query
+    or url.fragment
+    or match is None
+):
+    raise SystemExit("ManifestUrl должен быть immutable HTTPS URL официального GitHub release")
+print(match.group("tag"))
+PY
+)" || fail "ManifestUrl должен указывать на manifest.json конкретного GitHub release."
+if [[ "$BAKED_RELEASE_TAG" != __TEAM_SKILLS_* && "$EXPECTED_RELEASE_TAG" != "$BAKED_RELEASE_TAG" ]]; then
+  fail "ManifestUrl не совпадает с release tag, встроенным в installer."
+fi
+RELEASE_BASE="https://github.com/kir-kopylov/codex-team-skills/releases/download/$EXPECTED_RELEASE_TAG"
+
+assert_safe_managed_path() {
+  local target_path="$1"
+  local expected_leaf="$2"
+  local label="$3"
+  local resolved="${target_path:A}"
+  local home_resolved="${HOME:A}"
+  [[ -n "$resolved" && "$resolved" != "/" && "$resolved" != "$home_resolved" ]] || \
+    fail "Небезопасный путь $label: $target_path"
+  [[ "${resolved:t}" == "$expected_leaf" ]] || \
+    fail "Небезопасный путь $label: $target_path"
+  [[ ! -L "$target_path" ]] || fail "$label не должен быть symlink: $target_path"
 }
 
-remove_legacy_updater
+assert_safe_managed_path "$PLUGIN_DEST" "$PLUGIN_NAME" "plugin destination"
+assert_safe_managed_path "$CODEX_PLUGIN_CACHE_DIR" "$MARKETPLACE_NAME" "Codex plugin cache"
+[[ ! -e "$PLUGIN_DEST" || -d "$PLUGIN_DEST" ]] || \
+  fail "Plugin destination должен быть каталогом: $PLUGIN_DEST"
+[[ ! -e "$CODEX_PLUGIN_CACHE_DIR" || -d "$CODEX_PLUGIN_CACHE_DIR" ]] || \
+  fail "Codex plugin cache должен быть каталогом: $CODEX_PLUGIN_CACHE_DIR"
+PLUGIN_DEST="${PLUGIN_DEST:A}"
+MARKETPLACE_ROOT="${MARKETPLACE_ROOT:A}"
+MARKETPLACE_PATH="${MARKETPLACE_PATH:A}"
+CODEX_CONFIG_PATH="${CODEX_CONFIG_PATH:A}"
+CODEX_PLUGIN_CACHE_DIR="${CODEX_PLUGIN_CACHE_DIR:A}"
+
+download_file() {
+  local url="$1"
+  local destination="$2"
+  rm -f -- "$destination"
+  curl \
+    --fail \
+    --location \
+    --silent \
+    --show-error \
+    --proto '=https' \
+    --tlsv1.2 \
+    --retry 2 \
+    --retry-delay 2 \
+    --retry-max-time 180 \
+    --connect-timeout 10 \
+    --max-time 60 \
+    --output "$destination" \
+    "$url"
+}
 
 file_sha256() {
-  local file_path="$1"
-  if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$file_path" | awk '{print $1}'
-  elif command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$file_path" | awk '{print $1}'
-  else
-    openssl dgst -sha256 "$file_path" | awk '{print $NF}'
-  fi
+  python3 - "$1" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
 }
 
 verify_sha256() {
-  local file_path="$1"
-  local expected="$2"
   local actual
-  actual="$(file_sha256 "$file_path" | tr '[:upper:]' '[:lower:]')"
-  expected="$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')"
-  [[ "$actual" == "$expected" ]] || fail "Checksum mismatch для $(basename "$file_path")."
+  actual="$(file_sha256 "$1")"
+  [[ "$actual" == "${2:l}" ]] || fail "SHA-256 файла ${1:t} не совпадает с manifest."
+}
+
+verify_file_size() {
+  local actual
+  actual="$(LC_ALL=C wc -c < "$1" | tr -d '[:space:]')"
+  [[ "$actual" == "$2" ]] || \
+    fail "Размер файла ${1:t} не совпадает с manifest: ожидалось $2, получено $actual."
 }
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/codex-team-skills-install.XXXXXX")"
-trap 'rm -rf "$WORK_DIR"' EXIT
-PUBLIC_KEY_PATH="$WORK_DIR/team-skills-public-key.pem"
-SOURCE_DIR="$(cd "$(dirname "$0")" && pwd)"
+TRANSACTION_ACTIVE=0
+HAD_PLUGIN=0
+PLUGIN_MOVED_ASIDE=0
+PLUGIN_ACTIVATED=0
+MARKETPLACE_EXISTED=0
+CONFIG_EXISTED=0
+STAGED_PLUGIN=""
+PREVIOUS_PLUGIN=""
+MARKETPLACE_SNAPSHOT="$WORK_DIR/marketplace.original"
+CONFIG_SNAPSHOT="$WORK_DIR/config.original"
 
-if [[ -n "${CODEX_TEAM_SKILLS_PUBLIC_KEY:-}" ]]; then
-  cp "$CODEX_TEAM_SKILLS_PUBLIC_KEY" "$PUBLIC_KEY_PATH"
-elif [[ -f "$SOURCE_DIR/team-skills-public-key.pem" ]]; then
-  cp "$SOURCE_DIR/team-skills-public-key.pem" "$PUBLIC_KEY_PATH"
-else
-  info "Скачиваю public key."
-  curl -fsSL "$RELEASE_BASE/team-skills-public-key.pem" -o "$PUBLIC_KEY_PATH"
-fi
-verify_sha256 "$PUBLIC_KEY_PATH" "$EXPECTED_PUBLIC_KEY_SHA256"
-
-verify_signature() {
-  local payload="$1"
-  local signature="$2"
-  openssl dgst -sha256 -verify "$PUBLIC_KEY_PATH" -signature "$signature" "$payload" >/dev/null || \
-    fail "Подпись $(basename "$payload") недействительна."
+restore_optional_file() {
+  local target="$1"
+  local snapshot="$2"
+  local existed="$3"
+  if [[ "$existed" == "1" ]]; then
+    mkdir -p -- "${target:h}" || return 1
+    local temporary="$target.rollback.$$.$RANDOM"
+    cp -p -- "$snapshot" "$temporary" || return 1
+    mv -f -- "$temporary" "$target" || return 1
+  else
+    rm -f -- "$target" || return 1
+  fi
 }
 
-download_signed() {
-  local url="$1"
-  local destination="$2"
-  curl -fsSL "$url" -o "$destination"
-  curl -fsSL "$url.sig" -o "$destination.sig"
-  verify_signature "$destination" "$destination.sig"
+rollback_transaction() {
+  local rollback_failed=0
+  if [[ "$PLUGIN_ACTIVATED" == "1" ]]; then
+    rm -rf -- "$PLUGIN_DEST" || rollback_failed=1
+  fi
+  if [[ "$PLUGIN_MOVED_ASIDE" == "1" && -e "$PREVIOUS_PLUGIN" ]]; then
+    mv -- "$PREVIOUS_PLUGIN" "$PLUGIN_DEST" || rollback_failed=1
+  fi
+  restore_optional_file "$MARKETPLACE_PATH" "$MARKETPLACE_SNAPSHOT" "$MARKETPLACE_EXISTED" || rollback_failed=1
+  restore_optional_file "$CODEX_CONFIG_PATH" "$CONFIG_SNAPSHOT" "$CONFIG_EXISTED" || rollback_failed=1
+  [[ "$rollback_failed" == "0" ]]
 }
 
-LATEST_FILE="$WORK_DIR/latest.json"
+on_exit() {
+  local exit_code=$?
+  trap - EXIT
+  if [[ "$TRANSACTION_ACTIVE" == "1" ]]; then
+    rollback_transaction || exit_code=1
+  fi
+  rm -rf -- "$WORK_DIR"
+  exit "$exit_code"
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
 MANIFEST_FILE="$WORK_DIR/manifest.json"
 BUNDLE_FILE="$WORK_DIR/team-skills-bundle.zip"
 EXPANDED_DIR="$WORK_DIR/expanded"
-SUPPORT_DIR="$WORK_DIR/support"
-mkdir -p "$EXPANDED_DIR" "$SUPPORT_DIR"
+mkdir -p -- "$EXPANDED_DIR"
 
-if [[ -z "$MANIFEST_URL" ]]; then
-  info "Скачиваю подписанный указатель release."
-  download_signed "$LATEST_URL" "$LATEST_FILE"
-  MANIFEST_URL="$(python3 - "$LATEST_FILE" <<'PY'
+info "Скачиваю manifest конкретного GitHub release."
+download_file "$MANIFEST_URL" "$MANIFEST_FILE" || fail "Не удалось скачать manifest после повторных попыток."
+
+MANIFEST_VALUES="$(python3 - "$MANIFEST_FILE" "$EXPECTED_RELEASE_TAG" "$RELEASE_BASE" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
-print(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["manifest_url"])
-PY
-)"
-fi
+path, expected_tag, release_base = sys.argv[1:]
+try:
+    manifest = json.loads(Path(path).read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"Manifest JSON невалиден: {exc}")
 
-info "Скачиваю подписанный manifest."
-download_signed "$MANIFEST_URL" "$MANIFEST_FILE"
+expected_keys = {
+    "schema_version",
+    "release_tag",
+    "commit",
+    "plugin_version",
+    "bundle",
+}
+if set(manifest) != expected_keys or manifest.get("schema_version") != 1:
+    raise SystemExit("Manifest не соответствует минимальной schema_version=1")
+if manifest.get("release_tag") != expected_tag:
+    raise SystemExit("release_tag в manifest не совпадает с installer")
+if not re.fullmatch(r"[0-9a-fA-F]{7,64}", str(manifest.get("commit", ""))):
+    raise SystemExit("commit в manifest некорректен")
+if not isinstance(manifest.get("plugin_version"), str) or not manifest["plugin_version"]:
+    raise SystemExit("plugin_version в manifest некорректен")
 
-IFS=$'\t' read -r BUNDLE_URL BUNDLE_SHA PRODUCT_VERSION RUNTIME_VERSION RELEASE_ID < <(python3 - "$MANIFEST_FILE" <<'PY'
-import json
-import sys
-from pathlib import Path
+bundle = manifest.get("bundle")
+if not isinstance(bundle, dict) or set(bundle) != {"url", "size", "sha256"}:
+    raise SystemExit("метаданные plugin bundle некорректны")
+if bundle.get("url") != f"{release_base}/team-skills-bundle.zip":
+    raise SystemExit("bundle URL должен указывать на тот же immutable GitHub release")
+if not isinstance(bundle.get("size"), int) or bundle["size"] <= 0:
+    raise SystemExit("размер plugin bundle некорректен")
+if not re.fullmatch(r"[0-9a-fA-F]{64}", str(bundle.get("sha256", ""))):
+    raise SystemExit("SHA-256 plugin bundle некорректен")
 
-manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-bundle = manifest["plugin_bundle"]
 print("\t".join([
+    manifest["release_tag"],
+    manifest["commit"],
+    manifest["plugin_version"],
     bundle["url"],
-    bundle["sha256"],
-    manifest.get("product_version", ""),
-    manifest.get("runtime_version", ""),
-    manifest.get("release_id", ""),
+    str(bundle["size"]),
+    bundle["sha256"].lower(),
 ]))
 PY
-)
+)" || fail "Manifest не прошёл проверку."
+IFS=$'\t' read -r RELEASE_TAG COMMIT PLUGIN_VERSION BUNDLE_URL BUNDLE_SIZE BUNDLE_SHA <<< "$MANIFEST_VALUES"
 
 info "Скачиваю plugin bundle."
-curl -fsSL "$BUNDLE_URL" -o "$BUNDLE_FILE"
+download_file "$BUNDLE_URL" "$BUNDLE_FILE" || fail "Не удалось скачать plugin bundle после повторных попыток."
+verify_file_size "$BUNDLE_FILE" "$BUNDLE_SIZE"
 verify_sha256 "$BUNDLE_FILE" "$BUNDLE_SHA"
-unzip -q "$BUNDLE_FILE" -d "$EXPANDED_DIR"
+unzip -q "$BUNDLE_FILE" -d "$EXPANDED_DIR" || fail "Не удалось распаковать plugin bundle."
 
-PLUGIN_ROOT=""
-for candidate in "$EXPANDED_DIR/team-skills" "$EXPANDED_DIR/plugins/team-skills" "$EXPANDED_DIR"; do
-  if [[ -f "$candidate/.codex-plugin/plugin.json" ]]; then
-    PLUGIN_ROOT="$candidate"
-    break
-  fi
-done
-[[ -n "$PLUGIN_ROOT" ]] || fail "В bundle не найден plugin team-skills."
-
-python3 - "$PLUGIN_ROOT/.codex-plugin/plugin.json" "$RUNTIME_VERSION" <<'PY'
+PLUGIN_ROOT="$EXPANDED_DIR/team-skills"
+python3 - "$PLUGIN_ROOT/.codex-plugin/plugin.json" "$PLUGIN_NAME" "$PLUGIN_VERSION" "$RELEASE_TAG" "$COMMIT" <<'PY' || \
+  fail "Идентичность plugin в bundle не совпадает с manifest."
 import json
 import sys
 from pathlib import Path
 
-manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-if manifest.get("version") != sys.argv[2]:
-    raise SystemExit("runtime_version в bundle не совпадает с manifest")
+path, expected_name, expected_version, expected_tag, expected_commit = sys.argv[1:]
+try:
+    manifest = json.loads(Path(path).read_text(encoding="utf-8"))
+except Exception as exc:
+    raise SystemExit(f"manifest plugin невалиден: {exc}")
+if (
+    manifest.get("name") != expected_name
+    or manifest.get("version") != expected_version
+    or manifest.get("release_tag") != expected_tag
+    or manifest.get("commit") != expected_commit
+    or manifest.get("skills") != "./skills/"
+):
+    raise SystemExit("идентичность plugin не совпадает")
 PY
 
-download_support_file() {
-  local name="$1"
-  local destination="$SUPPORT_DIR/$name"
-  local metadata url expected
-  metadata="$(python3 - "$MANIFEST_FILE" "$name" <<'PY'
+if [[ -e "$MARKETPLACE_PATH" || -L "$MARKETPLACE_PATH" ]]; then
+  [[ -f "$MARKETPLACE_PATH" && ! -L "$MARKETPLACE_PATH" ]] || \
+    fail "Marketplace path должен быть обычным файлом: $MARKETPLACE_PATH"
+  cp -p -- "$MARKETPLACE_PATH" "$MARKETPLACE_SNAPSHOT"
+  MARKETPLACE_EXISTED=1
+fi
+if [[ -e "$CODEX_CONFIG_PATH" || -L "$CODEX_CONFIG_PATH" ]]; then
+  [[ -f "$CODEX_CONFIG_PATH" && ! -L "$CODEX_CONFIG_PATH" ]] || \
+    fail "Codex config path должен быть обычным файлом: $CODEX_CONFIG_PATH"
+  cp -p -- "$CODEX_CONFIG_PATH" "$CONFIG_SNAPSHOT"
+  CONFIG_EXISTED=1
+fi
+
+MARKETPLACE_NEXT="$WORK_DIR/marketplace.next"
+CONFIG_NEXT="$WORK_DIR/config.next"
+python3 - \
+  "$MARKETPLACE_SNAPSHOT" "$MARKETPLACE_EXISTED" "$MARKETPLACE_NEXT" \
+  "$CONFIG_SNAPSHOT" "$CONFIG_EXISTED" "$CONFIG_NEXT" \
+  "$PLUGIN_NAME" "$PLUGIN_DEST" "$MARKETPLACE_ROOT" <<'PY' || \
+  fail "Marketplace или Codex config не прошли безопасную подготовку."
 import json
 import sys
+import tomllib
+from datetime import datetime, timezone
 from pathlib import Path
 
-manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-for entry in manifest.get("support_files", []):
-    if entry.get("name") == sys.argv[2]:
-        print(f"{entry['url']}\t{entry['sha256']}")
-        break
+(
+    marketplace_snapshot,
+    marketplace_existed,
+    marketplace_next,
+    config_snapshot,
+    config_existed,
+    config_next,
+    plugin_name,
+    plugin_dest,
+    marketplace_root,
+) = sys.argv[1:]
+
+if marketplace_existed == "1":
+    data = json.loads(Path(marketplace_snapshot).read_text(encoding="utf-8-sig"))
 else:
-    raise SystemExit(f"support file отсутствует: {sys.argv[2]}")
-PY
-)"
-  IFS=$'\t' read -r url expected <<< "$metadata"
-  curl -fsSL "$url" -o "$destination"
-  verify_sha256 "$destination" "$expected"
-}
-
-for support_name in team-skills-registry.py uninstall-team-skills.command; do
-  download_support_file "$support_name"
-done
-
-python3 - "$MARKETPLACE_PATH" "$PLUGIN_NAME" "$PLUGIN_DEST" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]).expanduser()
-path.parent.mkdir(parents=True, exist_ok=True)
-data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {
-    "name": "local-team-skills",
-    "interface": {"displayName": "Локальные командные skills"},
-    "plugins": [],
-}
-plugins = [entry for entry in data.setdefault("plugins", []) if entry.get("name") != sys.argv[2]]
-plugins.append({
-    "name": sys.argv[2],
-    "source": {"source": "local", "path": str(Path(sys.argv[3]).expanduser()).replace("\\", "/")},
+    data = {
+        "name": "local-team-skills",
+        "interface": {"displayName": "Локальные командные skills"},
+        "plugins": [],
+    }
+if not isinstance(data, dict):
+    raise SystemExit("Marketplace JSON должен содержать объект верхнего уровня")
+plugins = data.setdefault("plugins", [])
+if not isinstance(plugins, list):
+    raise SystemExit("Marketplace plugins должен быть списком")
+data.setdefault("interface", {"displayName": "Локальные командные skills"})
+data["plugins"] = [
+    entry
+    for entry in plugins
+    if not (isinstance(entry, dict) and entry.get("name") == plugin_name)
+]
+data["plugins"].append({
+    "name": plugin_name,
+    "source": {"source": "local", "path": plugin_dest.replace("\\", "/")},
     "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
     "category": "Productivity",
 })
-data["plugins"] = plugins
-path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+Path(marketplace_next).write_text(
+    json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+    encoding="utf-8",
+)
+
+BEGIN = "# BEGIN codex-team-skills managed block"
+END = "# END codex-team-skills managed block"
+TARGETS = {
+    "[marketplaces.codex-team-skills]",
+    '[plugins."team-skills@codex-team-skills"]',
+}
+
+def strip_managed_content(text: str) -> str:
+    lines = text.splitlines()
+    kept: list[str] = []
+    rescued: list[str] = []
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if stripped == BEGIN:
+            index += 1
+            while index < len(lines) and lines[index].strip() != END:
+                header = lines[index].strip()
+                if header.startswith("[") and header not in TARGETS:
+                    rescued.append(lines[index])
+                    index += 1
+                    while (
+                        index < len(lines)
+                        and lines[index].strip() != END
+                        and not lines[index].lstrip().startswith("[")
+                    ):
+                        rescued.append(lines[index])
+                        index += 1
+                else:
+                    index += 1
+            if index < len(lines):
+                index += 1
+            continue
+        if stripped in TARGETS:
+            index += 1
+            while index < len(lines) and not lines[index].lstrip().startswith("["):
+                index += 1
+            continue
+        kept.append(lines[index])
+        index += 1
+    while rescued and not rescued[-1].strip():
+        rescued.pop()
+    if rescued:
+        if kept and kept[-1].strip():
+            kept.append("")
+        kept.extend(rescued)
+    return "\n".join(kept).rstrip() + "\n"
+
+config_text = (
+    Path(config_snapshot).read_text(encoding="utf-8-sig")
+    if config_existed == "1"
+    else ""
+)
+next_config = strip_managed_content(config_text)
+if next_config.strip():
+    next_config = next_config.rstrip() + "\n\n"
+now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+source = json.dumps(marketplace_root, ensure_ascii=False)
+next_config += (
+    f"{BEGIN}\n"
+    "[marketplaces.codex-team-skills]\n"
+    f'last_updated = "{now}"\n'
+    'source_type = "local"\n'
+    f"source = {source}\n"
+    "\n"
+    '[plugins."team-skills@codex-team-skills"]\n'
+    "enabled = true\n"
+    f"{END}\n"
+)
+tomllib.loads(next_config or "\n")
+Path(config_next).write_text(next_config, encoding="utf-8")
 PY
 
-python3 "$SUPPORT_DIR/team-skills-registry.py" ensure \
-  --config "$CODEX_CONFIG_PATH" \
-  --marketplace-root "$MARKETPLACE_ROOT" >/dev/null
+write_prepared_file() {
+  local prepared="$1"
+  local target="$2"
+  local temporary="$target.tmp.$$.$RANDOM"
+  mkdir -p -- "${target:h}" || return 1
+  cp -- "$prepared" "$temporary" || return 1
+  mv -f -- "$temporary" "$target" || return 1
+}
 
-TMP_DEST="$PLUGIN_DEST.tmp.$$"
-BACKUP_DEST="$PLUGIN_DEST.previous.$$"
-mkdir -p "$(dirname "$PLUGIN_DEST")"
-rm -rf "$TMP_DEST" "$BACKUP_DEST"
-cp -R "$PLUGIN_ROOT" "$TMP_DEST"
-if [[ -d "$PLUGIN_DEST" ]]; then
-  mv "$PLUGIN_DEST" "$BACKUP_DEST"
+STAGED_PLUGIN="$PLUGIN_DEST.tmp.$$.$RANDOM"
+PREVIOUS_PLUGIN="$PLUGIN_DEST.previous.$$.$RANDOM"
+mkdir -p -- "${PLUGIN_DEST:h}"
+cp -R -- "$PLUGIN_ROOT" "$STAGED_PLUGIN" || fail "Не удалось подготовить plugin к установке."
+
+TRANSACTION_ERROR=""
+run_transaction() {
+  TRANSACTION_ACTIVE=1
+  if [[ -e "$PLUGIN_DEST" ]]; then
+    HAD_PLUGIN=1
+    mv -- "$PLUGIN_DEST" "$PREVIOUS_PLUGIN" || {
+      TRANSACTION_ERROR="не удалось убрать прежний plugin"
+      return 1
+    }
+    PLUGIN_MOVED_ASIDE=1
+  fi
+  mv -- "$STAGED_PLUGIN" "$PLUGIN_DEST" || {
+    TRANSACTION_ERROR="не удалось активировать новый plugin"
+    return 1
+  }
+  PLUGIN_ACTIVATED=1
+  write_prepared_file "$MARKETPLACE_NEXT" "$MARKETPLACE_PATH" || {
+    TRANSACTION_ERROR="не удалось обновить marketplace"
+    return 1
+  }
+  write_prepared_file "$CONFIG_NEXT" "$CODEX_CONFIG_PATH" || {
+    TRANSACTION_ERROR="не удалось обновить Codex config"
+    return 1
+  }
+  [[ -f "$PLUGIN_DEST/.codex-plugin/plugin.json" ]] || {
+    TRANSACTION_ERROR="установленный plugin не прошёл post-check"
+    return 1
+  }
+  if [[ -e "$CODEX_PLUGIN_CACHE_DIR" ]]; then
+    rm -rf -- "$CODEX_PLUGIN_CACHE_DIR" || {
+      TRANSACTION_ERROR="не удалось удалить точный Codex plugin cache"
+      return 1
+    }
+  fi
+  if [[ "$HAD_PLUGIN" == "1" && -e "$PREVIOUS_PLUGIN" ]]; then
+    rm -rf -- "$PREVIOUS_PLUGIN" || {
+      TRANSACTION_ERROR="не удалось удалить временную recovery-копию прежнего plugin"
+      return 1
+    }
+  fi
+  TRANSACTION_ACTIVE=0
+}
+
+if ! run_transaction; then
+  if rollback_transaction; then
+    TRANSACTION_ACTIVE=0
+    fail "Установка не завершена; прежний plugin и registry восстановлены: $TRANSACTION_ERROR."
+  fi
+  TRANSACTION_ACTIVE=0
+  fail "Установка не завершена, а полный rollback не подтверждён: $TRANSACTION_ERROR."
 fi
-if mv "$TMP_DEST" "$PLUGIN_DEST"; then
-  rm -rf "$BACKUP_DEST"
-else
-  rm -rf "$PLUGIN_DEST" "$TMP_DEST"
-  [[ ! -d "$BACKUP_DEST" ]] || mv "$BACKUP_DEST" "$PLUGIN_DEST"
-  fail "Не удалось заменить plugin; прежняя версия восстановлена."
-fi
 
-if [[ -d "$CODEX_PLUGIN_CACHE_DIR" && "$CODEX_PLUGIN_CACHE_DIR" != "/" && "$CODEX_PLUGIN_CACHE_DIR" != "$HOME" ]]; then
-  mv "$CODEX_PLUGIN_CACHE_DIR" "$CODEX_PLUGIN_CACHE_DIR.stale.$(date -u +%Y%m%dT%H%M%SZ).$$"
-fi
-
-mkdir -p "$BIN_DIR"
-for support_name in team-skills-registry.py uninstall-team-skills.command; do
-  cp "$SUPPORT_DIR/$support_name" "$BIN_DIR/$support_name"
-done
-chmod +x "$BIN_DIR/team-skills-registry.py" "$BIN_DIR/uninstall-team-skills.command"
-
-info "Установлена проверенная версия team-skills: product=$PRODUCT_VERSION runtime=$RUNTIME_VERSION release=$RELEASE_ID."
-info "Автообновления нет: для новой версии повторно запустите эту же команду установки."
+info "Установлена версия team-skills $PLUGIN_VERSION из release $RELEASE_TAG."
+info "Автообновления нет: для новой версии вручную запустите новый installer."
 info "Перезапустите Codex, чтобы он перечитал plugin."

@@ -110,11 +110,25 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install test dependencies
+        run: python -m pip install ".[test]"
+
       - name: Download installable bundle artifact
         uses: actions/download-artifact@v4
         with:
           name: team-skills-installable-bundle
           path: dist
+
+      - name: Test Windows legacy cleanup
+        run: python -m pytest tests/test_remove_autoupdate_windows.py
+        env:
+          TEAM_SKILLS_WINDOWS_CLEANUP_SCRIPT: ${{ github.workspace }}/dist/remove-team-skills-autoupdate.ps1
 
       - name: Parse and validate Windows PowerShell assets
         shell: powershell
@@ -123,7 +137,8 @@ jobs:
           $dist = Join-Path $PWD "dist"
           $assets = @(
             "install-team-skills.ps1",
-            "uninstall-team-skills.ps1"
+            "uninstall-team-skills.ps1",
+            "remove-team-skills-autoupdate.ps1"
           )
 
           foreach ($name in $assets) {
@@ -148,49 +163,147 @@ jobs:
               throw "PowerShell parse errors in $name"
             }
 
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly
-          }
-
-      - name: Verify production signature in Windows PowerShell 5.1
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $installer = Join-Path $PWD "dist\install-team-skills.ps1"
-          $fixtureDir = Join-Path $PWD "tests\fixtures\windows-signature"
-          $payload = Join-Path $fixtureDir "latest.json"
-          $signature = Join-Path $fixtureDir "latest.json.sig"
-          $work = Join-Path $env:RUNNER_TEMP "team-skills-signature-smoke"
-          New-Item -ItemType Directory -Path $work -Force | Out-Null
-
-          function Invoke-SignatureCheck($PayloadPath) {
-            $previousPreference = $ErrorActionPreference
-            try {
-              $ErrorActionPreference = "Continue"
-              $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer `
-                -VerifySignatureOnly -PayloadPath $PayloadPath -SignaturePath $signature 2>&1
-              $exitCode = $LASTEXITCODE
-              return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
-            } finally {
-              $ErrorActionPreference = $previousPreference
+            if ($name -eq "remove-team-skills-autoupdate.ps1") {
+              powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -DryRun
+            } else {
+              powershell.exe -NoProfile -ExecutionPolicy Bypass -File $path -ValidateOnly
             }
           }
 
-          $validResult = Invoke-SignatureCheck $payload
-          if ($validResult.ExitCode -ne 0) {
-            throw "Valid production signature was rejected: $($validResult.Output -join [Environment]::NewLine)"
+      - name: Install and reinstall on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dist = Join-Path $PWD "dist"
+          $manifest = Get-Content (Join-Path $dist "manifest.json") -Raw | ConvertFrom-Json
+          $manifestUrl = "https://github.com/kir-kopylov/codex-team-skills/releases/download/$($manifest.release_tag)/manifest.json"
+          $testRoot = Join-Path $env:RUNNER_TEMP "team-skills-one-shot"
+          Remove-Item $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
+
+          $env:CODEX_TEAM_SKILLS_PLUGIN_DIR = Join-Path $testRoot "plugins\team-skills"
+          $env:CODEX_TEAM_SKILLS_MARKETPLACE_ROOT = $testRoot
+          $env:CODEX_TEAM_SKILLS_MARKETPLACE = Join-Path $testRoot ".agents\plugins\marketplace.json"
+          $env:CODEX_TEAM_SKILLS_CODEX_CONFIG = Join-Path $testRoot ".codex\config.toml"
+          $env:CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR = Join-Path $testRoot ".codex\plugins\cache\codex-team-skills"
+          $env:TEAM_SKILLS_FIXTURE_DIR = $dist
+
+          $wrapper = Join-Path $env:RUNNER_TEMP "invoke-team-skills-installer.ps1"
+          @'
+          param(
+              [string]$Installer,
+              [string]$ManifestUrl
+          )
+          $ErrorActionPreference = "Stop"
+          function Invoke-WebRequest {
+              param(
+                  [switch]$UseBasicParsing,
+                  [string]$Uri,
+                  [string]$OutFile,
+                  [int]$TimeoutSec
+              )
+              $name = [System.IO.Path]::GetFileName(([System.Uri]$Uri).AbsolutePath)
+              if ($name -ne "manifest.json" -and $name -ne "team-skills-bundle.zip") {
+                  throw "Unexpected fixture request: $name"
+              }
+              Copy-Item (Join-Path $env:TEAM_SKILLS_FIXTURE_DIR $name) $OutFile -Force
+          }
+          . $Installer -ManifestUrl $ManifestUrl
+          '@ | Set-Content -Path $wrapper -Encoding UTF8
+
+          $installer = Join-Path $dist "install-team-skills.ps1"
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -Installer $installer -ManifestUrl $manifestUrl
+          if ($LASTEXITCODE -ne 0) { throw "Fresh one-shot installation failed." }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper -Installer $installer -ManifestUrl $manifestUrl
+          if ($LASTEXITCODE -ne 0) { throw "Repeated one-shot installation failed." }
+
+          $pluginManifest = Join-Path $env:CODEX_TEAM_SKILLS_PLUGIN_DIR ".codex-plugin\plugin.json"
+          if (-not (Test-Path $pluginManifest)) { throw "Installed plugin manifest is missing." }
+          if (Test-Path (Join-Path $env:LOCALAPPDATA "CodexTeamSkills")) { throw "Installer left a legacy updater root." }
+          if (Get-ScheduledTask -TaskPath "\" -TaskName "Codex Team Skills Auto Update" -ErrorAction SilentlyContinue) {
+              throw "Installer registered a legacy Scheduled Task."
           }
 
-          $tamperedPayload = Join-Path $work "latest-tampered.json"
-          $payloadBytes = [System.IO.File]::ReadAllBytes($payload)
-          $payloadBytes[0] = $payloadBytes[0] -bxor 1
-          [System.IO.File]::WriteAllBytes($tamperedPayload, $payloadBytes)
-          $tamperedResult = Invoke-SignatureCheck $tamperedPayload
-          if ($tamperedResult.ExitCode -eq 0) {
-            throw "Tampered production payload was accepted: $($tamperedResult.Output -join [Environment]::NewLine)"
-          }
+  macos-one-shot-smoke:
+    name: macOS one-shot installer and cleanup smoke
+    runs-on: macos-latest
+    if: needs.build-release-bundle.result == 'success'
+    needs: build-release-bundle
 
-          Write-Host "Production signature smoke passed: valid accepted and tampered payload rejected."
-          exit 0
+    steps:
+      - name: Download installable bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: team-skills-installable-bundle
+          path: dist
+
+      - name: Parse and validate macOS assets
+        run: |
+          set -euo pipefail
+          for asset in install-team-skills.command uninstall-team-skills.command remove-team-skills-autoupdate.command; do
+            test -f "dist/$asset"
+            zsh -n "dist/$asset"
+          done
+          zsh "dist/install-team-skills.command" --validate-only
+          zsh "dist/remove-team-skills-autoupdate.command" --dry-run
+
+      - name: Install, reinstall and prove rollback on macOS
+        run: |
+          set -euo pipefail
+          test_home="$(mktemp -d -t team-skills-home.XXXXXX)"
+          fake_bin="$(mktemp -d -t team-skills-bin.XXXXXX)"
+          fixture_dir="$PWD/dist"
+
+          cat > "$fake_bin/curl" <<'SH'
+          #!/bin/sh
+          output=""
+          url=""
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
+              --output) output="$2"; shift 2 ;;
+              *) url="$1"; shift ;;
+            esac
+          done
+          name="${url##*/}"
+          case "$name" in
+            manifest.json|team-skills-bundle.zip)
+              cp "$TEAM_SKILLS_FIXTURE_DIR/$name" "$output"
+              ;;
+            *) exit 64 ;;
+          esac
+          SH
+          chmod +x "$fake_bin/curl"
+
+          cat > "$fake_bin/mv" <<'SH'
+          #!/bin/sh
+          if [ "${TEAM_SKILLS_FAIL_MARKETPLACE_WRITE:-0}" = "1" ]; then
+            for argument in "$@"; do
+              case "$argument" in
+                *marketplace.json.tmp.*) exit 77 ;;
+              esac
+            done
+          fi
+          exec /bin/mv "$@"
+          SH
+          chmod +x "$fake_bin/mv"
+
+          export HOME="$test_home"
+          export PATH="$fake_bin:$PATH"
+          export TEAM_SKILLS_FIXTURE_DIR="$fixture_dir"
+
+          zsh "dist/install-team-skills.command"
+          zsh "dist/install-team-skills.command"
+          test -f "$HOME/plugins/team-skills/.codex-plugin/plugin.json"
+          test ! -e "$HOME/Library/Application Support/CodexTeamSkills"
+          test ! -e "$HOME/Library/LaunchAgents/com.codex-team-skills.autoupdate.plist"
+
+          plugin_before="$(shasum -a 256 "$HOME/plugins/team-skills/.codex-plugin/plugin.json" | awk '{print $1}')"
+          if TEAM_SKILLS_FAIL_MARKETPLACE_WRITE=1 zsh "dist/install-team-skills.command"; then
+            echo "Installer unexpectedly accepted a simulated registry write failure" >&2
+            exit 1
+          fi
+          plugin_after="$(shasum -a 256 "$HOME/plugins/team-skills/.codex-plugin/plugin.json" | awk '{print $1}')"
+          test "$plugin_before" = "$plugin_after"
 
   claude-sync-smoke:
     name: Claude skills folder sync smoke
@@ -216,6 +329,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - windows-powershell-smoke
+      - macos-one-shot-smoke
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
@@ -227,16 +341,6 @@ jobs:
           name: team-skills-installable-bundle
           path: dist
 
-      - name: Sign release metadata
-        env:
-          TEAM_SKILLS_SIGNING_KEY_PEM: ${{ secrets.TEAM_SKILLS_SIGNING_KEY_PEM }}
-        run: |
-          test -n "$TEAM_SKILLS_SIGNING_KEY_PEM"
-          printf '%s\n' "$TEAM_SKILLS_SIGNING_KEY_PEM" > dist/signing-key.pem
-          openssl dgst -sha256 -sign dist/signing-key.pem -out dist/latest.json.sig dist/latest.json
-          openssl dgst -sha256 -sign dist/signing-key.pem -out dist/manifest.json.sig dist/manifest.json
-          rm -f dist/signing-key.pem
-
       - name: Publish immutable validated bundle
         env:
           GH_TOKEN: ${{ github.token }}
@@ -245,11 +349,11 @@ jobs:
           RELEASE_TAG="$(python - <<'PY'
           import json
           from pathlib import Path
-          print(json.loads(Path("dist/latest.json").read_text(encoding="utf-8"))["release_tag"])
+          print(json.loads(Path("dist/manifest.json").read_text(encoding="utf-8"))["release_tag"])
           PY
           )"
           gh release create "$RELEASE_TAG" dist/* \
             --target "$GITHUB_SHA" \
             --title "Team Skills $RELEASE_TAG" \
-            --notes "Проверенная CI версия plugin team-skills. latest.json и manifest.json подписаны." \
+            --notes "Проверенная CI версия plugin team-skills. Установка выполняется вручную одноразовым installer." \
             --latest

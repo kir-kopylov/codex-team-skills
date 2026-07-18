@@ -45,7 +45,7 @@ GitHub аккаунт не нужен для чтения и установки 
 
 Эту команду запускаешь ТЫ сам в окне PowerShell, а не Codex. Codex её не выполняет — он только подсказывает шаги.
 
-Команда скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
+Команда скачивает одноразовый установщик из последнего проверенного GitHub Release и ставит `team-skills`.
 
 Дай одну команду для PowerShell:
 
@@ -53,7 +53,7 @@ GitHub аккаунт не нужен для чтения и установки 
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/install-team-skills.ps1"; $p="$env:TEMP\install-team-skills.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p
 ```
 
-Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, какой release `team-skills` установлен, и просит перезапустить Codex.
 
 В конце ты должен увидеть строку про готовность и просьбу перезапустить Codex, чтобы он перечитал plugin `team-skills`.
 
@@ -65,7 +65,7 @@ GitHub аккаунт не нужен для чтения и установки 
 
 Эту команду запускаешь ТЫ сам в окне Terminal, а не Codex. Codex её не выполняет — он только подсказывает шаги.
 
-Команда скачивает официальный установщик и ставит последнюю подписанную проверенную версию `team-skills`.
+Команда скачивает одноразовый установщик из последнего проверенного GitHub Release и ставит `team-skills`.
 
 Дай одну команду для Terminal:
 
@@ -75,7 +75,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 Скопируй и вставь эту команду целиком; не скачивай файл через браузер.
 
-Ситуация успеха: установщик пишет, что поставил подписанную проверенную версию `team-skills`, и просит перезапустить Codex.
+Ситуация успеха: установщик пишет, какой release `team-skills` установлен, и просит перезапустить Codex.
 
 В самом конце ты должен увидеть просьбу перезапустить Codex, чтобы он перечитал plugin `team-skills`.
 
@@ -84,7 +84,7 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 Не выдумывай установку. Скажи:
 
 ```text
-Для этой системы автоматический установщик ещё не описан. Можно использовать ручной путь: скачать latest release-bundle, распаковать plugin team-skills, добавить его в локальный marketplace Codex и перезапустить Codex.
+Для этой системы установщик ещё не описан. Не придумывай команды: остановись и передай задачу maintainer-у.
 ```
 
 ## Проверка После Перезапуска
@@ -109,12 +109,12 @@ curl -fsSL -o /tmp/install-team-skills.command https://github.com/kir-kopylov/co
 
 ## Удаление
 
-Если коллега больше не хочет пользоваться общими skills:
+Если коллега больше не хочет пользоваться общими skills, скачай одноразовый uninstaller из последнего Release и запусти его:
 
-- Windows: запусти `%LOCALAPPDATA%\CodexTeamSkills\bin\uninstall-team-skills.ps1`;
-- macOS: запусти `~/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command`.
+- Windows: `uninstall-team-skills.ps1`;
+- macOS: `uninstall-team-skills.command`.
 
-Удаление убирает plugin, локальные support files и записи из marketplace/Codex registry.
+Если uninstaller сообщает о старом автообновлении, сначала выполни официальный legacy cleanup из [admin-onboarding-guide.md](admin-onboarding-guide.md). Uninstaller не принимает решений за cleanup и не хранится на машине после запуска.
 
 ## Режим Автора
 
