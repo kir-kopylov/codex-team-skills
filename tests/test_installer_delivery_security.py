@@ -32,6 +32,7 @@ def test_shell_script_set_contains_one_shot_entrypoints() -> None:
     names = {path.name for path in SHELL_SCRIPTS}
     assert {
         "install-team-skills.command",
+        "migrate-team-skills.command",
         "uninstall-team-skills.command",
         "remove-team-skills-autoupdate.command",
         "pull-skills.sh",

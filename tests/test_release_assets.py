@@ -16,12 +16,15 @@ BUILD_SCRIPT = ROOT / "scripts" / "build_release_bundle.py"
 UTF8_BOM = b"\xef\xbb\xbf"
 WINDOWS_PS1_ASSETS = (
     "install-team-skills.ps1",
+    "migrate-team-skills.ps1",
     "uninstall-team-skills.ps1",
     "remove-team-skills-autoupdate.ps1",
 )
 NON_POWERSHELL_ASSETS = (
     "install-team-skills.cmd",
     "install-team-skills.command",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.command",
     "uninstall-team-skills.command",
     "remove-team-skills-autoupdate.command",
     "manifest.json",
@@ -117,13 +120,27 @@ def test_manifest_is_minimal_and_matches_bundle(tmp_path: Path) -> None:
     assert plugin_manifest["commit"] == manifest["commit"]
 
 
-def test_release_installers_are_bound_to_the_built_tag(tmp_path: Path) -> None:
+def test_release_installers_and_migrators_are_bound_to_the_built_tag(tmp_path: Path) -> None:
     dist = build_dist(tmp_path)
-    for name in ("install-team-skills.ps1", "install-team-skills.command"):
+    for name in (
+        "install-team-skills.ps1",
+        "install-team-skills.command",
+        "migrate-team-skills.cmd",
+        "migrate-team-skills.ps1",
+        "migrate-team-skills.command",
+    ):
         content = (dist / name).read_text(encoding="utf-8-sig")
         assert "team-skills-vr123.2-abcdef1" in content
         assert "__TEAM_SKILLS_RELEASE_TAG__" not in content
         assert "releases/latest/download/manifest.json" not in content
+
+    for name in ("install-team-skills.cmd", "migrate-team-skills.cmd"):
+        content = (dist / name).read_text(encoding="utf-8")
+        assert 'if "%BAKED_RELEASE_TAG:~0,2%"=="__"' in content
+        assert 'if "%BAKED_RELEASE_TAG%"=="team-skills-vr123.2-abcdef1"' not in content
+        assert "%~dp0" not in content
+        assert "Invoke-WebRequest" in content
+        assert "=VALIDATED" in content
 
 
 def test_release_does_not_ship_updater_or_signing_runtime(tmp_path: Path) -> None:
@@ -156,14 +173,19 @@ def test_release_does_not_ship_updater_or_signing_runtime(tmp_path: Path) -> Non
         assert not name.startswith(BUNDLE_FORBIDDEN_PREFIXES)
 
 
-def test_windows_docs_preserve_ps51_utf8_bom_download(tmp_path: Path) -> None:
+def test_user_docs_download_the_cmd_migrator_and_remove_the_bootstrap(tmp_path: Path) -> None:
     del tmp_path
     docs = [ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md", ROOT / "quickstart.md"]
-    markers = ["DownloadData($u)", "UTF8.GetString($b)", "[char]0xFEFF", "UTF8Encoding($true)", "WriteAllText($p,$s,$enc)"]
     for path in docs:
         content = path.read_text(encoding="utf-8")
-        for marker in markers:
-            assert marker in content, f"{path} missing Windows encoding marker: {marker}"
+        assert "releases/latest/download/migrate-team-skills.cmd" in content
+        assert "releases/latest/download/migrate-team-skills.command" in content
+        assert "[guid]::NewGuid()" in content
+        assert "$c=1" in content
+        assert "Remove-Item -LiteralPath $p" in content
+        assert '( p="$(mktemp -t migrate-team-skills.XXXXXX)"' in content
+        assert "trap 'rm -f \"$p\"' EXIT" in content
+        assert "DownloadData($u)" not in content
 
 
 def test_workflow_gates_publish_on_both_os_smokes() -> None:
@@ -176,6 +198,9 @@ def test_workflow_gates_publish_on_both_os_smokes() -> None:
     workflow_text = json.dumps(workflow, ensure_ascii=False)
     assert "remove-team-skills-autoupdate.ps1" in workflow_text
     assert "remove-team-skills-autoupdate.command" in workflow_text
+    assert "migrate-team-skills.ps1" in workflow_text
+    assert "migrate-team-skills.command" in workflow_text
+    assert "python -m pytest tests/test_migrate_team_skills_windows.py" in workflow_text
     assert "System.Management.Automation.Language.Parser" in workflow_text
     assert "gh release create" in workflow_text
     for forbidden in (

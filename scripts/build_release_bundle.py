@@ -16,6 +16,9 @@ RELEASE_ASSET_NAMES = (
     "install-team-skills.cmd",
     "install-team-skills.ps1",
     "install-team-skills.command",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.ps1",
+    "migrate-team-skills.command",
     "uninstall-team-skills.ps1",
     "uninstall-team-skills.command",
     "remove-team-skills-autoupdate.ps1",
@@ -24,8 +27,18 @@ RELEASE_ASSET_NAMES = (
 
 WINDOWS_POWERSHELL_ASSETS = {
     "install-team-skills.ps1",
+    "migrate-team-skills.ps1",
     "uninstall-team-skills.ps1",
     "remove-team-skills-autoupdate.ps1",
+}
+
+RELEASE_BOUND_ASSETS = {
+    "install-team-skills.cmd",
+    "install-team-skills.ps1",
+    "install-team-skills.command",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.ps1",
+    "migrate-team-skills.command",
 }
 
 RELEASE_TAG_PLACEHOLDER = "__TEAM_SKILLS_RELEASE_TAG__"
@@ -101,7 +114,7 @@ def copy_release_asset(source: Path, destination: Path, replacements: dict[str, 
     if not source.is_file():
         raise FileNotFoundError(f"release asset source is missing: {source}")
 
-    if source.name.startswith("install-team-skills"):
+    if source.name in RELEASE_BOUND_ASSETS:
         content = source.read_text(encoding="utf-8-sig")
         for placeholder, value in replacements.items():
             content = content.replace(placeholder, value)

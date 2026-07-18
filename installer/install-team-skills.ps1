@@ -21,6 +21,7 @@ function Write-Info($Message) {
 
 if ($ValidateOnly) {
     Write-Info "ValidateOnly: install-team-skills.ps1 разобран без выполнения установки."
+    Write-Host "TEAM_SKILLS_RESULT=VALIDATED"
     exit 0
 }
 
@@ -423,6 +424,9 @@ try {
     Write-Info "Установлена версия team-skills $($manifest.plugin_version) из release $($manifest.release_tag)."
     Write-Info "Автообновления нет: для новой версии вручную запустите новый installer."
     Write-Info "Перезапустите Codex, чтобы он перечитал plugin."
+    Write-Host "TEAM_SKILLS_RESULT=INSTALLED"
+    Write-Host "TEAM_SKILLS_RELEASE=$($manifest.release_tag)"
+    Write-Host "TEAM_SKILLS_PLUGIN_VERSION=$($manifest.plugin_version)"
 } catch {
     Write-Error $_.Exception.Message -ErrorAction Continue
     $failed = $true
@@ -432,5 +436,8 @@ try {
     }
 }
 
-if ($failed) { exit 1 }
+if ($failed) {
+    Write-Host "TEAM_SKILLS_RESULT=INSTALL_FAILED"
+    exit 1
+}
 exit 0

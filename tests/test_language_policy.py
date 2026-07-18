@@ -143,8 +143,10 @@ def test_script_user_messages_are_russian() -> None:
 def test_installer_user_messages_are_russian() -> None:
     installer_files = [
         ROOT / "installer" / "install-team-skills.ps1",
+        ROOT / "installer" / "migrate-team-skills.ps1",
         ROOT / "installer" / "uninstall-team-skills.ps1",
         ROOT / "installer" / "install-team-skills.command",
+        ROOT / "installer" / "migrate-team-skills.command",
         ROOT / "installer" / "uninstall-team-skills.command",
     ]
 
@@ -232,8 +234,8 @@ def test_pr_language_workflow_checks_pr_comments_only() -> None:
 
 def test_technical_contract_terms_are_preserved() -> None:
     quickstart = (ROOT / "quickstart.md").read_text(encoding="utf-8")
-    assert "install-team-skills.ps1" in quickstart
-    assert "install-team-skills.command" in quickstart
+    assert "migrate-team-skills.cmd" in quickstart
+    assert "migrate-team-skills.command" in quickstart
     assert "./scripts/install_plugin.sh" in quickstart
     assert "python -m pytest" in quickstart
 

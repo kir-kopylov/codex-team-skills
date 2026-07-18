@@ -4,7 +4,7 @@
 
 ## Два Режима
 
-**User mode** — Codex Desktop и одноразовый installer. На macOS нужен Python 3.11 или новее. GitHub аккаунт и локальная копия repo не нужны.
+**User mode** — Codex Desktop и одна команда одноразового migrator. На macOS нужен Python 3.11 или новее. GitHub аккаунт и локальная копия repo не нужны.
 
 **Author mode** — GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
 
@@ -20,7 +20,7 @@ Installer скачивается из последнего GitHub Release, но 
 6. удаляет только cache `codex-team-skills` и временные файлы;
 7. завершается, не оставляя updater root, scheduler, LaunchAgent, state или logs.
 
-Повторный запуск того же installer — ручное обновление или repair. Отдельных update/status-команд нет.
+Пользователь не запускает этот внутренний installer напрямую. Ручное обновление или repair — повторный запуск той же команды migrator. Отдельных update/status-команд нет.
 
 ## Граница Доверия
 
@@ -28,48 +28,30 @@ Installer скачивается из последнего GitHub Release, но 
 
 ## Одноразовая Миграция Старых Машин
 
-Сначала должен быть опубликован release без фонового updater. После этого на каждой старой машине:
+Сначала публикуется release без фонового updater. После этого коллеге отправляется только [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md): Codex запускает одну OS-specific команду migrator.
 
-1. скачайте cleanup из того же Release;
-2. запустите только `dry-run`;
-3. проверьте, что результат — `DRY_RUN_SAFE` либо `NOT_FOUND`;
-4. при `DRY_RUN_SAFE` запустите `apply`;
-5. ожидайте `CLEANED` и exit code `0`;
-6. только затем запустите новый one-shot installer и перезапустите Codex;
-7. повторный `apply` должен вернуть `NOT_FOUND`.
+Migrator сам скачивает cleanup и installer одного exact release, выполняет безопасную проверку, при необходимости удаляет доказанный legacy updater, ставит plugin один раз и повторно проверяет, что updater не вернулся. Единственный успешный итог — `MIGRATED_RESTART_REQUIRED`; после него коллега полностью перезапускает Codex и выполняет проверочную фразу из стартового файла.
 
-Windows:
+Если итог другой, ничего вручную не удаляйте:
 
-```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/remove-team-skills-autoupdate.ps1"; $p="$env:TEMP\remove-team-skills-autoupdate.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -DryRun
-```
+- `BLOCKED_PREFLIGHT` — переход не начинался; устраните указанную предпосылку;
+- `REFUSED_UNSAFE` — объект неоднозначен; передайте вывод maintainer-у;
+- `CLEANUP_INCOMPLETE` — cleanup мог начаться, но postcondition не доказан;
+- `LEGACY_REMOVED_INSTALL_PENDING` — updater уже отсутствует, но установка не завершена; повторно запустите ту же команду после устранения указанной причины;
+- `INSTALLER_REGRESSION_CLEANED` — после installer снова появился updater; rollout этого release остановить.
 
-После безопасного отчёта замените последний `-DryRun` на `-Apply`.
-
-macOS:
-
-```bash
-curl -fsSL -o /tmp/remove-team-skills-autoupdate.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/remove-team-skills-autoupdate.command && chmod +x /tmp/remove-team-skills-autoupdate.command && /tmp/remove-team-skills-autoupdate.command --dry-run
-```
-
-После безопасного отчёта замените последний `--dry-run` на `--apply`.
-
-Cleanup удаляет только доказанную старую задачу/plist, процессы updater, legacy root и два точных macOS updater-лога. Он не удаляет plugin, marketplace, Codex config, active cache или recovery-копии. Нестандартный orphan-root без живого scheduler автоматически не удаляется.
-
-Промпт для Codex на машине:
-
-> Запусти официальный `remove-team-skills-autoupdate` сначала в `dry-run`. Покажи найденные объекты. Если скрипт вернул `DRY_RUN_SAFE`, запусти `apply` и покажи before/after report. Ничего вне скрипта не удаляй.
+Отдельные `remove-team-skills-autoupdate.ps1` и `remove-team-skills-autoupdate.command` нужны только maintainer-у для разбора `REFUSED_UNSAFE` или `CLEANUP_INCOMPLETE`. Это не второй пользовательский протокол и не команда для импровизированного ручного удаления.
 
 ## Установка, Обновление И Удаление
 
-Для установки или обновления повторно используйте OS-specific команду из [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md), затем перезапустите Codex.
+Для установки или обновления повторно используйте ту же OS-specific команду migrator из [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md), затем перезапустите Codex.
 
 Для полного удаления скачайте из последнего Release и запустите:
 
 - Windows — `uninstall-team-skills.ps1`;
 - macOS — `uninstall-team-skills.command`.
 
-Uninstaller не выполняет legacy cleanup. Если старая задача или root ещё существуют, он откажется и потребует сначала выполнить предыдущий раздел.
+Uninstaller не выполняет legacy cleanup. Если старая задача или root ещё существуют, сначала запустите обычный migrator; при `REFUSED_UNSAFE` или `CLEANUP_INCOMPLETE` передайте вывод maintainer-у.
 
 ## Что Отправить Коллеге
 

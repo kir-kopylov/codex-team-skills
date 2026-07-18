@@ -23,6 +23,7 @@ CACHE_PATH="${CODEX_TEAM_SKILLS_CODEX_PLUGIN_CACHE_DIR:-$DEFAULT_CACHE_PATH}"
 MODE=""
 if [[ "$#" -ne 1 ]]; then
   printf '[team-skills] Использование: %s --dry-run | --apply\n' "${0:t}" >&2
+  printf 'TEAM_SKILLS_RESULT=INVALID_INVOCATION\n' >&2
   exit 2
 fi
 
@@ -36,6 +37,7 @@ case "$1" in
   *)
     printf '[team-skills] Неизвестный аргумент: %s\n' "$1" >&2
     printf '[team-skills] Использование: %s --dry-run | --apply\n' "${0:t}" >&2
+    printf 'TEAM_SKILLS_RESULT=INVALID_INVOCATION\n' >&2
     exit 2
     ;;
 esac
@@ -47,6 +49,7 @@ info() {
 unexpected() {
   info "Очистка запрещена: $1"
   info "Результат: REFUSED_UNSAFE"
+  printf 'TEAM_SKILLS_RESULT=REFUSED_UNSAFE\n'
   exit 3
 }
 
@@ -535,7 +538,7 @@ if required_fallback_markers <= markers:
 elif markers:
     refusal("canonical root содержит неполный или неоднозначный набор updater-маркеров.", canonical_root)
 else:
-    emit("NOT_FOUND", "", "Canonical root не содержит updater-инфраструктуру.")
+    refusal("canonical root существует, но updater-маркеры отсутствуют; автоматически удалять его нельзя.", canonical_root)
 PY
 }
 
@@ -593,6 +596,7 @@ render_report() {
   printf '[team-skills] %-22s | %-64s | %-64s\n' "Active cache SHA-256" "$BEFORE_CACHE" "$AFTER_CACHE"
   printf '[team-skills] %-22s | %-64s | %-64s\n' "Protected set SHA-256" "$BEFORE_PROTECTED_SET" "$AFTER_PROTECTED_SET"
   info "Результат: $outcome"
+  printf 'TEAM_SKILLS_RESULT=%s\n' "$outcome"
 }
 
 capture_after() {
@@ -620,6 +624,13 @@ fi
 if [[ "$DISCOVERY_STATE" == "NOT_FOUND" ]]; then
   info "$DISCOVERY_REASON"
   capture_after
+  if ! protected_unchanged || [[ "$SCHEDULER_BEFORE" != "0" || "$SCHEDULER_AFTER" != "0" || \
+       "$PROCESSES_BEFORE" != "0" || "$PROCESSES_AFTER" != "0" || \
+       "$ROOT_BEFORE" != "false" || "$ROOT_AFTER" != "false" ]]; then
+    render_report "REFUSED_UNSAFE"
+    info "NOT_FOUND допустим только при полном отсутствии scheduler, updater-процессов и canonical root."
+    exit 3
+  fi
   render_report "NOT_FOUND"
   exit 0
 fi
