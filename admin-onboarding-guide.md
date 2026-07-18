@@ -1,122 +1,84 @@
 # Гид Для Организатора Onboarding
 
-Эта инструкция для человека, который помогает коллегам подключиться к общему хранилищу Codex skills.
-
-Коллеге по-прежнему отправляйте один файл: [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md). Разница в том, что обычный пользователь больше не проходит ручное скачивание repo и не устанавливает plugin через отдельное desktop-приложение.
+Эта инструкция для человека, который помогает коллегам подключиться к общему хранилищу Codex skills. Коллеге отправляйте [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md).
 
 ## Два Режима
 
-**User mode** — для коллег, которые только пользуются skills. Им нужен Codex Desktop и один установщик. GitHub аккаунт, локальная копия repo и Pull Request не нужны.
+**User mode** — Codex Desktop и одноразовый installer. На macOS нужен Python 3.11 или новее. GitHub аккаунт и локальная копия repo не нужны.
 
-**Author mode** — для коллег, которые хотят добавить свои skills в общее хранилище. Им нужен GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
+**Author mode** — GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
 
-## User Mode: Что Делает Коллега
+## Что Делает Installer
 
-1. Открывает Codex Desktop.
-2. Загружает [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md).
-3. Отвечает, какая у него система: Windows или macOS.
-4. Запускает одну команду, которую даст Codex.
-5. Перезапускает Codex.
-6. Проверяет фразой: `Покажи, какие командные skills доступны.`
+Installer скачивается из последнего GitHub Release, но внутри привязан к конкретному immutable release tag. Он:
 
-Ситуация успеха: plugin `team-skills` установлен, автообновление включено, коллега видит доступные командные skills.
+1. во временной папке скачивает `manifest.json` и `team-skills-bundle.zip` этого release;
+2. сверяет release tag, размер и SHA-256 bundle;
+3. проверяет имя, версию и release ID в `.codex-plugin/plugin.json`;
+4. транзакционно заменяет plugin с rollback при ошибке;
+5. обновляет только записи `codex-team-skills` в marketplace и Codex config;
+6. удаляет только cache `codex-team-skills` и временные файлы;
+7. завершается, не оставляя updater root, scheduler, LaunchAgent, state или logs.
 
-## Что Делает Установщик
+Повторный запуск того же installer — ручное обновление или repair. Отдельных update/status-команд нет.
 
-Установщик скачивает не сырой `main`, а последний подписанный release:
+## Граница Доверия
 
-- `latest.json` — подписанный pointer на последний проверенный подписанный release (неизменяемый тег не гарантируется платформой);
-- `manifest.json` — подписанная schema с `product_version`, `runtime_version`, `release_id`, commit, channel и checksum assets;
-- `team-skills-bundle.zip` — plugin `team-skills`;
-- служебные scripts для bootstrap, обновления, repair, статуса и удаления.
+Клиент доверяет публичному GitHub repository, GitHub Releases и HTTPS. SHA-256 обнаруживает повреждение bundle при скачивании, но не является независимой подписью и не защищает от компрометации GitHub или аккаунта владельца repo. Собственная RSA-подпись, локальный public key и signing secret не используются.
 
-Перед заменой активного plugin установщик проверяет подпись metadata, checksum assets, распаковывает bundle во временную папку, проверяет `.codex-plugin/plugin.json`, регистрирует local marketplace в Codex config и только потом заменяет локальную версию. После успешной замены updater инвалидирует snapshot `~/.codex/plugins/cache/codex-team-skills`, потому что перезапуск Codex должен перечитывать свежий plugin, а не старый persistent cache.
+## Одноразовая Миграция Старых Машин
 
-## Auto Update
+Сначала должен быть опубликован release без фонового updater. После этого на каждой старой машине:
 
-Автообновление включается без выбора пользователя:
-
-- Windows: user-level Windows Task Scheduler, задача `Codex Team Skills Auto Update`;
-- macOS: user-level LaunchAgent `com.codex-team-skills.autoupdate`;
-- интервал: раз в двое суток.
-
-Если интернет недоступен, подпись невалидна или bundle повреждён, текущий рабочий plugin остаётся на месте. Следующая попытка будет при очередном запуске автообновления.
-
-## Release Signing
-
-Публикация release после merge требует GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`. Он должен содержать приватный ключ, соответствующий публичному ключу `installer/team-skills-public-key.pem`. Без этого CI должен падать на publish-step, потому что unsigned release не должен становиться источником автообновления.
-
-Честно про bus-factor: приватный ключ хранится только офлайн и как GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, и сейчас до него дотягивается только владелец repo. Это единая точка отказа: если ключ потерян или скомпрометирован, новые подписанные release выпускать некем. Восстановление — это смена доверенного якоря, а не починка старого ключа.
-
-Ротация не должна зависеть от ещё не опубликованного release:
-
-1. Офлайн сгенерируйте новую пару ключей. Приватный ключ не копируйте в repo.
-2. В одном PR замените `installer/team-skills-public-key.pem`, оба значения `EXPECTED_PUBLIC_KEY_SHA256`, `$PinnedPublicKeyModulusBase64` и `$PinnedPublicKeyExponentBase64`.
-3. До merge этим же PR соберите candidate metadata штатным `scripts/build_release_bundle.py`. В офлайн-среде подпишите полученный `latest.json` новым приватным ключом той же командой, что использует publish job:
-
-   ```bash
-   python scripts/build_release_bundle.py --dist <candidate-dist> --commit <candidate-commit> --run-number 0 --run-attempt 0
-   openssl dgst -sha256 -sign <new-private-key.pem> -out tests/fixtures/windows-signature/latest.json.sig <candidate-dist>/latest.json
-   ```
-
-   Сам `latest.json` скопируйте из `<candidate-dist>` в `tests/fixtures/windows-signature/latest.json`. Эта публичная пара нужна для проверки нового ключа до merge; приватный ключ в fixture не входит.
-4. PEM, оба pin, встроенные RSA-параметры и fixture должны меняться одним PR. Полный suite и Windows PowerShell 5.1 smoke обязаны доказать соответствие и отклонить изменённый байт.
-5. Только после зелёного PR замените GitHub Actions secret `TEAM_SKILLS_SIGNING_KEY_PEM`, сразу выполните merge и дождитесь свежего подписанного release. После публикации можно заменить candidate fixture публичной парой этого release отдельным PR без смены ключа.
-
-Коллеги подхватят новый якорь доверия, заново запустив установщик; до этого их клиент остаётся на старой подписи. Деградация при этом штатная: если подпись невалидна, старый рабочий plugin остаётся на месте, так что смена ключа не ломает текущие установки, а лишь откладывает новые обновления до повторного запуска установщика.
-
-## Команды Поддержки
+1. скачайте cleanup из того же Release;
+2. запустите только `dry-run`;
+3. проверьте, что результат — `DRY_RUN_SAFE` либо `NOT_FOUND`;
+4. при `DRY_RUN_SAFE` запустите `apply`;
+5. ожидайте `CLEANED` и exit code `0`;
+6. только затем запустите новый one-shot installer и перезапустите Codex;
+7. повторный `apply` должен вернуть `NOT_FOUND`.
 
 Windows:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\team-skills-status.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\update-team-skills.ps1" -RepairInstall
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\CodexTeamSkills\bin\uninstall-team-skills.ps1"
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/remove-team-skills-autoupdate.ps1"; $p="$env:TEMP\remove-team-skills-autoupdate.ps1"; $b=(New-Object System.Net.WebClient).DownloadData($u); $s=[System.Text.Encoding]::UTF8.GetString($b); if($s.Length -gt 0 -and $s[0] -eq [char]0xFEFF){$s=$s.Substring(1)}; $enc=New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($p,$s,$enc); powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -DryRun
 ```
 
-Если установленный Windows updater падает на `ImportFromPem`, он не сможет
-получить исправление через собственный signed update. Дайте коллеге повторно
-запустить официальную команду установки из `START_HERE_CONNECT_CODEX_SKILLS.md`.
-Не используйте `CODEX_TEAM_SKILLS_ALLOW_UNSIGNED=1` и Git checkout как
-пользовательское восстановление.
+После безопасного отчёта замените последний `-DryRun` на `-Apply`.
 
 macOS:
 
 ```bash
-"$HOME/Library/Application Support/CodexTeamSkills/bin/team-skills-status.command"
-"$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh"
-"$HOME/Library/Application Support/CodexTeamSkills/bin/update-team-skills.sh" --repair-install
-"$HOME/Library/Application Support/CodexTeamSkills/bin/uninstall-team-skills.command"
+curl -fsSL -o /tmp/remove-team-skills-autoupdate.command https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/remove-team-skills-autoupdate.command && chmod +x /tmp/remove-team-skills-autoupdate.command && /tmp/remove-team-skills-autoupdate.command --dry-run
 ```
 
-## Что Отправить Коллеге
+После безопасного отчёта замените последний `--dry-run` на `--apply`.
 
-Отправьте файл [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md) и короткий текст:
+Cleanup удаляет только доказанную старую задачу/plist, процессы updater, legacy root и два точных macOS updater-лога. Он не удаляет plugin, marketplace, Codex config, active cache или recovery-копии. Нестандартный orphan-root без живого scheduler автоматически не удаляется.
+
+Промпт для Codex на машине:
+
+> Запусти официальный `remove-team-skills-autoupdate` сначала в `dry-run`. Покажи найденные объекты. Если скрипт вернул `DRY_RUN_SAFE`, запусти `apply` и покажи before/after report. Ничего вне скрипта не удаляй.
+
+## Установка, Обновление И Удаление
+
+Для установки или обновления повторно используйте OS-specific команду из [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md), затем перезапустите Codex.
+
+Для полного удаления скачайте из последнего Release и запустите:
+
+- Windows — `uninstall-team-skills.ps1`;
+- macOS — `uninstall-team-skills.command`.
+
+Uninstaller не выполняет legacy cleanup. Если старая задача или root ещё существуют, он откажется и потребует сначала выполнить предыдущий раздел.
+
+## Что Отправить Коллеге
 
 ```text
 Загрузи этот .md файл в Codex Desktop, нажми отправить и следуй инструкциям.
 
-Codex определит твою систему, даст одну команду для установки и включит автообновление командных skills.
+Codex определит твою систему и даст одну команду для установки командных skills.
 ```
 
-## Author Mode: Если Коллега Хочет Добавлять Skills
+## Author Mode
 
-Только для авторов нужен GitHub workflow:
-
-1. GitHub аккаунт.
-2. Локальная рабочая копия repo `codex-team-skills`.
-3. Branch для изменения.
-4. Черновик через `python scripts/new_skill.py`.
-5. Заполненные `SKILL.md`, `skill.yaml`, `examples/`.
-6. `python -m pytest`.
-7. Pull Request.
-
-Ситуация успеха: Pull Request создан, CI проходит, ревьюер видит цель skill, аудиторию, ограничения и примеры.
-
-## Короткое Объяснение Для Коллег
-
-```text
-Система сама раз в двое суток ставит последнюю подписанную версию командных skills. Если обновление не удалось, старая рабочая версия остаётся на месте. После успешного обновления нужен перезапуск Codex, чтобы новая runtime-версия skill стала видна.
-```
+Автор создаёт branch, добавляет или меняет skill, запускает `python -m pytest` и открывает Pull Request. Обычному пользователю этот workflow не нужен.

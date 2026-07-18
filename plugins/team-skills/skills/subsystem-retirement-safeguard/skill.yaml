@@ -1,0 +1,24 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Безопасно удаляет ненужную подсистему, сохраняя только остаточный контракт и необходимую миграцию старых установок."
+use_cases:
+  - "Удалить updater, scheduler, daemon, adapter или другой ненужный механизм по всей поверхности repo."
+  - "Сохранить узкую одноразовую очистку уже развёрнутого legacy-следа, не продолжая старый runtime."
+  - "Доказать отсутствие shipped-хвостов и работоспособность оставшегося ручного или прямого пути."
+do_not_use_for:
+  - "Решение, нужна ли подсистема вообще; сначала используйте overengineering-stop-gate."
+  - "Удаление без явного разрешения, проверенного target repo и доказанного scope."
+  - "Проектирование replacement platform, общий Git cleanup или destructive cleanup неизвестных внешних путей."
+natural_triggers:
+  - "снеси updater целиком"
+  - "убери scheduler и оставь ручной запуск"
+  - "удали старый daemon без хвостов"
+  - "выведи эту подсистему из эксплуатации"
+  - "удали adapter, его config, tests и документацию"
+example_files:
+  - "examples/good-01.md"
+  - "examples/good-02.md"
+  - "examples/good-03.md"
+  - "examples/anti-01.md"
+  - "examples/anti-02.md"
+last_reviewed: "2026-07-18"

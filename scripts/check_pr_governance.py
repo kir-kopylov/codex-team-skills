@@ -57,6 +57,7 @@ ALLOWED_LATIN_WORDS = {
     "release",
     "repo",
     "scripts",
+    "sha",
     "skill",
     "skills",
     "smoke",
@@ -260,8 +261,10 @@ def check_installer_release_hard_section(body: str) -> list[str]:
         errors.append("раздел installer/release должен иметь минимум 3 отмеченных пункта проверки")
     if not any(marker in lower for marker in ("powershell 5.1", "validateonly", "windows powershell")):
         errors.append("раздел installer/release должен явно покрывать Windows PowerShell 5.1/ValidateOnly")
-    if not any(marker in lower for marker in ("manifest.json", "latest.json", "подпис", "signature")):
-        errors.append("раздел installer/release должен явно покрывать manifest/latest или подпись release metadata")
+    if "manifest.json" not in lower or "sha-256" not in lower:
+        errors.append("раздел installer/release должен явно покрывать manifest.json и SHA-256 bundle")
+    if not any(marker in lower for marker in ("cleanup", "dry-run", "dryrun", "legacy")):
+        errors.append("раздел installer/release должен явно покрывать legacy cleanup и dry-run")
     if not any(marker in lower for marker in ("откат", "rollback", "переустанов", "повторная установка")):
         errors.append("раздел installer/release должен явно покрывать rollback/переустановку")
     return errors

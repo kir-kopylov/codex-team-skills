@@ -19,8 +19,10 @@ example_files:
   - "examples/good-01.md"
   - "examples/good-02.md"
   - "examples/good-03.md"
+  - "examples/good-04.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
+  - "examples/anti-03.md"
 last_reviewed: "2026-07-15"
 authors:
   - "Пользователь Codex"

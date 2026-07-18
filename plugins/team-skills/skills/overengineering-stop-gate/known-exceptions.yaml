@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Gate правильно называет ownership cost, но сразу превращает найденные gaps в roadmap по hardening."
+    root_cause: "Не решён вопрос существования механизма; production practice ошибочно принята за обязательный scope."
+    do_next_time: "Заморозить расширение, вынести keep, simplify или delete и тестировать только surviving invariant."
+    source_example: "examples/good-01.md"
+  - symptom: "Отсутствие telemetry или жалоб трактуется как доказательство, что механизм никому не нужен."
+    root_cause: "Unknown подменён нулём, а последствия удаления и safety-риск не проверены."
+    do_next_time: "Закрыть один критичный evidence gap; при высоком ущербе временно сохранить узкий safety invariant."
+    source_example: "examples/anti-02.md"
+  - symptom: "Verdict delete превращается в фактическое удаление без подтверждённого scope и разрешения пользователя."
+    root_cause: "Архитектурная рекомендация ошибочно принята за авторизацию на изменение repo или системы."
+    do_next_time: "Назвать точный scope удаления и получить явное согласие; затем передать работу в subsystem-retirement-safeguard."
+    source_example: "examples/anti-01.md"

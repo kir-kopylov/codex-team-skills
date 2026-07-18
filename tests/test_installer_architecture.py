@@ -11,146 +11,145 @@ INSTALLER_DIR = ROOT / "installer"
 
 
 def read(path: Path) -> str:
-    return path.read_text(encoding="utf-8")
+    return path.read_text(encoding="utf-8-sig")
 
 
-def test_installer_files_exist() -> None:
-    expected = [
+def test_one_shot_source_entrypoints_exist() -> None:
+    expected = {
         "install-team-skills.cmd",
         "install-team-skills.ps1",
         "install-team-skills.command",
+        "uninstall-team-skills.ps1",
+        "uninstall-team-skills.command",
+        "remove-team-skills-autoupdate.ps1",
+        "remove-team-skills-autoupdate.command",
+        "team-skills-registry.py",
+    }
+    assert expected.issubset({path.name for path in INSTALLER_DIR.iterdir() if path.is_file()})
+
+    for obsolete in (
         "bootstrap-team-skills.ps1",
         "bootstrap-team-skills.sh",
         "update-team-skills.ps1",
         "update-team-skills.sh",
-        "uninstall-team-skills.ps1",
-        "uninstall-team-skills.command",
         "team-skills-status.ps1",
         "team-skills-status.command",
-        "team-skills-registry.py",
+        "refresh-team-skills.command",
         "team-skills-public-key.pem",
-    ]
-    for name in expected:
-        path = INSTALLER_DIR / name
-        assert path.exists(), f"installer file missing: {path}"
-        assert path.stat().st_size > 0, f"installer file is empty: {path}"
+    ):
+        assert not (INSTALLER_DIR / obsolete).exists()
 
 
-def test_windows_installer_uses_release_bundle_and_task_scheduler() -> None:
+def test_windows_installer_is_temp_only_and_has_no_legacy_cleanup() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.ps1")
-    bootstrap = read(INSTALLER_DIR / "bootstrap-team-skills.ps1")
-    update = read(INSTALLER_DIR / "update-team-skills.ps1")
-    uninstall = read(INSTALLER_DIR / "uninstall-team-skills.ps1")
+    for required in (
+        "__TEAM_SKILLS_RELEASE_TAG__",
+        "manifest.json",
+        "team-skills-bundle.zip",
+        "Get-FileHash -Algorithm SHA256",
+        ".codex-plugin\\plugin.json",
+        "Invalidate-CodexPluginCache",
+        "Replace-Plugin",
+        "ValidateOnly",
+        "Автообновления нет",
+    ):
+        assert required in install
 
-    assert "releases/latest/download" in install
-    assert "& powershell.exe" in install
-    assert "Invoke-BootstrapProcess -RegisterAutoUpdate" in install
-    assert "Scheduled Task не создаётся" in install
-    assert "Register-ScheduledTask" not in install
-
-    assert "Register-ScheduledTask" in bootstrap
-    assert "New-ScheduledTaskTrigger -Daily -DaysInterval 2" in bootstrap
-    assert "Codex Team Skills Auto Update" in bootstrap
-    assert "RegisterAutoUpdate" in bootstrap
-
-    assert "manifest.json" in update
-    assert "latest.json" in update
-    assert "team-skills-bundle.zip" in update
-    assert "Get-FileHash -Algorithm SHA256" in update
-    assert ".codex-plugin\\plugin.json" in update
-    assert "previous" in update
-    assert "Verify-Signature" in update
-    assert "runtime_version" in update
-    assert "codex-team-skills" in update
-    assert ".codex\\plugins\\cache\\codex-team-skills" in update
-    assert "Invalidate-CodexPluginCache" in update
-    assert '$UpdaterVersion = "1.2.0"' in update
-    assert "last-failure.json" in update
-    assert "last-repair.json" in update
-    assert "CODEX_TEAM_SKILLS_DOWNLOAD_TIMEOUT_SEC" in update
-    assert "CODEX_TEAM_SKILLS_DOWNLOAD_MAX_ATTEMPTS" in update
-    assert "Start-PluginSwap" in update
-    assert "Undo-PluginSwap" in update
-
-    assert "Unregister-ScheduledTask" in uninstall
-    assert "marketplace.json" in uninstall
-    assert "codex-team-skills managed block" in uninstall
+    for forbidden in (
+        "releases/latest/download/manifest.json",
+        "latest.json",
+        "Verify-Signature",
+        "PinnedPublicKey",
+        "Register-ScheduledTask",
+        "Unregister-ScheduledTask",
+        "New-ScheduledTaskTrigger",
+        "CodexTeamSkills",
+        "bootstrap-team-skills",
+        "update-team-skills",
+        "state.json",
+        "last-repair.json",
+        "team-skills-registry.py",
+        "pull-skills.sh",
+    ):
+        assert forbidden not in install
 
 
-def test_macos_installer_uses_release_bundle_and_launchagent() -> None:
+def test_macos_installer_is_temp_only_and_has_no_legacy_cleanup() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.command")
-    update = read(INSTALLER_DIR / "update-team-skills.sh")
-    uninstall = read(INSTALLER_DIR / "uninstall-team-skills.command")
+    for required in (
+        "__TEAM_SKILLS_RELEASE_TAG__",
+        "manifest.json",
+        "team-skills-bundle.zip",
+        "sha256",
+        ".codex-plugin/plugin.json",
+        ".codex/plugins/cache/$MARKETPLACE_NAME",
+        "--validate-only",
+        "sys.version_info >= (3, 11)",
+        "Автообновления нет",
+    ):
+        assert required in install
 
-    assert "releases/latest/download" in install
-    assert "com.codex-team-skills.autoupdate" in install
-    assert "<integer>172800</integer>" in install
-    assert "launchctl load" in install
-    assert "bootstrap-team-skills.sh" in install
-
-    assert "manifest.json" in update
-    assert "latest.json" in update
-    assert "team-skills-bundle.zip" in update
-    assert "hashlib.sha256" in update
-    assert ".codex-plugin/plugin.json" in update
-    assert "previous" in update
-    assert "verify_signature" in update
-    assert "runtime_version" in update
-    assert "team-skills-registry.py" in update
-    assert ".codex/plugins/cache/$MARKETPLACE_NAME" in update
-    assert "invalidate_codex_plugin_cache" in update
-    assert '"refresh-team-skills.command"' in update
-    assert "$support_dest.next" in update
-
-    assert "launchctl unload" in uninstall
-    assert "marketplace.json" in uninstall
-    assert "Codex registry" in uninstall
+    for forbidden in (
+        "releases/latest/download/manifest.json",
+        "latest.json",
+        "verify_signature",
+        "EXPECTED_PUBLIC_KEY_SHA256",
+        "launchctl",
+        "CodexTeamSkills",
+        "bootstrap-team-skills",
+        "update-team-skills",
+        "state.json",
+        "team-skills-registry.py",
+        "pull-skills.sh",
+    ):
+        assert forbidden not in install
 
 
-def test_user_docs_do_not_require_github_desktop() -> None:
+def test_uninstall_is_separate_from_legacy_cleanup() -> None:
+    windows = read(INSTALLER_DIR / "uninstall-team-skills.ps1")
+    macos = read(INSTALLER_DIR / "uninstall-team-skills.command")
+
+    assert "remove-team-skills-autoupdate.ps1 -DryRun" in windows
+    assert "Unregister-ScheduledTask" not in windows
+    assert "team-skills-registry.py" not in windows
+    assert "remove-team-skills-autoupdate.command --dry-run" in macos
+    assert "launchctl bootout" not in macos
+    assert "team-skills-registry.py" not in macos
+
+    for content in (windows, macos):
+        assert "marketplace.json" in content
+        assert "codex-team-skills managed block" in content
+
+
+def test_user_docs_keep_codex_and_claude_delivery_separate() -> None:
     colleague = read(ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md")
     admin = read(ROOT / "admin-onboarding-guide.md")
-
-    assert "GitHub Desktop" not in colleague
-    assert "GitHub Desktop" not in admin
-    assert "clone repo" not in colleague
     assert "install-team-skills.ps1" in colleague
     assert "install-team-skills.command" in colleague
-    assert "User mode" in admin
-    assert "Author mode" in admin
+    assert "remove-team-skills-autoupdate.ps1" in admin
+    assert "remove-team-skills-autoupdate.command" in admin
+    assert "нативный marketplace" in colleague
+    assert "pull-skills.sh" not in colleague
 
 
-def test_ci_builds_validated_release_bundle() -> None:
+def test_ci_builds_and_validates_manual_only_release() -> None:
     workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8"))
-    pytest_job = workflow["jobs"]["pytest"]
-    pytest_step_text = "\n".join(str(step) for step in pytest_job["steps"])
-    bundle_job = workflow["jobs"]["build-release-bundle"]
-    bundle_step_text = "\n".join(str(step) for step in bundle_job["steps"])
+    jobs = workflow["jobs"]
+    assert "python -m pytest" in str(jobs["pytest"]["steps"])
+    assert "scripts/build_release_bundle.py" in str(jobs["build-release-bundle"]["steps"])
+    assert jobs["windows-powershell-smoke"]["runs-on"] == "windows-latest"
+    assert jobs["macos-one-shot-smoke"]["runs-on"] == "macos-latest"
+    assert jobs["publish"]["needs"] == ["windows-powershell-smoke", "macos-one-shot-smoke"]
 
-    assert "python -m pytest" in pytest_step_text
-    assert "scripts/build_release_bundle.py" in bundle_step_text
-    assert "actions/upload-artifact" in bundle_step_text
-    assert bundle_job["if"] == "needs.release-scope.outputs.run_release_checks == 'true'"
-    assert bundle_job["needs"] == [
-        "pr-governance",
-        "installer-release-gate",
-        "release-scope",
-        "pytest",
-        "claude-sync-smoke",
-    ]
+    build_script = read(ROOT / "scripts" / "build_release_bundle.py")
+    for marker in ("team-skills-bundle.zip", "manifest.json", "sha256", "release_tag"):
+        assert marker in build_script
+    assert "support_files" not in build_script
+    assert "BUNDLE_FORBIDDEN_FILE_NAMES" in build_script
+    for forbidden_name in ("latest.json", "team-skills-public-key.pem"):
+        assert f'"{forbidden_name}"' in build_script
 
-    build_script = (ROOT / "scripts" / "build_release_bundle.py").read_text(encoding="utf-8")
-    assert "team-skills-bundle.zip" in build_script
-    assert "manifest.json" in build_script
-    assert "latest.json" in build_script
-    assert "sha256" in build_script
-    assert "runtime_version" in build_script
-    assert "release_id" in build_script
-    assert "team-skills-v" in build_script
-
-    workflow_text = "\n".join(str(job) for job in workflow["jobs"].values())
-    assert "manifest.json.sig" in workflow_text
-    assert "latest.json.sig" in workflow_text
-    assert "windows-powershell-smoke" in workflow["jobs"]
+    workflow_text = str(workflow)
     assert "gh release create" in workflow_text
-    assert "gh release delete team-skills-latest" not in workflow_text
+    assert "TEAM_SKILLS_SIGNING_KEY_PEM" not in workflow_text
+    assert "manifest.json.sig" not in workflow_text

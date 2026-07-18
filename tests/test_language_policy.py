@@ -143,13 +143,9 @@ def test_script_user_messages_are_russian() -> None:
 def test_installer_user_messages_are_russian() -> None:
     installer_files = [
         ROOT / "installer" / "install-team-skills.ps1",
-        ROOT / "installer" / "update-team-skills.ps1",
         ROOT / "installer" / "uninstall-team-skills.ps1",
-        ROOT / "installer" / "team-skills-status.ps1",
         ROOT / "installer" / "install-team-skills.command",
-        ROOT / "installer" / "update-team-skills.sh",
         ROOT / "installer" / "uninstall-team-skills.command",
-        ROOT / "installer" / "team-skills-status.command",
     ]
 
     for path in installer_files:

@@ -9,15 +9,15 @@ skills**, packaged as a single local Codex plugin named `team-skills`. The same
 skill folders are also synced into Claude Code, so one registry serves **two
 runtimes**. It is a *workflow*, not just a file store: a colleague finds the
 skill that fits their task, learns the plain-language phrase that triggers it,
-sees the owner / boundaries / examples, installs everything through one signed
-installer, and receives updates via signed releases with auto-update every two
-days.
+sees the owner / boundaries / examples, installs everything through one
+one-shot installer from an immutable GitHub Release, and gets a newer release
+by running the installer again.
 
 There are two roles to keep in mind:
 
 - **User mode** — a non-engineer who never clones the repo. They load
-  `START_HERE_CONNECT_CODEX_SKILLS.md` into Codex, get an OS-specific signed
-  installer, and run the latest CI-validated `team-skills` bundle.
+  `START_HERE_CONNECT_CODEX_SKILLS.md` into Codex, get an OS-specific installer,
+  and run the latest CI-validated `team-skills` bundle.
 - **Author mode** — a contributor who adds or edits skills via a Pull Request:
   create a branch, add/fill a skill, run `python -m pytest`, open a PR.
 
@@ -76,15 +76,14 @@ admin-onboarding-guide.md          # internal guide for whoever runs onboarding
 language-policy.md                 # the language contract (enforced by tests)
 docs/                              # platform-overview.md, seed-skill-example.md,
                                    #   skill-exception-learning.md, claude-code-marketplace.md
-installer/                         # signed user-mode install / update / status / uninstall
-                                   #   + bootstrap-*, refresh-team-skills.command
+installer/                         # one-shot install / uninstall / legacy cleanup
 scripts/                           # install_plugin.sh, new_skill.py,
                                    #   build_release_bundle.py, pull-skills.sh,
                                    #   templates/log_usage_feedback.py (canonical copy)
 tests/                             # pytest suite (see Testing & CI)
 .agents/plugins/marketplace.json   # local marketplace entry pointing at the plugin (Codex)
 .claude-plugin/marketplace.json    # native Claude Code marketplace entry (codex-team-skills)
-.github/workflows/tests.yml        # CI: pytest + smoke tests + signed publish on main
+.github/workflows/tests.yml        # CI: pytest + OS smoke tests + publish on main
 pyproject.toml                     # Python project (requires-python >=3.11)
 ```
 
@@ -158,9 +157,9 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 ./scripts/install_plugin.sh   # copies plugin to ~/plugins and registers local marketplace
 ```
 
-End users instead use the signed installers in `installer/` (documented in
-`quickstart.md`). `scripts/build_release_bundle.py` builds the validated
-release bundle that CI signs and publishes.
+End users instead use the one-shot tools in `installer/` (documented in
+`quickstart.md`). `scripts/build_release_bundle.py` builds an immutable release
+whose manifest carries the bundle size and SHA-256.
 
 ## Feedback-Learning System (known-exceptions + usage feedback)
 
@@ -269,23 +268,21 @@ language keys); a generic, interface-independent failure does not need one.
 The same skill folders reach users two ways; both are covered by tests, so
 changes here must keep the tests and the Russian user-facing messages intact.
 
-- **Codex plugin** — the signed release bundle. `installer/` contains the full
-  install / update / status / uninstall set for macOS (`.command` / `.sh`) and
-  Windows (`.ps1` / `.cmd`), plus `bootstrap-team-skills.{sh,ps1}`. Auto-update
-  runs every two days via a macOS LaunchAgent
-  (`com.codex-team-skills.autoupdate`, interval `172800`) and a Windows
-  Scheduled Task (`-Daily -DaysInterval 2`). Updates are verified against a
-  signed `manifest.json` / `latest.json` using
-  `installer/team-skills-public-key.pem`. `installer/team-skills-registry.py`
-  idempotently manages the Codex `config.toml` marketplace/plugin stanzas
-  (touching only `codex-team-skills`-owned entries).
+- **Codex plugin** — an immutable GitHub Release bundle. `installer/` contains
+  one-shot install, uninstall, and legacy auto-update cleanup entrypoints for
+  macOS (`.command`) and Windows (`.ps1` / `.cmd`). There is no resident updater,
+  support root, state, log, Scheduled Task, or LaunchAgent. Each release
+  installer is bound to that release tag, verifies `manifest.json`, bundle size,
+  SHA-256, and plugin identity, then performs a transactional replacement. The
+  trust boundary is GitHub Releases plus HTTPS; SHA-256 detects corruption but
+  is not an independent signature. Claude sync is never invoked by a Codex
+  installer.
 - **Claude Code sync** — `scripts/pull-skills.sh` copies the repo's skill
   folders into `~/.claude/skills/` (overridable via `CLAUDE_SKILLS_DIR` /
   `TEAM_SKILLS_SRC`; `TEAM_SKILLS_PULL=0` skips the network `git pull`). It is
   fail-closed on bad frontmatter, marks managed skills with a `.team-skill`
   sentinel, and prunes only its own orphans — never a colleague's local-only
-  skill. `installer/refresh-team-skills.command` chains update + sync + a
-  detached app restart.
+  skill.
 
 ## Testing & CI
 
@@ -309,17 +306,17 @@ changes here must keep the tests and the Russian user-facing messages intact.
   - per-skill behavior: `test_dopsoglasheniya_po_oplate.py`,
     `test_remont_smeta_builder.py`, `test_translate_daily_briefs.py`
   - delivery: `test_installer_architecture.py`, `test_release_assets.py`,
-    `test_team_skills_delivery.py`, `test_claude_sync.py`,
-    `test_refresh_team_skills_command.py`
+    `test_team_skills_delivery.py`, `test_claude_sync.py`
 
 - CI (`.github/workflows/tests.yml`) runs on every PR and on push to `main`:
   1. `pytest` (includes language-policy and privacy checks) on Python 3.11;
   2. builds the release bundle via `scripts/build_release_bundle.py`;
   3. a Windows PowerShell smoke test validating the `.ps1` release assets
      (UTF-8 BOM present, no double BOM, parseable, `-ValidateOnly` runs);
-  4. a `claude-sync-smoke` job exercising `scripts/pull-skills.sh`;
-  5. on push to `main` only: signs `latest.json` / `manifest.json` and
-     publishes an immutable GitHub release.
+  4. a macOS one-shot installer and cleanup smoke test;
+  5. a `claude-sync-smoke` job exercising `scripts/pull-skills.sh`;
+  6. on push to `main` only: publishes the already validated immutable GitHub
+     release without client-side signing metadata.
 
 - If you touch `installer/`, `scripts/pull-skills.sh`, or the release bundle,
   run the delivery tests above and keep the Russian user-facing messages intact.

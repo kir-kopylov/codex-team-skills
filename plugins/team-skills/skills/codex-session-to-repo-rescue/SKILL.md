@@ -48,16 +48,28 @@ Codex task -> session file -> cwd -> repo/worktree -> commit/files -> remote -> 
 ### 2. Идентифицировать Task Без Загрузки Всего Чата
 
 1. Если доступен Codex thread/task tool, получите по нему `thread_id`, title, archived/pinned state и последние нужные метаданные.
-2. Если дано только название task, сначала разрешите его в `thread_id`; не ищите название широким чтением всех больших JSONL.
-3. Если дан `thread_id`, найдите активный или архивный session file потоково:
+2. До inventory создайте immutable target lock. Если дано только название task, добавьте наблюдаемый размер из UI; resolver использует index и только ранние user messages, а не широкое чтение raw chat:
 
    ```bash
-   python3 <skill-dir>/scripts/rescue_evidence.py inventory-session --thread-id <thread-id>
+   python3 <skill-dir>/scripts/rescue_evidence.py resolve-session \
+     --title "<точное название>" --expected-size-mib <size> \
+     --lock-file <run-dir>/target-lock.json
    ```
 
-4. Считайте подтверждёнными только поля, которые вернули текущие tools или файл: session path, `cwd`, archive state, repo root, worktrees, branch, HEAD и очищенные remotes.
-5. Если inventory вернул `records_truncated=true`, `path_hints_truncated=true` или `discovery_status=partial`, не делайте отрицательный вывод «worktree/commit не найден». Повторите с большим `--max-records` или сузьте поиск дополнительным evidence.
-6. Не считайте размер session-файла доказательством причины тормозов. Этот skill спасает работу; performance triage — отдельная задача.
+   `<run-dir>` должен быть приватным локальным каталогом вне любого Git worktree. `target-lock.json` содержит локальную identity и абсолютный session path: никогда не добавляйте его в manifest, commit или publish package.
+
+   Если native task tool уже вернул точный ID, используйте `--thread-id <id>` вместо `--title`. Статус `identity_incomplete`, `ambiguous_target` или `target_not_found` — жёсткий стоп; не выбирайте первый или самый похожий candidate.
+3. Продолжайте только после JSON-статуса `target_locked`. Inventory принимает lock, а не свободный `thread_id`:
+
+   ```bash
+   python3 <skill-dir>/scripts/rescue_evidence.py inventory-session \
+     --target-lock <run-dir>/target-lock.json
+   ```
+
+4. Не заменяйте существующий lock другим target. `target_lock_conflict` означает, что текущий recovery run и все его выводы нужно явно аннулировать; для другого target создайте новый run-dir и новый lock.
+5. Считайте подтверждёнными только поля, которые вернули текущие tools или файл: session path, `cwd`, archive state, repo root, worktrees, branch, HEAD и очищенные remotes.
+6. Если inventory вернул `records_truncated=true`, `path_hints_truncated=true` или `discovery_status=partial`, не делайте отрицательный вывод «worktree/commit не найден». Повторите с большим `--max-records` или сузьте поиск дополнительным evidence.
+7. Не считайте размер session-файла доказательством причины тормозов. Размер здесь только identity gate; performance triage — отдельная задача.
 
 Если task tool недоступен, schema JSONL неизвестна или `thread_id` не найден, сообщите точный пробел. Не придумывайте связь с repo по похожему имени папки.
 
