@@ -135,7 +135,11 @@ def test_release_installers_and_migrators_are_bound_to_the_built_tag(tmp_path: P
         assert "releases/latest/download/manifest.json" not in content
 
     for name in ("install-team-skills.cmd", "migrate-team-skills.cmd"):
-        content = (dist / name).read_text(encoding="utf-8")
+        data = (dist / name).read_bytes()
+        assert not data.startswith(UTF8_BOM)
+        assert b"\r\n" in data
+        assert b"\n" not in data.replace(b"\r\n", b"")
+        content = data.decode("utf-8")
         assert 'if "%BAKED_RELEASE_TAG:~0,2%"=="__"' in content
         assert 'if "%BAKED_RELEASE_TAG%"=="team-skills-vr123.2-abcdef1"' not in content
         assert "%~dp0" not in content

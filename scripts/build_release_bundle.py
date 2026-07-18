@@ -32,6 +32,11 @@ WINDOWS_POWERSHELL_ASSETS = {
     "remove-team-skills-autoupdate.ps1",
 }
 
+WINDOWS_CMD_ASSETS = {
+    "install-team-skills.cmd",
+    "migrate-team-skills.cmd",
+}
+
 RELEASE_BOUND_ASSETS = {
     "install-team-skills.cmd",
     "install-team-skills.ps1",
@@ -124,8 +129,12 @@ def copy_release_asset(source: Path, destination: Path, replacements: dict[str, 
         if unresolved:
             names = ", ".join(sorted(unresolved))
             raise ValueError(f"release installer contains unresolved placeholders: {names}")
-        encoding = "utf-8-sig" if source.name in WINDOWS_POWERSHELL_ASSETS else "utf-8"
-        destination.write_text(content, encoding=encoding)
+        if source.name in WINDOWS_CMD_ASSETS:
+            normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+            destination.write_bytes(normalized.replace("\n", "\r\n").encode("utf-8"))
+        else:
+            encoding = "utf-8-sig" if source.name in WINDOWS_POWERSHELL_ASSETS else "utf-8"
+            destination.write_text(content, encoding=encoding)
         shutil.copymode(source, destination)
         return
 
