@@ -19,8 +19,8 @@ def test_personal_skill_uses_documented_discovery_and_invocation() -> None:
         "$HOME/.agents/skills/<имя>/SKILL.md",
         "$имя",
         "/skills",
-        "ChatGPT Desktop",
-        "enabled skills появляются в slash-списке",
+        "Codex в ChatGPT desktop app",
+        "раздел `Skills` в боковой панели",
         "один restart",
         "фактического запуска и эквивалентности исходному prompt проверены",
     ):
@@ -38,7 +38,8 @@ def test_generated_skill_name_is_normalized_before_write() -> None:
         r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
         "не длиннее 64 символов",
         "Кириллицу, пробелы, `_`, uppercase",
-        "до записи покажите пользователю итоговый вызов `$имя`",
+        "до записи покажите пользователю итоговое имя",
+        "для CLI/IDE — вызов `$имя`",
         "папка и `name` совпадают уже после нормализации",
         "Get-Content -Raw -Encoding UTF8",
     ):
@@ -68,10 +69,10 @@ def test_completion_is_scoped_to_the_target_surface() -> None:
 
     for required in (
         "для выбранной целевой поверхности",
-        "Slash-список проверяйте только для ChatGPT Desktop",
-        "для CLI/IDE проверяйте `$имя` и `/skills`",
-        "Статус `первое после /` применим только при явном запросе приоритета",
-        "для статуса другой поверхности или незапрошенного приоритета — `не применимо`",
+        "Для Codex в ChatGPT desktop app проверяйте раздел `Skills`",
+        "для CLI/IDE проверяйте `/skills` и `$имя`",
+        "Видимость после `/` и позицию проверяйте только при явном запросе пользователя",
+        "для статуса другой поверхности или незапрошенного свойства — `не применимо`",
     ):
         assert required in process
 
@@ -81,8 +82,9 @@ def test_completion_is_scoped_to_the_target_surface() -> None:
         "отсутствие несогласованной коллизии имени",
         "UTF-8 без BOM",
         "успешный результат штатного валидатора",
-        "для CLI/IDE отдельно проверен `/skills`",
-        "Desktop-статусы помечены `не применимо`",
+        "Для Codex в ChatGPT desktop app отдельно проверены раздел `Skills`",
+        "для CLI/IDE отдельно проверены `/skills`, `$имя`",
+        "Видимость после `/`, буквальный `/имя` и позиция в списке не входят",
         "Применимый непроверенный статус или проверенный результат `нет` означает честный стоп",
     ):
         assert required in done
@@ -93,13 +95,14 @@ def test_completion_is_scoped_to_the_target_surface() -> None:
     ):
         assert required in example
 
-    assert "Desktop slash-список не является условием готовности CLI/IDE" in exceptions
-    assert "для ChatGPT Desktop проверить его в slash-списке" in catalog
-    assert "для CLI/IDE — через `/skills`" in catalog
-    assert "на выбранной поверхности проверить `$имя`" in catalog
-    assert "увидеть его в slash-списке Desktop и проверить `$имя`" not in catalog
+    assert "раздел Skills настольного приложения не является условием готовности CLI/IDE" in exceptions
+    assert "для Codex в ChatGPT desktop app проверить раздел `Skills`" in catalog
+    assert "для CLI/IDE — `/skills` и `$имя`" in catalog
+    assert "на выбранной поверхности доказать запуск" in catalog
+    assert "slash-спис" not in catalog
     assert "если её нельзя определить из входа или среды, задаёт один вопрос" in priority_example
-    assert "обнаружение, видимость в slash-списке и фактический запуск проверены" not in done
+    assert "только как отдельные наблюдаемые свойства" in priority_example
+    assert "slash-спис" not in done
 
 
 def test_target_surface_is_fixed_before_mutation() -> None:
@@ -109,12 +112,70 @@ def test_target_surface_is_fixed_before_mutation() -> None:
     for required in (
         "До выбора проверок зафиксируйте целевую поверхность",
         "Явно названная целевая поверхность имеет приоритет",
-        "Где нужен быстрый вызов: ChatGPT Desktop, CLI или IDE?",
+        "Где нужен быстрый вызов: Codex в ChatGPT desktop app, CLI или IDE?",
         "Не создавайте файл и не выполняйте restart до ответа",
     ):
         assert required in process
 
     assert process.index("До выбора проверок") < process.index("До любой записи")
+
+
+def test_desktop_surface_uses_official_build_skills_name() -> None:
+    sources = [
+        ROOT / "catalog.md",
+        SKILL_DIR / "skill.yaml",
+        SKILL_DIR / "known-exceptions.yaml",
+    ]
+    sources.extend(sorted(SKILL_DIR.rglob("*.md")))
+    combined = "\n".join(path.read_text(encoding="utf-8") for path in sources)
+
+    assert "Codex в ChatGPT desktop app" in combined
+    assert "ChatGPT Desktop" not in combined
+    assert "Codex app" not in combined
+
+
+def test_desktop_oracle_uses_sidebar_and_observed_ui() -> None:
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    playbook = (SKILL_DIR / "references" / "domain-playbook.md").read_text(encoding="utf-8")
+    priority_example = (SKILL_DIR / "examples" / "good-02-menu-priority.md").read_text(
+        encoding="utf-8"
+    )
+    combined = skill + playbook + priority_example
+    done = skill.split("## Definition Of Done", 1)[1].split(
+        "## Опрос После Использования", 1
+    )[0]
+
+    assert "раздел `Skills` в боковой панели" in combined
+    assert "не приписывайте этой поверхности `$имя` или slash-список" in skill
+    assert "Видимость после `/` и позицию проверяйте только при явном запросе" in skill
+    assert "enabled skills появляются в slash-списке" not in combined
+    assert "должен появиться в slash-списке" not in combined
+    assert "slash-спис" not in done
+
+
+def test_dollar_invocation_is_scoped_to_cli_or_ide_across_guidance() -> None:
+    exceptions = (SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8")
+    playbook = (SKILL_DIR / "references" / "domain-playbook.md").read_text(
+        encoding="utf-8"
+    )
+    combined = exceptions + playbook
+
+    for required in (
+        "показать новое имя и, для CLI/IDE, новый `$вызов`",
+        "вызов `$имя` — только для CLI/IDE",
+        "для CLI/IDE проверить `/skills` и `$имя`, а для Codex в ChatGPT desktop app",
+        "успешный запуск на выбранной поверхности",
+    ):
+        assert required in combined
+
+    for forbidden in (
+        "показать новый `$вызов`",
+        "показать итоговый `$имя`",
+        "проверить `$имя` или Skills",
+        "успешный `$вызов`",
+        "Skill обнаруживается и `$имя` запускается",
+    ):
+        assert forbidden not in combined
 
 
 def test_prewrite_name_collision_cannot_overwrite_another_skill() -> None:
@@ -130,7 +191,7 @@ def test_prewrite_name_collision_cannot_overwrite_another_skill() -> None:
         "не перезаписывайте файл",
         "Skill неверного scope с тем же именем считайте коллизией",
         "вернитесь к шагу 7",
-        "снова покажите новый `$имя`",
+        "снова покажите новое имя и, для CLI/IDE, новый `$имя`",
         "повторите collision-check",
         "Не пишите файл, пока цикл не прошёл без коллизии",
     ):
@@ -138,7 +199,7 @@ def test_prewrite_name_collision_cannot_overwrite_another_skill() -> None:
 
     assert skill.index("До любой записи") < skill.index("Создайте минимальный валидный")
     assert "Занятый другим поведением файл не перезаписывает" in example
-    assert "снова показывает новый `$вызов` и повторяет collision-check" in example
+    assert "снова показывает новое имя и, для CLI/IDE, новый `$вызов`" in example
     assert "коллизию целевого path и поля `name` до изменяющего действия" in exceptions
 
 
