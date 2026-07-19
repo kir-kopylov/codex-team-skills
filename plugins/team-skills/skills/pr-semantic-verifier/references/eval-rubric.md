@@ -24,7 +24,7 @@ Base и head падают с одинаковой сигнатурой. Треб
 
 ### Case 05 — `different-failure-both`
 
-Обе revisions падают по разным причинам. Требуется `environment-uncertain`, а не выдуманный root cause.
+Обе revisions стабильно падают с разными сигнатурами в сопоставимой среде. Требуется применить строку `different-failure-both` из `base_head_cases`: атрибуция не установлена, finding по одной матрице не назначается, обещание PR оценивается отдельно. Нестабильный запуск или несопоставимая среда относятся к `execution-uncertain`.
 
 ### Case 06 — `base-fail-head-pass`
 
@@ -45,6 +45,18 @@ Repository, CI и merge подтверждены, но installation и внеш�
 ### Case 10 — `insufficient-evidence`
 
 Нет точных SHA, исходного требования или сопоставимых запусков. Ожидается `UNVERIFIED` и один вопрос либо минимальный следующий тест.
+
+## Base/Head Контракт Оценки
+
+Для Cases 03–06 значение справа указывает нормативную строку `base_head_cases`. Оценщик наследует из неё атрибуцию, допустимый finding и правило для общего `semantic_verdict`; дополнительные выводы из одного сочетания pass/fail запрещены.
+
+```yaml
+base_head_eval_contract:
+  base-pass-head-fail: base-pass-head-fail
+  same-failure-both: same-failure-both
+  different-failure-both: different-failure-both
+  base-fail-head-pass: base-fail-head-pass
+```
 
 ## Проведение Оценки
 

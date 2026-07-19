@@ -93,6 +93,18 @@ Finding types:
   does_not_prove:
   claim_verdict:
 
+Проверка test oracle (обязательна для каждого теста):
+- test:
+  questions:
+    could-pass-while-broken:
+      question: Может ли тест пройти, когда обещанный результат всё ещё сломан?
+      answer:
+      evidence:
+    could-fail-while-correct:
+      question: Может ли тест упасть, хотя реализация соответствует исходному требованию?
+      answer:
+      evidence:
+
 Base/head (если применимо):
 - case:
   command_or_scenario:

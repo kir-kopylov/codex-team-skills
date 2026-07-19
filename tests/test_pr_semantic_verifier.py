@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+import pytest
 import yaml
 
 from conftest import ROOT, load_registry
@@ -52,6 +53,10 @@ VERDICT_RULES = {
 ORACLE_PURPOSES = {
     "could-pass-while-broken": "detect-false-green",
     "could-fail-while-correct": "detect-test-contract-defect",
+}
+ORACLE_QUESTION_TEXTS = {
+    "could-pass-while-broken": "Может ли тест пройти, когда обещанный результат всё ещё сломан?",
+    "could-fail-while-correct": "Может ли тест упасть, хотя реализация соответствует исходному требованию?",
 }
 EVIDENCE_LAYERS = [
     "repository",
@@ -154,6 +159,41 @@ EVAL_CASES = {
     "runtime-unknown",
     "insufficient-evidence",
 }
+BASE_HEAD_EVAL_CONTRACT = {
+    "base-pass-head-fail": "base-pass-head-fail",
+    "same-failure-both": "same-failure-both",
+    "different-failure-both": "different-failure-both",
+    "base-fail-head-pass": "base-fail-head-pass",
+}
+
+
+class UniqueKeyLoader(yaml.SafeLoader):
+    """YAML loader that rejects ambiguous duplicate contract keys."""
+
+
+def construct_unique_mapping(loader: UniqueKeyLoader, node, deep: bool = False):
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise yaml.constructor.ConstructorError(
+                "while constructing a mapping",
+                node.start_mark,
+                f"found duplicate key {key!r}",
+                key_node.start_mark,
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+UniqueKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+    construct_unique_mapping,
+)
+
+
+def strict_yaml_load(value: str):
+    return yaml.load(value, Loader=UniqueKeyLoader)
 
 
 def read(relative: str) -> str:
@@ -211,9 +251,30 @@ def yaml_block(relative: str, heading: str, root_key: str):
         section(relative, heading),
     )
     assert match, f"{relative}: нет YAML-контракта в секции {heading!r}"
-    data = yaml.safe_load(match.group(1))
+    data = strict_yaml_load(match.group(1))
     assert isinstance(data, dict) and root_key in data
     return data[root_key]
+
+
+def structured_text_template(relative: str, heading: str) -> dict:
+    match = re.search(
+        r"(?ms)```text\s*\n(.*?)^```\s*$",
+        section(relative, heading),
+    )
+    assert match, f"{relative}: нет структурированного text-шаблона в секции {heading!r}"
+    data = strict_yaml_load(match.group(1))
+    assert isinstance(data, dict)
+    return data
+
+
+def eval_case_text(case_id: str) -> str:
+    match = re.search(
+        rf"(?ms)^###\s+Case\s+\d+\s*[-—:]\s*`{re.escape(case_id)}`\s*\n"
+        r"(.*?)(?=^###\s+Case\s+|^##\s+|\Z)",
+        read("references/eval-rubric.md"),
+    )
+    assert match, f"references/eval-rubric.md: нет case {case_id!r}"
+    return match.group(1)
 
 
 def evidence_layers() -> list[str]:
@@ -289,6 +350,34 @@ def test_verdict_reference_defines_the_complete_semantic_contract() -> None:
     assert code_map(reference, "aggregation") == AGGREGATION
     assert {condition: verdict for verdict, condition in VERDICT_RULES.items()} == AGGREGATION
     assert evidence_layers() == EVIDENCE_LAYERS
+
+
+def test_result_template_requires_both_oracle_questions_for_every_test() -> None:
+    template = structured_text_template("SKILL.md", "Формат Результата")
+    oracle_rows = template["Проверка test oracle (обязательна для каждого теста)"]
+
+    assert isinstance(oracle_rows, list) and len(oracle_rows) == 1
+    assert oracle_rows[0] == {
+        "test": None,
+        "questions": {
+            question_id: {
+                "question": question_text,
+                "answer": None,
+                "evidence": None,
+            }
+            for question_id, question_text in ORACLE_QUESTION_TEXTS.items()
+        },
+    }
+
+
+def test_contract_yaml_loader_rejects_duplicate_oracle_keys() -> None:
+    duplicate = """questions:
+  could-pass-while-broken: first
+  could-pass-while-broken: second
+"""
+
+    with pytest.raises(yaml.constructor.ConstructorError, match="duplicate key"):
+        strict_yaml_load(duplicate)
 
 
 def test_base_head_reference_keeps_attribution_cautious() -> None:
@@ -373,7 +462,7 @@ def test_examples_cover_false_confidence_and_routing_boundaries() -> None:
 
 def test_exceptions_and_evaluation_cover_required_failure_classes() -> None:
     registered = set(load_registry(SKILL)["example_files"])
-    exceptions = yaml.safe_load(read("known-exceptions.yaml"))["exceptions"]
+    exceptions = strict_yaml_load(read("known-exceptions.yaml"))["exceptions"]
 
     assert len(exceptions) == 5
     assert {
@@ -394,6 +483,29 @@ def test_exceptions_and_evaluation_cover_required_failure_classes() -> None:
         )
     )
     assert case_ids == EVAL_CASES
+    eval_contract = yaml_block(
+        "references/eval-rubric.md",
+        "Base/Head Контракт Оценки",
+        "base_head_eval_contract",
+    )
+    assert eval_contract == BASE_HEAD_EVAL_CONTRACT
+    assert all(case_id in EVAL_CASES for case_id in eval_contract)
+    assert all(matrix_case in BASE_HEAD_CASES for matrix_case in eval_contract.values())
+    assert BASE_HEAD_CASES[eval_contract["different-failure-both"]] == {
+        "base": {"fail", "signature-a"},
+        "head": {"fail", "signature-b"},
+        "attribution": {"attribution-inconclusive"},
+        "finding": {"none-by-matrix-alone"},
+        "semantic": {"evaluate-claim-separately"},
+    }
+    assert set(code_tokens([eval_case_text("different-failure-both")])) == {
+        "different-failure-both",
+        "base_head_cases",
+        "execution-uncertain",
+    }
+    assert BASE_HEAD_CASES["execution-uncertain"]["finding"] == {
+        "environment-uncertain"
+    }
     assert code_map("references/eval-rubric.md", "promotion_gate") == {
         "independent-evaluators": "2",
         "false-proved": "0",
