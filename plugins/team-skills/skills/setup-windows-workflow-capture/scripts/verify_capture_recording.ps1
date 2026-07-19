@@ -55,6 +55,16 @@ $errors = New-Object System.Collections.Generic.List[string]
 $warnings = New-Object System.Collections.Generic.List[string]
 $audioResults = New-Object System.Collections.Generic.List[object]
 $audioPreviewFiles = New-Object System.Collections.Generic.List[string]
+$detectedFormat = [string]$metadata.format.format_name
+$formatNames = @($detectedFormat.Split(",") | ForEach-Object { $_.Trim().ToLowerInvariant() })
+$extension = [System.IO.Path]::GetExtension($fullPath)
+
+if ($extension -ine ".mkv") {
+    $errors.Add("Расширение файла '$extension', ожидалось '.mkv'.")
+}
+if ($formatNames -notcontains "matroska") {
+    $errors.Add("Контейнер '$detectedFormat' не является Matroska (MKV).")
+}
 
 if ($videoStreams.Count -lt 1) {
     $errors.Add("В файле нет видеопотока.")
@@ -154,7 +164,7 @@ $videoSummary = if ($videoStreams.Count -gt 0) {
 $report = [pscustomobject]@{
     status = if ($errors.Count -eq 0) { "AUTOMATIC_CHECK_PASSED" } else { "AUTOMATIC_CHECK_FAILED" }
     file = $fullPath
-    format = $metadata.format.format_name
+    format = $detectedFormat
     duration_seconds = [math]::Round($duration, 2)
     file_size_mb = [math]::Round($fileSize / 1MB, 2)
     estimated_two_hours_gb_with_25_percent_reserve = $estimatedTwoHoursGb
