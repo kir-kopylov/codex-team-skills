@@ -16,7 +16,7 @@ LATIN_WORD_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9+-]{2,}\b")
 
 ALLOWED_LATIN_WORDS = {
     "api", "branch", "catalog", "check", "checks", "ci", "claude",
-    "codex", "gate", "gates", "git", "github", "http", "https", "json",
+    "code", "codex", "gate", "gates", "git", "github", "http", "https", "json",
     "local", "logs", "main", "managed", "markdown", "marketplace",
     "macos", "mcp", "metadata", "md", "native", "only", "openai", "paths",
     "plugin", "policy", "pr", "pytest", "raw", "ready", "repo",
