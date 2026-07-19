@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 from conftest import ROOT
@@ -87,6 +89,26 @@ def test_ci_runs_native_marketplace_smoke_on_windows_and_macos() -> None:
     assert "scripts/smoke_native_codex_marketplace.py" in workflow
     assert "github.event.pull_request.head.repo.full_name || github.repository" in workflow
     assert "gh release create" not in workflow
+
+
+def test_smoke_reconfigures_cp1252_output_to_utf8() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import scripts.smoke_native_codex_marketplace as smoke; "
+                "smoke.configure_utf8_output(); print('русский вывод')"
+            ),
+        ],
+        cwd=ROOT,
+        env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        check=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert result.stdout == "русский вывод\n"
 
 
 def test_no_executable_delivery_artifacts_remain_tracked() -> None:

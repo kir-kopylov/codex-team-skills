@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -17,6 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ID = "team-skills@codex-team-skills"
 MARKETPLACE_NAME = "codex-team-skills"
 MINIMUM_CODEX_VERSION = (0, 144, 4)
+
+
+def configure_utf8_output() -> None:
+    """Keep Russian diagnostics writable on Windows CI code pages."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
 
 
 def run_json(command: list[str], *, env: dict[str, str]) -> dict:
@@ -73,6 +82,7 @@ def assert_inside(path: Path, parent: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    configure_utf8_output()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", required=True)
     parser.add_argument("--ref")
