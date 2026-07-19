@@ -5,7 +5,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from conftest import ROOT
+from scripts.smoke_native_codex_marketplace import assert_git_marketplace_source
 
 
 INSTALL = "codex plugin marketplace add kir-kopylov/codex-team-skills --ref main --json"
@@ -133,6 +136,29 @@ def test_smoke_reconfigures_cp1252_output_to_utf8() -> None:
         stderr=subprocess.PIPE,
     )
     assert result.stdout == "русский вывод\n"
+
+
+def test_remote_smoke_requires_the_requested_git_marketplace_source() -> None:
+    installed = {
+        "marketplaceSource": {
+            "sourceType": "git",
+            "source": "https://github.com/kir-kopylov/codex-team-skills.git",
+        }
+    }
+    assert_git_marketplace_source(installed, "kir-kopylov/codex-team-skills")
+
+    local = {"marketplaceSource": {"sourceType": "local", "source": str(ROOT)}}
+    with pytest.raises(AssertionError):
+        assert_git_marketplace_source(local, "kir-kopylov/codex-team-skills")
+
+    wrong_repo = {
+        "marketplaceSource": {
+            "sourceType": "git",
+            "source": "https://github.com/another-owner/codex-team-skills.git",
+        }
+    }
+    with pytest.raises(AssertionError):
+        assert_git_marketplace_source(wrong_repo, "kir-kopylov/codex-team-skills")
 
 
 def test_no_executable_delivery_artifacts_remain_tracked() -> None:

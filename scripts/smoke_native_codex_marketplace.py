@@ -81,6 +81,16 @@ def assert_inside(path: Path, parent: Path) -> None:
         raise AssertionError(f"Codex записал plugin вне изолированного CODEX_HOME: {path}") from error
 
 
+def assert_git_marketplace_source(item: dict, requested_source: str) -> None:
+    marketplace_source = item.get("marketplaceSource")
+    assert isinstance(marketplace_source, dict), "plugin list не вернул marketplaceSource"
+    assert marketplace_source.get("sourceType") == "git", marketplace_source
+
+    if re.fullmatch(r"[^/\\]+/[^/\\]+", requested_source):
+        expected = f"https://github.com/{requested_source}.git"
+        assert marketplace_source.get("source") == expected, marketplace_source
+
+
 def main(argv: list[str] | None = None) -> int:
     configure_utf8_output()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -130,6 +140,8 @@ def main(argv: list[str] | None = None) -> int:
         assert len(matches) == 1
         assert matches[0]["enabled"] is True
         assert matches[0]["version"] == expected_plugin_version()
+        if args.ref:
+            assert_git_marketplace_source(matches[0], args.source)
 
         run_json([codex, "plugin", "remove", PLUGIN_ID, "--json"], env=env)
         run_json(
