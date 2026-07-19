@@ -7,8 +7,8 @@
 - коллега находит нужный скилл по задаче;
 - понимает, какой фразой запустить его в Codex;
 - видит владельца, границы применения и примеры;
-- может установить скиллы локально через одноразовый installer из GitHub Release;
-- получает новые скиллы повторным запуском той же команды установки;
+- может установить или обновить скиллы одной командой одноразового migrator из GitHub Release;
+- получает новые скиллы повторным запуском той же команды migrator;
 - может предложить новый скилл через Pull Request;
 - проверки не дают случайно добавить мусор, приватные данные или сломанный skill.
 
@@ -44,14 +44,14 @@ catalog.md                        # каталог для людей
 quickstart.md                     # короткий технический старт
 START_HERE_CONNECT_CODEX_SKILLS.md # стартовый файл, который отправляют коллеге
 admin-onboarding-guide.md         # внутренний гид для организатора onboarding
-installer/                        # одноразовые install, uninstall и legacy cleanup
+installer/                        # одноразовые migrate, install, uninstall и legacy cleanup
 scripts/                          # установка plugin и создание новых скиллов
 tests/                            # проверки структуры, примеров и приватности
 ```
 
 ## User Mode И Author Mode
 
-Обычный пользователь не клонирует repo руками. Он загружает [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md) в Codex, получает OS-specific installer и ставит последнюю проверенную версию `team-skills` из release-bundle.
+Обычный пользователь не клонирует repo руками. Он загружает [START_HERE_CONNECT_CODEX_SKILLS.md](START_HERE_CONNECT_CODEX_SKILLS.md) в Codex, запускает одну OS-specific команду migrator и ставит последнюю проверенную версию `team-skills` из release-bundle.
 
 Автор скиллов работает через Pull Request: создаёт branch, добавляет skill, запускает `python -m pytest` и отправляет изменения на review.
 

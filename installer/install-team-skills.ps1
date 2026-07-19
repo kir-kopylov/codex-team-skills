@@ -21,6 +21,7 @@ function Write-Info($Message) {
 
 if ($ValidateOnly) {
     Write-Info "ValidateOnly: install-team-skills.ps1 разобран без выполнения установки."
+    Write-Host "TEAM_SKILLS_RESULT=VALIDATED"
     exit 0
 }
 
@@ -123,17 +124,21 @@ function Assert-SafeManagedPath($Path, $ExpectedLeaf, $Label) {
 function Write-Utf8NoBomAtomic($Path, $Text) {
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     Ensure-Directory (Split-Path $fullPath -Parent)
-    $temporary = "$fullPath.tmp.$PID.$([guid]::NewGuid().ToString('N'))"
+    $transactionId = "$PID.$([guid]::NewGuid().ToString('N'))"
+    $temporary = "$fullPath.tmp.$transactionId"
+    $backup = "$fullPath.bak.$transactionId"
     try {
         $encoding = New-Object System.Text.UTF8Encoding($false)
         [System.IO.File]::WriteAllText($temporary, $Text, $encoding)
         if (Test-Path -LiteralPath $fullPath) {
-            [System.IO.File]::Replace($temporary, $fullPath, $null)
+            [System.IO.File]::Replace($temporary, $fullPath, $backup)
+            Remove-Item -LiteralPath $backup -Force -ErrorAction Stop
         } else {
             [System.IO.File]::Move($temporary, $fullPath)
         }
     } finally {
         Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -423,6 +428,9 @@ try {
     Write-Info "Установлена версия team-skills $($manifest.plugin_version) из release $($manifest.release_tag)."
     Write-Info "Автообновления нет: для новой версии вручную запустите новый installer."
     Write-Info "Перезапустите Codex, чтобы он перечитал plugin."
+    Write-Host "TEAM_SKILLS_RESULT=INSTALLED"
+    Write-Host "TEAM_SKILLS_RELEASE=$($manifest.release_tag)"
+    Write-Host "TEAM_SKILLS_PLUGIN_VERSION=$($manifest.plugin_version)"
 } catch {
     Write-Error $_.Exception.Message -ErrorAction Continue
     $failed = $true
@@ -432,5 +440,8 @@ try {
     }
 }
 
-if ($failed) { exit 1 }
+if ($failed) {
+    Write-Host "TEAM_SKILLS_RESULT=INSTALL_FAILED"
+    exit 1
+}
 exit 0
