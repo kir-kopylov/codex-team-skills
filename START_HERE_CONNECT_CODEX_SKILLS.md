@@ -1,123 +1,59 @@
 # Начать Здесь: Подключить Командные Skills
 
-Этот файл — стартовая точка для коллеги, который хочет подключить командные Codex skills.
+Этот файл можно загрузить в Codex Desktop и написать: «Установи эту библиотеку skills и проверь результат».
 
-Коллеге нужно загрузить этот `.md` файл в Codex Desktop, нажать отправить и дальше следовать инструкциям Codex.
+Codex, подключи публичный plugin `team-skills` штатными командами marketplace. Не скачивай и не запускай установочные скрипты, не меняй настройки Defender и не добавляй исключения безопасности.
 
-> Если ты работаешь в `Claude Code`, а не в Codex — путь другой: подключайся через нативный маркетплейс. Две команды и детали — в [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md).
+## Первый Шаг
 
-Публичная ссылка на repo:
-
-```text
-https://github.com/kir-kopylov/codex-team-skills
-```
-
-Codex, твоя задача — подключить коллеге plugin `team-skills` в режиме пользователя. Коллега может быть не инженером и не должен вручную выбирать способ установки.
-
-## Главная Цель
-
-Помоги коллеге за 15 минут пройти путь:
-
-1. проверить, что он работает в Codex Desktop на своём компьютере;
-2. определить операционную систему;
-3. запустить одноразовый migrator;
-4. дождаться сообщения, что plugin установлен;
-5. перезапустить Codex;
-6. проверить, что командные skills доступны.
-
-GitHub аккаунт не нужен для чтения и установки skills из публичного repo. Он понадобится позже только для режима автора: branch, commit, push и Pull Request.
-
-## Первый Ответ Коллеге
-
-Начни с одного короткого шага:
-
-```text
-Я помогу подключить командные Codex skills.
-
-Сейчас нужен только первый шаг: ответь коротко, какая у тебя система — Windows, macOS или другое?
-
-Ситуация успеха: мы выберем правильный migrator и не будем проходить лишние шаги.
-```
-
-## Если У Коллеги Windows
-
-Codex сам запускает в доступном терминале один одноразовый migrator. Коллега не копирует команды и не выбирает режим очистки.
-
-Используй только эту команду в терминале Codex:
+В терминале выполни:
 
 ```powershell
-[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $u="https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/migrate-team-skills.cmd"; $p=Join-Path $env:TEMP ("migrate-team-skills-"+[guid]::NewGuid().ToString("N")+".cmd"); $c=1; try{(New-Object System.Net.WebClient).DownloadFile($u,$p); & $p; $c=$LASTEXITCODE}finally{Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue}; exit $c
+codex --version
+codex plugin --help
 ```
 
-Ситуация успеха: последняя машинная строка содержит `MIGRATED_RESTART_REQUIRED`. При любом другом результате ничего вручную не удаляй и покажи пользователю точный blocker.
+Нужен Codex `0.144.4` или новее и доступная группа команд `codex plugin`. Если условие не выполнено, остановись и попроси пользователя обновить Codex. Не используй запасной способ через удалённый скрипт.
 
-## Если У Коллеги macOS
+Перед установкой проверь, нет ли признаков старого подключения: `~/plugins/team-skills`, управляемого блока `codex-team-skills`, старой фоновой задачи или старого каталога поддержки. Если признаки есть, перейди к [START_HERE_RECONNECT_CODEX_SKILLS.md](START_HERE_RECONNECT_CODEX_SKILLS.md).
 
-Codex сам запускает в доступном терминале один одноразовый migrator. Он до изменений проверяет Python 3.11, права, пути и доступность release.
+## Чистая Установка
 
-Используй только эту команду в терминале Codex:
-
-```bash
-( p="$(mktemp -t migrate-team-skills.XXXXXX)" && trap 'rm -f "$p"' EXIT && curl -fsSL -o "$p" https://github.com/kir-kopylov/codex-team-skills/releases/latest/download/migrate-team-skills.command && chmod +x "$p" && "$p" )
+```powershell
+codex plugin marketplace add kir-kopylov/codex-team-skills --ref main --json
+codex plugin add team-skills@codex-team-skills --json
 ```
 
-Ситуация успеха: последняя машинная строка содержит `MIGRATED_RESTART_REQUIRED`. При `BLOCKED_PREFLIGHT` не устанавливай Python и не меняй права самостоятельно: покажи пользователю точную причину.
+Ситуация успеха:
 
-## Если Другая Система
+- первая команда вернула `marketplaceName` = `codex-team-skills`;
+- вторая вернула `pluginId` = `team-skills@codex-team-skills`, путь установки и semver;
+- команда `codex plugin list --json` показывает plugin как `installed` и `enabled`.
 
-Не выдумывай установку. Скажи:
-
-```text
-Для этой системы migrator ещё не описан. Не придумывай команды: остановись и передай задачу maintainer-у.
-```
+После этого попроси пользователя полностью закрыть и снова открыть Codex. Не называй runtime проверенным до перезапуска.
 
 ## Проверка После Перезапуска
 
-Первый запуск заканчивается только состоянием `MIGRATED_RESTART_REQUIRED`: закрывать Codex автоматически нельзя. Когда коллега полностью перезапустил Codex, в новой задаче попроси написать:
-
-```text
-Проверь только по списку skills этой новой сессии: доступен ли `team-skills:production-forensic-auditor`? Не ищи файлы на диске. Ответь «да» или «нет».
-```
-
-Ситуация успеха: ответ `да`. Migrator уже доказал exact release на диске; эта отдельная проверка доказывает только то, что новая сессия действительно увидела team-skills. Если ответ `нет`, не переустанавливай вслепую — передай maintainer-у результат migrator и этот ответ.
+В новой задаче проверь только список доступных skills: есть ли `team-skills:production-forensic-auditor`. Не подменяй эту проверку наличием файлов на диске.
 
 ## Обновление
 
-Если коллега хочет получить новые skills, объясни одной фразой:
-
-```text
-Повторно запусти ту же команду migrator для своей системы, затем перезапусти Codex.
+```powershell
+codex plugin marketplace upgrade codex-team-skills --json
+codex plugin add team-skills@codex-team-skills --json
 ```
 
-Автообновления и отдельной update-команды нет. Для Claude Code действует отдельный нативный marketplace workflow из инструкции выше.
+Успех: `errors` пуст, повторная установка вернула актуальную semver. Затем пользователь полностью перезапускает Codex и повторяет проверку skill.
 
 ## Удаление
 
-Если коллега больше не хочет пользоваться общими skills, скачай одноразовый uninstaller из последнего Release и запусти его:
-
-- Windows: `uninstall-team-skills.ps1`;
-- macOS: `uninstall-team-skills.command`.
-
-Если uninstaller сообщает о старом автообновлении, сначала запусти обычную команду migrator, затем повтори uninstaller. Ничего вручную не удаляй.
-
-## Режим Автора
-
-Если коллега хочет добавлять свои skills в общее хранилище, это отдельный путь. Тогда ему нужен GitHub аккаунт и Pull Request.
-
-Скажи:
-
-```text
-Использование skills подключается одной командой установки. Для добавления своих skills нужен режим автора: GitHub аккаунт, локальная рабочая копия repo, branch, tests и Pull Request.
+```powershell
+codex plugin remove team-skills@codex-team-skills --json
+codex plugin marketplace remove codex-team-skills --json
 ```
 
-## Постоянное Правило
+После удаления `codex plugin list --json` не должен показывать установленный `team-skills`. Затем пользователь перезапускает Codex.
 
-Если коллега пишет “что дальше?”, “я застрял”, “не вижу” или “не понимаю”:
+## Если Что-то Не Совпало
 
-1. остановись;
-2. спроси, что он видит на экране;
-3. назови только один следующий шаг;
-4. скажи, какой результат должен появиться;
-5. дождись ответа.
-
-Не превращай onboarding в лекцию.
+Покажи пользователю точную команду, код возврата и короткий вывод без секретов. Не удаляй неоднозначные каталоги, не отключай защиту и не повторяй установку вслепую.

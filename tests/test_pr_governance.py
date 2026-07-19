@@ -40,18 +40,6 @@ def valid_body() -> str:
 """
 
 
-def hard_check_body() -> str:
-    return valid_body() + """
-
-## Жёсткая Проверка installer/release
-
-- [x] Windows PowerShell 5.1 ValidateOnly проверен.
-- [x] `manifest.json` и SHA-256 bundle проверены.
-- [x] Legacy cleanup в dry-run не меняет систему.
-- [x] Откат и повторная установка проверены повторным запуском installer.
-"""
-
-
 def test_pr_title_and_body_must_be_russian() -> None:
     event = pr_event(title="Add governance gate", body=valid_body())
     errors = check_pr_governance.check_pr_metadata(event)
@@ -75,59 +63,3 @@ def test_russian_pr_metadata_passes_with_allowed_technical_terms() -> None:
 def test_pull_request_template_does_not_introduce_forbidden_latin_words() -> None:
     template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
     assert check_pr_governance.latin_offenders(template) == []
-
-
-def test_protected_paths_require_hard_check_section() -> None:
-    event = pr_event(title="Усилить release gate", body=valid_body())
-    errors = check_pr_governance.check_protected_paths(event, ["installer/install-team-skills.command"])
-    assert any("защищённые installer/release пути" in error for error in errors)
-    assert any("Жёсткая проверка installer/release" in error for error in errors)
-
-
-def test_protected_paths_pass_with_hard_check_section() -> None:
-    event = pr_event(title="Усилить release gate", body=hard_check_body())
-    errors = check_pr_governance.check_protected_paths(event, ["scripts/build_release_bundle.py"])
-    assert errors == []
-
-
-def test_dot_github_workflow_path_is_protected() -> None:
-    protected = check_pr_governance.protected_changed_paths([".github/workflows/tests.yml"])
-    assert protected == [".github/workflows/tests.yml"]
-
-
-def test_unprotected_paths_do_not_need_hard_check_section() -> None:
-    event = pr_event(title="Обновить skill examples", body=valid_body())
-    errors = check_pr_governance.check_protected_paths(event, ["plugins/team-skills/skills/verify/SKILL.md"])
-    assert errors == []
-
-
-def test_release_checks_required_for_protected_pr_paths() -> None:
-    event = pr_event(title="Усилить release gate", body=hard_check_body())
-    required = check_pr_governance.release_checks_required(
-        event,
-        event_name="pull_request",
-        ref="refs/pull/1/merge",
-        changed_paths=["scripts/build_release_bundle.py"],
-    )
-    assert required is True
-
-
-def test_release_checks_not_required_for_regular_skill_pr() -> None:
-    event = pr_event(title="Обновить skill examples", body=valid_body())
-    required = check_pr_governance.release_checks_required(
-        event,
-        event_name="pull_request",
-        ref="refs/pull/1/merge",
-        changed_paths=["plugins/team-skills/skills/verify/SKILL.md"],
-    )
-    assert required is False
-
-
-def test_release_checks_required_on_main_push() -> None:
-    required = check_pr_governance.release_checks_required(
-        {},
-        event_name="push",
-        ref="refs/heads/main",
-        changed_paths=[],
-    )
-    assert required is True

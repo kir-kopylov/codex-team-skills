@@ -8,7 +8,7 @@ This root file applies to the whole repository. A nested `AGENTS.md` may add
 more specific instructions for its own subtree.
 
 The complete shared repository contract lives in `CLAUDE.md`. Read it in full
-before editing code, prose, skills, installers, delivery scripts, or CI. Despite
+before editing code, prose, skills, delivery scripts, or CI. Despite
 its filename, `CLAUDE.md` is intentionally written for all AI assistants,
 including Codex. It remains the authoritative source for:
 
@@ -16,7 +16,7 @@ including Codex. It remains the authoritative source for:
 - the Russian-language policy;
 - skill structure, registry fields, examples, and status rules;
 - privacy and feedback-log boundaries;
-- installer and delivery architecture;
+- native marketplace and delivery architecture;
 - tests, CI, Git, and Pull Request etiquette.
 
 This file is a Codex entry point and a runtime map. It must not become a copied
@@ -33,12 +33,13 @@ The repository intentionally serves two different runtimes from the same
 | --- | --- | --- |
 | Plugin manifest | `plugins/team-skills/.codex-plugin/plugin.json` | `.claude-plugin/plugin.json` |
 | Marketplace metadata | `.agents/plugins/marketplace.json` | `.claude-plugin/marketplace.json` |
-| Delivery | immutable bundle and one-shot tools in `installer/` | sync through `scripts/pull-skills.sh` |
-| Local skill destination | managed by the Codex plugin installer | `~/.claude/skills/` |
+| Delivery | native Git marketplace through `codex plugin` | sync through `scripts/pull-skills.sh` |
+| Local skill destination | managed by the native Codex plugin system | `~/.claude/skills/` |
 
 The Claude Code manifest intentionally has no `version` field. The Codex
 manifest has a semver `version`. Preserve both rules exactly as documented and
-tested in `CLAUDE.md`.
+tested in `CLAUDE.md`. Any effective change under `plugins/team-skills/` must
+raise the Codex semver; the CI gate compares it with the PR base.
 
 Names such as `Claude Code`, `.claude-plugin`, `~/.claude/skills/`,
 `CLAUDE_SKILLS_DIR`, `test_claude_manifest.py`, and `claude-sync-smoke` are

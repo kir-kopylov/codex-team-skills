@@ -1,6 +1,6 @@
 [project]
 name = "codex-team-skills"
-version = "0.1.0"
+version = "0.2.0"
 description = "Pragmatic registry and validation suite for team Codex skills."
 requires-python = ">=3.11"
 dependencies = [
@@ -20,13 +20,12 @@ addopts = "-q --cov --cov-report=term-missing:skip-covered"
 testpaths = ["tests"]
 
 # Покрытие включено, но НЕ гейтит (нет fail_under) — это карта пробелов, а не
-# блокер. Меряем только исполняемый Python (генераторы, registry-хелпер,
-# скрипты скилов). Оговорка: скрипты, которые тесты запускают через subprocess
-# (build_release_bundle.py, часть registry-хелпера), внутрипроцессным покрытием
-# не учитываются и будут выглядеть недопокрытыми — это ожидаемо для v1.
+# блокер. Меряем только исполняемый Python: генераторы, repo gates,
+# smoke-проверки и скрипты скилов. Скрипты, которые тесты запускают через
+# subprocess, внутрипроцессным покрытием не учитываются — это ожидаемо.
 [tool.coverage.run]
 branch = true
-source = ["scripts", "installer", "plugins/team-skills/skills"]
+source = ["scripts", "plugins/team-skills/skills"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
