@@ -79,6 +79,18 @@ def test_windows_installer_is_temp_only_and_has_no_legacy_cleanup() -> None:
         assert forbidden not in install
 
 
+def test_windows_atomic_replace_uses_a_real_temporary_backup_path() -> None:
+    install = read(INSTALLER_DIR / "install-team-skills.ps1")
+
+    atomic_write = install[
+        install.index("function Write-Utf8NoBomAtomic") : install.index("function Save-OptionalFile")
+    ]
+    assert '$backup = "$fullPath.bak.$transactionId"' in atomic_write
+    assert "[System.IO.File]::Replace($temporary, $fullPath, $backup)" in atomic_write
+    assert "[System.IO.File]::Replace($temporary, $fullPath, $null)" not in atomic_write
+    assert atomic_write.count("Remove-Item -LiteralPath $backup") == 2
+
+
 def test_macos_installer_is_temp_only_and_has_no_legacy_cleanup() -> None:
     install = read(INSTALLER_DIR / "install-team-skills.command")
     for required in (
