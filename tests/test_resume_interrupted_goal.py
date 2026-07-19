@@ -15,6 +15,9 @@ def test_resume_skill_keeps_read_only_reconstruction_contract() -> None:
         "Выполните один проход только для чтения",
         "Память чата используйте только как указатель",
         "Текущий provider state доказывает push, PR/MR, review, merge",
+        "Все применимые `AGENTS.md` от корня репозитория до каждого целевого артефакта",
+        "соберите все `AGENTS.md`, чья область включает этот путь",
+        "прочитайте цепочку от корня репозитория к самому глубокому каталогу",
         "Перед повтором commit, push, PR/MR, сообщения, запроса",
         "Разведите четыре независимых состояния",
         "Сам шаг не выполняйте",
@@ -109,7 +112,7 @@ def test_resume_skill_keeps_mandatory_automatic_survey() -> None:
 def test_resume_skill_known_exceptions_point_to_existing_examples() -> None:
     data = yaml.safe_load((SKILL / "known-exceptions.yaml").read_text(encoding="utf-8"))
 
-    assert len(data["exceptions"]) >= 4
+    assert len(data["exceptions"]) >= 5
     for item in data["exceptions"]:
         assert (SKILL / item["source_example"]).is_file()
 

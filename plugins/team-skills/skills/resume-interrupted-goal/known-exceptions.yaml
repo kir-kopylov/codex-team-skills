@@ -15,3 +15,7 @@ exceptions:
     root_cause: "Неоднозначная цепочка session → cwd → worktree → commit → target была заменена догадкой."
     do_next_time: "Вернуть AMBIGUOUS_TARGET и передать один следующий шаг codex-session-to-repo-rescue в режиме read-only map."
     source_example: "examples/anti-01.md"
+  - symptom: "Продолжение признано безопасным после чтения только ближайшего AGENTS.md, хотя целевой файл также подчиняется родительским инструкциям."
+    root_cause: "Область инструкций ошибочно сведена к одному файлу вместо всей цепочки от корня репозитория до целевого артефакта."
+    do_next_time: "Собрать все применимые AGENTS.md, прочитать их от корня к файлу и вернуть RECONCILE_REQUIRED, если правила расходятся без однозначного приоритета."
+    source_example: "examples/good-01.md"
