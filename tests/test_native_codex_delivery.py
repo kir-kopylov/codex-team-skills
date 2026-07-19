@@ -39,6 +39,19 @@ FORBIDDEN_DELIVERY_MARKERS = (
     "одноразовым установщиком",
 )
 
+FORBIDDEN_SHIPPED_SKILL_DELIVERY_MARKERS = (
+    "releases/latest/download",
+    "migrate-team-skills.cmd",
+    "migrate-team-skills.command",
+    "install-team-skills.cmd",
+    "install-team-skills.command",
+    "install-team-skills.ps1",
+    "team-skills-bundle.zip",
+    "signed one-shot Windows installer",
+    "подписанный one-shot installer",
+    "повторным ручным запуском подписанного installer",
+)
+
 
 def test_custom_codex_delivery_is_absent() -> None:
     assert not (ROOT / "installer").exists()
@@ -51,6 +64,17 @@ def test_public_delivery_docs_do_not_restore_download_and_execute() -> None:
         text = path.read_text(encoding="utf-8")
         for marker in FORBIDDEN_DELIVERY_MARKERS:
             assert marker not in text, f"{path} вернул запрещённую схему доставки: {marker}"
+
+
+def test_shipped_skills_do_not_restore_retired_team_skills_delivery() -> None:
+    skills_root = ROOT / "plugins/team-skills/skills"
+    text_suffixes = {".md", ".yaml", ".yml", ".json", ".toml", ".txt"}
+    for path in skills_root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in text_suffixes:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for marker in FORBIDDEN_SHIPPED_SKILL_DELIVERY_MARKERS:
+            assert marker not in text, f"{path} вернул старую Team Skills delivery: {marker}"
 
 
 def test_clean_install_update_and_remove_commands_are_documented() -> None:

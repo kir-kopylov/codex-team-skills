@@ -83,18 +83,23 @@ def test_simple_team_skills_case_keeps_required_work_without_a_platform() -> Non
     forbidden = section(content, "## Нельзя")
 
     for phrase in [
-        "signed one-shot Windows installer",
-        "Windows PowerShell 5.1",
-        "повторную установку через временную копию",
-        "backup",
-        "автоматический rollback при ошибке замены",
-        "Windows tests",
+        "штатные команды Codex marketplace",
+        "agent-guided переход",
+        "Windows/macOS smoke",
+        "установки, переустановки, обновления и удаления",
     ]:
         assert phrase in expected
     assert "MDM, KMS и production telemetry относятся к `только при дополнительных условиях`" in expected
     assert "Отдельные пользовательские update, status и repair-команды" in expected
     assert "новая update-платформа относятся к `вне scope`" in expected
     assert "RepairInstall" not in content
+    for retired_phrase in [
+        "signed one-shot Windows installer",
+        "Windows PowerShell 5.1",
+        "повторную установку через временную копию",
+        "автоматический rollback при ошибке замены",
+    ]:
+        assert retired_phrase not in content
     for addition in ["MDM", "KMS", "telemetry", "новую платформу обновлений"]:
         assert addition in forbidden
 
