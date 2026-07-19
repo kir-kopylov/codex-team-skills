@@ -287,7 +287,7 @@ python3 -m pytest
 - example не содержит нужные секции;
 - текст пользовательских файлов не на русском;
 - есть токены, приватные пути, pasteboard/download paths или raw PII.
-- `scripts/pull-skills.sh` не попадает в release bundle или Claude sync smoke не копирует repo-managed skills.
+- Codex marketplace smoke не видит обновлённый plugin или Claude sync smoke не копирует repo-managed skills через `scripts/pull-skills.sh`.
 - domain/interface-heavy skill потерял selectors, URL patterns, статусы, лимиты или recovery вместо очищения частных значений.
 
 ## Pull Request

@@ -20,6 +20,7 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "catalog.md",
     ROOT / "quickstart.md",
     ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
+    ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md",
     ROOT / "admin-onboarding-guide.md",
     ROOT / "CONTRIBUTING.md",
     ROOT / "language-policy.md",
@@ -27,6 +28,7 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "docs" / "seed-skill-example.md",
     ROOT / "docs" / "skill-exception-learning.md",
     ROOT / "docs" / "claude-code-marketplace.md",
+    ROOT / "docs" / "security" / "2026-07-19-codex-delivery-retirement.md",
     ROOT / ".github" / "pull_request_template.md",
 ]
 
@@ -127,11 +129,6 @@ def test_human_metadata_fields_are_russian() -> None:
 
 
 def test_script_user_messages_are_russian() -> None:
-    install_script = (ROOT / "scripts/install_plugin.sh").read_text(encoding="utf-8")
-    assert "Источник plugin не найден" in install_script
-    assert "установлен" in install_script
-    assert "Перезапустите Codex" in install_script
-
     new_skill = (ROOT / "scripts/new_skill.py").read_text(encoding="utf-8")
     assert "Создан черновик skill" in new_skill
     assert "Дальше заполните" in new_skill
@@ -140,27 +137,10 @@ def test_script_user_messages_are_russian() -> None:
     assert "## Нельзя" in new_skill
 
 
-def test_installer_user_messages_are_russian() -> None:
-    installer_files = [
-        ROOT / "installer" / "install-team-skills.ps1",
-        ROOT / "installer" / "migrate-team-skills.ps1",
-        ROOT / "installer" / "uninstall-team-skills.ps1",
-        ROOT / "installer" / "install-team-skills.command",
-        ROOT / "installer" / "migrate-team-skills.command",
-        ROOT / "installer" / "uninstall-team-skills.command",
-    ]
-
-    for path in installer_files:
-        content = path.read_text(encoding="utf-8")
-        assert CYRILLIC_RE.search(content), f"{path} должен содержать русские сообщения для пользователя"
-        assert "team-skills" in content
-
-
 def test_old_english_interface_phrases_do_not_return() -> None:
     checked_files = STRICT_RUSSIAN_FILES + [
         ROOT / "plugins/team-skills/.codex-plugin/plugin.json",
         ROOT / ".agents/plugins/marketplace.json",
-        ROOT / "scripts/install_plugin.sh",
         ROOT / "scripts/new_skill.py",
     ]
     for skill_dir in skill_dirs():
@@ -234,9 +214,9 @@ def test_pr_language_workflow_checks_pr_comments_only() -> None:
 
 def test_technical_contract_terms_are_preserved() -> None:
     quickstart = (ROOT / "quickstart.md").read_text(encoding="utf-8")
-    assert "migrate-team-skills.cmd" in quickstart
-    assert "migrate-team-skills.command" in quickstart
-    assert "./scripts/install_plugin.sh" in quickstart
+    assert "codex plugin marketplace add kir-kopylov/codex-team-skills" in quickstart
+    assert "codex plugin add team-skills@codex-team-skills --json" in quickstart
+    assert "codex plugin marketplace upgrade codex-team-skills --json" in quickstart
     assert "python -m pytest" in quickstart
 
     manifest = json.loads((ROOT / "plugins/team-skills/.codex-plugin/plugin.json").read_text(encoding="utf-8"))

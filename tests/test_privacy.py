@@ -8,7 +8,7 @@ import pytest
 from conftest import ROOT, load_registry, skill_dirs
 
 
-# What this privacy gate DOES catch (regex-only, in the scanned docs/installer/
+# What this privacy gate DOES catch (regex-only, in the scanned docs/
 # plugin trees, and — for the reference-only patterns — under */references/**):
 #   - OpenAI/GitHub-style tokens (sk-..., gh[opsu]_...);
 #   - PEM "BEGIN ... PRIVATE KEY" blocks;
@@ -46,9 +46,9 @@ SCAN_PATHS = [
     ROOT / "quickstart.md",
     ROOT / "CONTRIBUTING.md",
     ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
+    ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md",
     ROOT / "admin-onboarding-guide.md",
     ROOT / "docs",
-    ROOT / "installer",
     ROOT / ".github",
     ROOT / "plugins",
 ]
