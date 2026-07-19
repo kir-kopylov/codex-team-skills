@@ -14,6 +14,7 @@ REMOVE_MARKETPLACE = "codex plugin marketplace remove codex-team-skills --json"
 
 PUBLIC_DELIVERY_FILES = [
     ROOT / "README.md",
+    ROOT / "catalog.md",
     ROOT / "quickstart.md",
     ROOT / "START_HERE_CONNECT_CODEX_SKILLS.md",
     ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md",
@@ -33,6 +34,7 @@ FORBIDDEN_DELIVERY_MARKERS = (
     "ExecutionPolicy Bypass",
     "build_release_bundle.py",
     "team-skills-bundle.zip",
+    "одноразовым установщиком",
 )
 
 
@@ -63,6 +65,7 @@ def test_legacy_transition_is_evidence_gated() -> None:
     guide = (ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md").read_text(encoding="utf-8")
     required_markers = (
         "# BEGIN codex-team-skills managed block",
+        "~/.codex/config.toml",
         "~/plugins/team-skills",
         "~/.codex/plugins/cache/codex-team-skills",
         "Codex Team Skills Auto Update",
@@ -82,7 +85,7 @@ def test_ci_runs_native_marketplace_smoke_on_windows_and_macos() -> None:
     assert "macos-latest" in workflow
     assert "@openai/codex@0.144.4" in workflow
     assert "scripts/smoke_native_codex_marketplace.py" in workflow
-    assert "kir-kopylov/codex-team-skills" in workflow
+    assert "github.event.pull_request.head.repo.full_name || github.repository" in workflow
     assert "gh release create" not in workflow
 
 

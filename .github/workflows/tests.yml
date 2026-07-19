@@ -89,7 +89,7 @@ jobs:
       - name: Test the Git marketplace source
         run: >-
           python scripts/smoke_native_codex_marketplace.py
-          --source kir-kopylov/codex-team-skills
+          --source "${{ github.event.pull_request.head.repo.full_name || github.repository }}"
           --ref "${{ github.head_ref || github.ref_name }}"
 
   claude-sync-smoke:
