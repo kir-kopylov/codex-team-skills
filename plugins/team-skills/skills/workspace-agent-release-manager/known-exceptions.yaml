@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Текущая конфигурация агента не читается, но доступна старая recovery documentation."
+    root_cause: "Документ отражает прошлый релиз и не доказывает актуальный draft или live; полный replacement по нему может стереть новые controls."
+    do_next_time: "Сделать не более трёх bounded read attempts, затем остановиться в BLOCKED_PRECHECK без записи и запросить восстановление доступа."
+    source_example: "examples/anti-01-stale-document.md"
+  - symptom: "Publish вернул timeout или ошибку после отправки, поэтому неизвестно, появилась ли новая версия."
+    root_cause: "Повторная публикация без readback может создать лишнюю версию или применить draft дважды."
+    do_next_time: "Сначала перечитать deployments и live version; повторять publish только если machine evidence доказывает отсутствие результата."
+    source_example: "examples/good-03-ambiguous-publish.md"
+  - symptom: "В тексте агента указано новое время, но live schedule сохранил прежний cadence или появился второй schedule."
+    root_cause: "Instructions и schedule resources являются отдельными состояниями и были ошибочно проверены как одно."
+    do_next_time: "До изменения и после publish отдельно перечислить schedules, сравнить stable ids, timezone, cadence и проверить отсутствие эквивалентного дубля."
+    source_example: "examples/good-02-schedule-release.md"

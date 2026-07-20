@@ -1,0 +1,7 @@
+interface:
+  display_name: "Релизы Workspace Agent"
+  short_description: "Безопасная публикация и проверка Workspace Agent"
+  default_prompt: "Use $workspace-agent-release-manager, или скажи: «выпусти изменение Workspace Agent с проверкой и rollback»."
+
+policy:
+  allow_implicit_invocation: true

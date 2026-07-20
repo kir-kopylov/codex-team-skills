@@ -1,0 +1,27 @@
+owner: "@kir-kopylov"
+status: "team-ready"
+summary: "Безопасно выпускает изменения Workspace Agent через snapshot, точный diff, publish, live-проверку, rollback и синхронизацию документации."
+use_cases:
+  - "Изменить инструкции, приложения, tools, получателей или другие controls Workspace Agent и доказать опубликованный результат."
+  - "Обновить schedule агента без создания дубля и проверить его отдельно от draft deployment."
+  - "Возобновить релиз после сбоя API или неоднозначного publish, не повторяя внешнее действие вслепую."
+  - "Откатить агента к точной предыдущей версии и синхронизировать recovery documentation после проверки."
+do_not_use_for:
+  - "Создание обычной Codex scheduled task, не связанной с Workspace Agent."
+  - "Выполнение ежедневного бизнес-процесса агента, обработку его данных или отправку рабочих уведомлений."
+  - "Изменение внешних систем, browser fallback, публикацию или тестовую отправку без явных полномочий пользователя."
+  - "Восстановление полного prompt по старому документу, screenshot, памяти или пересказу при недоступной текущей конфигурации."
+natural_triggers:
+  - "выпусти изменение Workspace Agent"
+  - "обнови агента и опубликуй новую версию"
+  - "проверь live-версию агента"
+  - "измени расписание агента без дубля"
+  - "верни предыдущую версию агента"
+  - "документируй релиз агента"
+example_files:
+  - "examples/good-01-recipients-release.md"
+  - "examples/good-02-schedule-release.md"
+  - "examples/good-03-ambiguous-publish.md"
+  - "examples/anti-01-stale-document.md"
+  - "examples/anti-02-unauthorized-browser.md"
+last_reviewed: "2026-07-20"
