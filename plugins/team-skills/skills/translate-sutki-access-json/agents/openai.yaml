@@ -1,0 +1,4 @@
+interface:
+  display_name: "Перевод Sutki Access JSON"
+  short_description: "Переводит access JSON с проверкой схемы, кодов и смысла"
+  default_prompt: "Используй $translate-sutki-access-json, чтобы перевести этот JSON инструкций доступа на English, Kazakh и Chinese, сохранив схему, коды, плейсхолдеры, смысл маршрутов, последовательность переносов CRLF/LF/CR и UTF-8 без BOM."
