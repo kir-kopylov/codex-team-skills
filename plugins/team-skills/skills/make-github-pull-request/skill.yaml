@@ -1,0 +1,32 @@
+owner: "@nadya90simarzina"
+authors:
+  - "nadya90simarzina"
+status: "team-ready"
+summary: "Проводит пользователя через создание или обновление GitHub Pull Request из fork в командный repo простыми шагами."
+use_cases:
+  - "Помочь нетехническому пользователю сделать PR в командный репозиторий через fork, branch и compare."
+  - "По скриншоту GitHub сказать, куда нажать дальше, чтобы не потерять PR и авторство."
+  - "Создать или обновить PR через доступные GitHub-инструменты и дать ссылку владельцу repo."
+  - "Объяснить, почему директор не получил уведомление, и запросить review или подготовить прямую ссылку."
+  - "Разобрать статус GitHub Actions вроде action_required без ложного вывода, что тесты упали."
+do_not_use_for:
+  - "Локальный git-cleanup, merge, rebase, stash, удаление веток и перенос WIP без фокуса на GitHub PR UI."
+  - "Глубокий debug GitHub Actions по логам тестов; для этого нужен отдельный CI/debug workflow."
+  - "Публикацию приватных выгрузок, скриншотов, токенов, реальных адресов, ФИО, личных путей или клиентских данных."
+  - "Обещание, что владелец repo точно увидел PR, если нет reviewer request, mention или прямого сообщения."
+natural_triggers:
+  - "сделай PR"
+  - "сделать Pull Request"
+  - "отправь в командный репозиторий"
+  - "куда нажать в GitHub"
+  - "директор не видит PR"
+  - "fork уже создан"
+  - "как добавить мой skill в repo"
+example_files:
+  - "examples/good-01-existing-fork.md"
+  - "examples/good-02-what-to-click.md"
+  - "examples/good-03-actions-required.md"
+  - "examples/anti-01-no-repo-or-permission.md"
+  - "examples/anti-02-destructive-git-cleanup.md"
+last_reviewed: "2026-07-22"
+source_asset: "Sanitized workflow developed with @nadya90simarzina while adding team skills through a GitHub fork and Pull Request."}      Вроде missing closing quote? Need check JSON content: source_asset line has closing quote? It ends `.
