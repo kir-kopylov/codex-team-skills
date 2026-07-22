@@ -1,0 +1,17 @@
+exceptions:
+  - symptom: "Пользователь думает, что fork уже уведомил владельца исходного repo."
+    root_cause: "Fork сам по себе не является Pull Request и обычно не создает review-событие для maintainer-а upstream repo."
+    do_next_time: "Сначала проверьте наличие PR URL. Если PR нет, проведите пользователя через Compare & pull request; если PR есть, дайте ссылку и запросите review или подготовьте сообщение владельцу."
+    source_example: "examples/good-01-existing-fork.md"
+  - symptom: "GitHub Actions показывает action_required после PR из fork."
+    root_cause: "Repo может требовать ручного разрешения workflow для pull request из fork."
+    do_next_time: "Скажите, что это не падение тестов; владелец repo должен разрешить запуск workflow или review CI settings."
+    source_example: "examples/good-03-actions-required.md"
+  - symptom: "Пользователь спрашивает 'куда нажать?' и получает длинное объяснение про git."
+    root_cause: "Skill перепутал UI-навигацию для нетехнического пользователя с обучающим ответом."
+    do_next_time: "Дайте один следующий клик по текущему экрану и только затем коротко объясните, зачем он нужен."
+    source_example: "examples/good-02-what-to-click.md"
+  - symptom: "Есть открытый PR по той же задаче, но skill создает второй PR."
+    root_cause: "Не была проверена текущая карта PR перед публикацией."
+    do_next_time: "Перед созданием PR проверьте existing PRs из той же head branch или с тем же scope; при совпадении обновите существующий PR."
+    source_example: "examples/good-01-existing-fork.md"}      Need check closing? JSON with content includes final 
