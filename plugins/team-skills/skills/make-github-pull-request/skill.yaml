@@ -29,4 +29,4 @@ example_files:
   - "examples/anti-01-no-repo-or-permission.md"
   - "examples/anti-02-destructive-git-cleanup.md"
 last_reviewed: "2026-07-22"
-source_asset: "Sanitized workflow developed with @nadya90simarzina while adding team skills through a GitHub fork and Pull Request."}      Вроде missing closing quote? Need check JSON content: source_asset line has closing quote? It ends `.
+source_asset: "Sanitized workflow developed with @nadya90simarzina while adding team skills through a GitHub fork and Pull Request."
