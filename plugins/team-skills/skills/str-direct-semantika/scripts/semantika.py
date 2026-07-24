@@ -256,6 +256,37 @@ def build_campaigns(cfg: dict) -> list[dict]:
 SHEETS = ["Сводка", "Маски", "Минус-слова", "Гео-кластеры", "Хвосты", "Кампании"]
 
 
+def _sheet_campaigns(wb, campaigns):
+    """(Пере)создаёт лист «Кампании». Лист производный — генерируется из масок,
+    ручных правок не содержит, поэтому пересоздание безопасно."""
+    if "Кампании" in wb.sheetnames:
+        wb.remove(wb["Кампании"])
+    cp = wb.create_sheet("Кампании")
+    cp.sheet_properties.tabColor = NAVY
+    _header(cp, ["Кампания", "Группа объявлений", "Интент группы", "Маска",
+                 "Кросс-минусы группы", "Комментарий"])
+    for col, w in zip("ABCDEF", [30, 22, 22, 46, 44, 24]):
+        cp.column_dimensions[col].width = w
+    r = 2
+    if campaigns:
+        for row_c in campaigns:
+            vals = [row_c.get("campaign", ""), row_c.get("adgroup", ""),
+                    row_c.get("intent", ""), row_c.get("mask", ""),
+                    row_c.get("cross_minus", ""), row_c.get("note", "")]
+            for c, v in enumerate(vals, 1):
+                SC(cp.cell(row=r, column=c, value=v), F(10), None,
+                   AL("left") if c in (4, 5, 6) else AL("center"))
+            r += 1
+    else:
+        cp.merge_cells("A2:F2")
+        SC(cp["A2"], F(10, True, "9C6500"), SOFT, AL("left"))
+        cp["A2"].value = ("Лист заполнится после вердиктов: сюда попадают только маски "
+                          "с вердиктом «в кампанию» (semantika.py verdicts → build/merge).")
+        cp.row_dimensions[2].height = 30
+    cp.freeze_panes = "A2"
+    return cp
+
+
 def _header(ws, headers, row=1):
     for i, h in enumerate(headers, start=1):
         SC(ws.cell(row=row, column=i, value=h), F(10, True, WHITE), HEAD, AL("center"))
@@ -410,29 +441,7 @@ def build(cfg: dict, out_path: str) -> dict:
     _dv(tl, ["в минус-лист", "игнор", "в маски"], f"C2:C{last}")
 
     # Кампании
-    cp = wb.create_sheet("Кампании")
-    cp.sheet_properties.tabColor = NAVY
-    _header(cp, ["Кампания", "Группа объявлений", "Интент группы", "Маска",
-                 "Кросс-минусы группы", "Комментарий"])
-    for col, w in zip("ABCDEF", [30, 22, 22, 46, 44, 24]):
-        cp.column_dimensions[col].width = w
-    r = 2
-    if campaigns:
-        for row_c in campaigns:
-            vals = [row_c.get("campaign", ""), row_c.get("adgroup", ""),
-                    row_c.get("intent", ""), row_c.get("mask", ""),
-                    row_c.get("cross_minus", ""), row_c.get("note", "")]
-            for c, v in enumerate(vals, 1):
-                SC(cp.cell(row=r, column=c, value=v), F(10), None,
-                   AL("left") if c in (4, 5, 6) else AL("center"))
-            r += 1
-    else:
-        cp.merge_cells("A2:F2")
-        SC(cp["A2"], F(10, True, "9C6500"), SOFT, AL("left"))
-        cp["A2"].value = ("Лист заполнится после вердиктов: сюда попадают только маски "
-                          "с вердиктом «в кампанию» (semantika.py verdicts → build/merge).")
-        cp.row_dimensions[2].height = 30
-    cp.freeze_panes = "A2"
+    _sheet_campaigns(wb, campaigns)
 
     wb.save(out_path)
     return {"out": out_path, "sheets": wb.sheetnames,
@@ -509,9 +518,28 @@ def merge(cfg: dict, xlsx_path: str) -> dict:
         r += 1
         added_cl += 1
 
+    # «Кампании» — производный лист: пересобираем из ИТОГОВОГО состояния «Масок»
+    # (включая ручные вердикты книги и только что дозалитые маски), иначе новый
+    # кластер с вердиктом «в кампанию» молча не попадёт в кампании.
+    city = ""
+    for row in wb["Сводка"].iter_rows(min_col=1, max_col=2):
+        if row[0].value == "Город" and row[1].value and row[1].value != "—":
+            city = str(row[1].value)
+    masks_state = []
+    for row in ms.iter_rows(min_row=2):
+        if not row[1].value:
+            continue
+        masks_state.append({"text": row[1].value, "group": row[2].value or "",
+                            "cluster": row[3].value or "", "verdict": row[6].value,
+                            "note": row[7].value or ""})
+    campaigns = build_campaigns({"city": city, "masks": masks_state,
+                                 "campaign_overrides": cfg.get("campaign_overrides", [])})
+    _sheet_campaigns(wb, campaigns)
+
     wb.save(xlsx_path)
     return {"backup": backup, "added_masks": added_masks,
-            "added_minus": added_minus, "added_clusters": added_cl}
+            "added_minus": added_minus, "added_clusters": added_cl,
+            "campaign_rows": len(campaigns)}
 
 
 # ---------- CLI ----------

@@ -189,7 +189,7 @@ def test_merge_preserves_manual_and_backups(tmp_path):
                "masks": [
                    {"text": "квартира посуточно город n", "group": "ядро", "cluster": ""},
                    {"text": "квартира посуточно город n новый район", "group": "гео",
-                    "cluster": "C3"},
+                    "cluster": "C3", "freq": 300, "verdict": "в кампанию"},
                ],
                "minus_words": [{"word": "длительно", "status": "ок"},
                                {"word": "офис", "status": "ок"}]}
@@ -202,6 +202,14 @@ def test_merge_preserves_manual_and_backups(tmp_path):
     assert wb2["Маски"].max_row == rows_before + 1
     assert wb2["Маски"].cell(row=2, column=7).value == "в кампанию", "ручной вердикт затёрт"
     assert wb2["Минус-слова"].cell(row=2, column=5).value == "не минусовать", "ручное решение затёрто"
+    # «Кампании» пересобраны из итогового состояния масок: и дозалитая маска
+    # с вердиктом «в кампанию», и маска с ручным вердиктом из книги.
+    camp_masks = [wb2["Кампании"].cell(row=r, column=4).value
+                  for r in range(2, wb2["Кампании"].max_row + 1)]
+    assert "квартира посуточно город n новый район" in camp_masks, \
+        "дозалитый кластер с вердиктом «в кампанию» пропал из «Кампаний»"
+    assert "квартиры посуточно город n" in camp_masks, \
+        "ручной вердикт «в кампанию» из книги не попал в «Кампании»"
 
 
 def test_merge_refuses_foreign_book(tmp_path):
