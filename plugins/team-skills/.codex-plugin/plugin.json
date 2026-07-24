@@ -1,9 +1,14 @@
 {
   "name": "team-skills",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Командный plugin с переиспользуемыми Codex skills, практическими примерами и registry-метаданными.",
   "license": "UNLICENSED",
-  "keywords": ["codex", "skills", "team", "registry"],
+  "keywords": [
+    "codex",
+    "skills",
+    "team",
+    "registry"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Командные скиллы",
@@ -11,7 +16,10 @@
     "longDescription": "Командный пакет Codex skills с владельцами, примерами, анти-примерами и лёгкими проверками качества.",
     "developerName": "Команда",
     "category": "Productivity",
-    "capabilities": ["Interactive", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
     "defaultPrompt": [
       "Найди командный skill для этой задачи.",
       "Покажи, какие командные skills доступны.",
