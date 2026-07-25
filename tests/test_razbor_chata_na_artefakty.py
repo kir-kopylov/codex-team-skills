@@ -55,6 +55,61 @@ def test_marker_in_text_is_violation_and_still_counted(mod) -> None:
     assert r["doubts"], "маркер из текста утверждения потерян в подсчёте"
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "? 012 | текст | якорь: !сомнение «цитата»",
+        "0 013 | текст | якорь: «цитата !контекст-сжат»",
+        "x 014 | текст альт:001 | якорь: «цитата»",
+    ],
+)
+def test_marker_outside_tail_is_violation(mod, line) -> None:
+    # маркер внутри якоря с хвоста не снимается и при чтении теряется,
+    # а строка выглядит валидной и открывает шлюз
+    why = mod.validate_line(line)
+    assert why is not None and "не в конце строки" in why
+
+
+def test_marker_hidden_in_anchor_is_still_counted(mod) -> None:
+    r = mod.analyze(VALID_HEAD + ["? 012 | текст | якорь: !сомнение «цитата»"])
+    assert len(r["problems"]) == 1
+    assert r["doubts"], "маркер из якоря потерян в подсчёте незакрытых"
+
+
+def test_empty_registry_closes_gate(mod, tmp_path, monkeypatch, capsys) -> None:
+    path = _write(tmp_path, VALID_HEAD)
+    assert _run(mod, monkeypatch, path) == 1
+    out = capsys.readouterr().out
+    assert "ШЛЮЗ ЗАКРЫТ" in out
+    assert "ни одной строки-утверждения" in out
+
+
+def test_decreasing_number_is_violation(mod) -> None:
+    r = mod.analyze(
+        VALID_HEAD
+        + [
+            "+ 001 | первое | якорь: «а»",
+            "+ 003 | третье | якорь: «б»",
+            "+ 002 | второе | якорь: «в»",
+        ]
+    )
+    assert any("меньше предыдущего" in why for _, why, _ in r["problems"])
+
+
+def test_number_gap_is_allowed(mod) -> None:
+    # человек по инструкции переносит строку без якоря в раздел «Без якоря»,
+    # поэтому дыра в нумерации — штатный след вычитки, а не дефект
+    r = mod.analyze(
+        VALID_HEAD
+        + [
+            "+ 001 | первое | якорь: «а»",
+            "+ 004 | четвёртое | якорь: «б»",
+            "+ 901 | дописано человеком | якорь: «в»",
+        ]
+    )
+    assert r["problems"] == []
+
+
 def test_dash_line_is_not_swallowed_by_header_filter(mod) -> None:
     r = mod.analyze(VALID_HEAD + ["- 905 | дописано руками | якорь: «слова из чата»"])
     assert len(r["problems"]) == 1
