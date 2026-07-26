@@ -19,6 +19,9 @@ description: "Use this experimental team skill when a live debugging or repair t
 
 ## Быстрый Роутинг
 
+- Первый неоднозначный сбой ещё не зациклился: используйте
+  `layered-differential-diagnostics`, чтобы выбрать один безопасный
+  причинно-различающий опыт.
 - Пользователь явно просит найти, как другие решали похожую проблему: применяйте skill сразу.
 - Пользователь говорит, что диагностика долго шла "мимо": применяйте skill, если есть журнал, список веток или текущий факт.
 - В задаче два раза повторился одинаковый failed/partial на одном слое: применяйте skill перед третьим действием.
@@ -194,7 +197,7 @@ Pivot gate:
 
 ## Precedence
 
-Этот skill не заменяет доменные runbook. Если есть конкретный skill для Windows VPN, CI, browser automation, GitHub PR, data validation или repo workflow, сначала используйте его для базовых gates. `stuck-troubleshooting-reframe` включайте, когда доменная ветка дала повторный no-outcome или пользователь прямо просит сменить предпосылки.
+Этот skill не заменяет доменные runbook. Если есть конкретный skill для Windows VPN, CI, browser automation, GitHub PR, data validation или repo workflow, сначала используйте его для базовых gates. При первом неоднозначном сбое используйте `layered-differential-diagnostics`; `stuck-troubleshooting-reframe` включайте после двух одинаковых неразличающих циклов, повторного no-outcome в доменной ветке или прямой просьбы сменить предпосылки.
 
 ## Анти-Правила
 
