@@ -32,7 +32,6 @@ observed_facts:
     boundary: "..."
 state_fingerprint:
   target: "..."
-  observed_at: "..."
   relevant_config: "..."
   environment: "..."
   last_action: "..."
@@ -60,9 +59,15 @@ verdict: "outcome_reached | favors_a | favors_b | inconclusive | invalid_test | 
 ## Снимок Состояния
 
 Fingerprint содержит только признаки, способные изменить интерпретацию опыта:
-версию, маршрут, профиль, конфигурацию, стенд, время, последний шаг и результат.
+версию, маршрут, профиль, конфигурацию, стенд, последний причинно значимый шаг
+и результат.
 Не включайте secrets, аккаунтные реквизиты, приватные пути и необработанные
 журналы.
+
+Время наблюдения храните в `observed_facts.observed_at`, а не в причинном ключе
+повтора. Для совместимости валидатор игнорирует служебные ключи `observed_at`,
+`timestamp`, `time`, `captured_at`, `collected_at`, `recorded_at` и
+`last_checked_at` внутри fingerprint.
 
 Одинаковыми считаются два опыта, у которых совпадают причинно значимый
 fingerprint и probe. Такой повтор не добавляет знания. Повтор разрешён только

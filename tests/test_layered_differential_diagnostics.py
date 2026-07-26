@@ -87,12 +87,14 @@ def test_skill_separates_safe_checks_from_permissioned_changes() -> None:
         "чтение конфигурации",
         "просмотр процессов",
         "разбор уже полученных артефактов",
+        "заранее подтверждённые локальные тесты и проверки без побочных эффектов",
         "временные локальные пробы",
     ):
         assert safe_fragment in body
 
     for permissioned_fragment in (
         "запись конфигурации",
+        "integration/e2e-тест с БД, API, сообщениями, платежами или внешним стендом",
         "перезапуск сервиса",
         "переключение VPN",
         "авторизация",
@@ -152,6 +154,34 @@ def test_validator_rejects_non_string_verdict_and_owner_without_crashing() -> No
     assert any("неизвестный owner" in error for error in errors)
 
 
+def test_validator_enforces_published_field_types() -> None:
+    validator = _load_validator()
+    entry = _valid_entry()
+    entry["outcome"] = 42
+    entry["observed_facts"] = True
+    entry["state_fingerprint"] = True
+    entry["causal_boundaries"] = [1]
+    entry["hypothesis_a"] = 1
+    entry["held_constant"] = True
+
+    errors = validator.validate_entries([entry])
+    assert any("поле outcome должно быть непустой строкой" in error for error in errors)
+    assert any("поле observed_facts должно быть непустым списком object" in error for error in errors)
+    assert any("поле state_fingerprint должно быть непустым object" in error for error in errors)
+    assert any("поле causal_boundaries должно быть непустым списком строк" in error for error in errors)
+    assert any("поле hypothesis_a должно быть непустой строкой" in error for error in errors)
+    assert any("поле held_constant должно быть непустым списком строк" in error for error in errors)
+
+
+def test_validator_enforces_observed_fact_shape() -> None:
+    validator = _load_validator()
+    entry = _valid_entry()
+    entry["observed_facts"] = [{"fact": "Есть сигнал", "source": "", "observed_at": 42}]
+
+    errors = validator.validate_entries([entry])
+    assert any("нужны непустые строки: source, observed_at" in error for error in errors)
+
+
 def test_validator_rejects_equal_hypotheses_and_predictions() -> None:
     validator = _load_validator()
     entry = _valid_entry()
@@ -171,6 +201,28 @@ def test_validator_rejects_duplicate_probe_at_same_fingerprint() -> None:
 
     errors = validator.validate_entries([first, second])
     assert any("дублирует probe записи 1" in error for error in errors)
+
+
+def test_validator_ignores_service_time_in_duplicate_fingerprint() -> None:
+    validator = _load_validator()
+    first = _valid_entry()
+    second = copy.deepcopy(first)
+    first["state_fingerprint"]["observed_at"] = "2026-07-27T10:00:00Z"
+    first["state_fingerprint"]["metadata"] = {"captured_at": "2026-07-27T10:00:01Z"}
+    second["state_fingerprint"]["observed_at"] = "2026-07-27T11:00:00Z"
+    second["state_fingerprint"]["metadata"] = {"captured_at": "2026-07-27T11:00:01Z"}
+
+    errors = validator.validate_entries([first, second])
+    assert any("дублирует probe записи 1" in error for error in errors)
+
+
+def test_validator_keeps_causal_fingerprint_fields_in_duplicate_key() -> None:
+    validator = _load_validator()
+    first = _valid_entry()
+    second = copy.deepcopy(first)
+    second["state_fingerprint"]["version"] = "v2"
+
+    assert validator.validate_entries([first, second]) == []
 
 
 def test_validator_cli_accepts_jsonl_and_rejects_bad_json(tmp_path) -> None:
