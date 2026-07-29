@@ -9,7 +9,7 @@ import sys
 from conftest import ROOT, load_registry
 
 
-SKILL = ROOT / "plugins" / "team-skills" / "skills" / "layered-differential-diagnostics"
+SKILL = ROOT / "plugins" / "team-skills" / "skills" / "proverka-prichin-sboya"
 STUCK = ROOT / "plugins" / "team-skills" / "skills" / "stuck-troubleshooting-reframe"
 VALIDATOR = SKILL / "scripts" / "validate_diagnostic_ledger.py"
 
@@ -53,7 +53,7 @@ def _valid_entry() -> dict:
     }
 
 
-def test_skill_declares_first_failure_differential_contract() -> None:
+def test_skill_declares_first_failure_cause_check_contract() -> None:
     body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     registry = load_registry(SKILL)
 
@@ -115,7 +115,7 @@ def test_examples_cover_three_domains_and_two_boundaries() -> None:
     assert "Нельзя писать «неверный пароль»" in sip
     assert "digest" in ci and "`favors_a`" in ci and "`favors_b`" in ci
     assert "зелёный статус" in gui and "`invalid_test`" in gui
-    assert "не запускает `layered-differential-diagnostics`" in assertion
+    assert "не запускает `proverka-prichin-sboya`" in assertion
     assert "одновременно меняются версия, процесс, credentials и маршрут" in compound
 
 
@@ -123,7 +123,7 @@ def test_stuck_skill_routes_first_ambiguous_failure_to_base_skill() -> None:
     body = (STUCK / "SKILL.md").read_text(encoding="utf-8")
 
     assert "Первый неоднозначный сбой ещё не зациклился" in body
-    assert "При первом неоднозначном сбое используйте `layered-differential-diagnostics`" in body
+    assert "При первом неоднозначном сбое используйте `proverka-prichin-sboya`" in body
     assert "после двух одинаковых неразличающих циклов" in body
 
 
