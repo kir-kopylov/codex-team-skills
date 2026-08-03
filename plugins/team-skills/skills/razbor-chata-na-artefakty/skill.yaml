@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: >-
   Разбирает длинный чат на реестр утверждений `registry.md`: одна строка на утверждение,
@@ -29,4 +30,7 @@ example_files:
   - "examples/good-03-szhatyy-kontekst-shlyuz-zakryt.md"
   - "examples/anti-01-sobrat-vsyo-srazu.md"
   - "examples/anti-02-vpisat-v-pravila-proekta.md"
-last_reviewed: "2026-07-25"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Санитизированная методика двухфазного разбора длинного чата через реестр утверждений, ручную проверку статусов и четыре итоговых артефакта; исходные переписки и частные решения не переносились."

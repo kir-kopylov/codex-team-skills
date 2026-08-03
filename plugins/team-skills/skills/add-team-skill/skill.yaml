@@ -1,6 +1,8 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 authors:
   - "коллега из команды"
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Ведёт автора через discovery, создание, проверку и публикацию нового командного skill по правилам repo."
 use_cases:
@@ -28,5 +30,5 @@ example_files:
   - "examples/good-04-colleague-draft.md"
   - "examples/anti-01-one-off-prompt.md"
   - "examples/anti-02-private-data.md"
-last_reviewed: "2026-06-05"
+last_reviewed: "2026-08-04"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."

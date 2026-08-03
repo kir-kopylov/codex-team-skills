@@ -1,6 +1,8 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 authors:
   - "Пользователь, передавший исходный workflow (имя не подтверждено)"
+  - "Кирилл Копылов"
 source_asset: "Санированная методика из диалога о превращении часто используемого личного промпта в быстрый вызов Codex без копирования из буфера обмена."
 status: "team-ready"
 summary: "Превращает часто повторяемый промпт в skill нужного scope и отдельно проверяет файл, обнаружение, запуск на выбранной поверхности и сохранение исходного поведения."
@@ -25,4 +27,4 @@ example_files:
   - "examples/anti-01-unverified-pinning.md"
   - "examples/anti-02-content-design.md"
   - "examples/anti-03-plugin-detour.md"
-last_reviewed: "2026-07-19"
+last_reviewed: "2026-08-04"

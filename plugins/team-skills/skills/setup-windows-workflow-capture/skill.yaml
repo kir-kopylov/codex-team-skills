@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Настраивает и проверяет OBS для записи двух рабочих экранов, звука компьютера и микрофона на Windows."
 use_cases:
@@ -21,4 +24,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-19"
+last_reviewed: "2026-08-04"
+source_asset: "Обезличенная методика настройки OBS для локальной записи двух рабочих экранов и раздельного звука на Windows; имена сотрудников, записи и конфигурации рабочих мест не переносились."

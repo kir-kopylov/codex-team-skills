@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Анализирует приватные карточки сбоев skill и предлагает безопасный patch proposal без применения изменений."
 use_cases:
@@ -21,4 +24,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-06-03"
+last_reviewed: "2026-08-04"
+source_asset: "Обезличенная методика превращения карточек сбоев и обратной связи в проект точечных улучшений; приватные журналы, пути и клиентские данные не переносились."

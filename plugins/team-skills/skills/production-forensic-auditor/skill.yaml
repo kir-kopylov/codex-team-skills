@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: "Проводит жесткий forensic-аудит текста на методологическую наивность, funnel gaps, production reality, AI-agent limits и missing measurement layer."
 use_cases:
@@ -24,4 +25,7 @@ example_files:
   - "examples/anti-01-no-target-text.md"
   - "examples/anti-02-personal-attack.md"
   - "examples/anti-03-full-template-after-format-limit.md"
-last_reviewed: "2026-07-18"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Санитизированная методика инженерного аудита планов, текстов и архитектурных предложений по предметным линзам; исходные клиентские материалы, названия проектов и частные метрики не переносились."

@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "draft"
 summary: "Подключает SIP к корпоративному номеру напрямую или через единственную проверяемую заявку."
 use_cases:
@@ -19,4 +22,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-23"
+last_reviewed: "2026-08-04"
+source_asset: "Обезличенная методика подключения SIP к корпоративному номеру через операторский кабинет с проверкой текущей услуги, дублей заявок и наблюдаемого результата; номера и учётные данные не включены."

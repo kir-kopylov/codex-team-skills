@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: "Незаметно замечает связанные микрошаги и предлагает собрать цельный рабочий эпизод только после паттерна или явного риска."
 use_cases:
@@ -26,5 +27,7 @@ example_files:
   - "examples/anti-01.md"
   - "examples/anti-02.md"
   - "examples/anti-03-ordinary-result-complaint.md"
-last_reviewed: "2026-06-28"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
 source_asset: "Спецификация krupnee Lift 0.2.0, переданная пользователем; repo-пакет сохраняет разделение короткого runtime и длинного review без raw-приватного контекста."

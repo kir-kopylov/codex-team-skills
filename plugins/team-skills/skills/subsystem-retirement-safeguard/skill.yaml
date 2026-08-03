@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Безопасно удаляет ненужную подсистему, сохраняя только остаточный контракт и необходимую миграцию старых установок."
 use_cases:
@@ -21,4 +24,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-18"
+last_reviewed: "2026-08-04"
+source_asset: "Санитизированная методика вывода ненужных подсистем из эксплуатации с узкой миграцией старых установок; приватные репозитории, пути и журналы не переносились."

@@ -114,6 +114,33 @@ def test_consent_gate_has_canonical_contract() -> None:
                 f"{skill_dir.name}: сначала покажите результат с навыком, "
                 "затем ограничение без навыка"
             )
+            with_skill = re.search(
+                r"> \*\*С навыком\*\*\n>\n(?P<text>.*?)(?=\n\n> \*\*Без навыка\*\*)",
+                user_block,
+                re.DOTALL,
+            )
+            without_skill = re.search(
+                r"> \*\*Без навыка\*\*\n>\n(?P<text>.*?)(?=\n\n\*\*)",
+                user_block,
+                re.DOTALL,
+            )
+            assert with_skill and without_skill, (
+                f"{skill_dir.name}: оба блока сравнения должны содержать "
+                "отдельный полный текст"
+            )
+            for label, comparison in (
+                ("С навыком", with_skill.group("text")),
+                ("Без навыка", without_skill.group("text")),
+            ):
+                for detail in (
+                    "действие пользователя",
+                    "количеств",
+                    "проверяем",
+                ):
+                    assert detail in comparison, (
+                        f"{skill_dir.name}: блок «{label}» должен явно повторять "
+                        f"{detail!r} из запроса"
+                    )
             assert not re.search(r"(?m)^\s*\|.*\|\s*$", user_block), (
                 f"{skill_dir.name}: карточка не должна использовать таблицу: "
                 "в интерфейсе колонки слипаются"

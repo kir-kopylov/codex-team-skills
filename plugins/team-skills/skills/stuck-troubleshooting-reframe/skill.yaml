@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Останавливает зацикленную диагностику через обязательные поля: outcome, state fingerprint, layer ledger, external-case matrix, pivot gate, owner, rollback, falsifier и stop condition."
 use_cases:
@@ -29,5 +32,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-09"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из санированного урока длинного Telegram/Happ repair-loop: локальные proxy/DC/connected признаки не двигали пользовательский outcome, а перелом случился после поиска похожих случаев и перехода от app-level proxy к system-level TUN. Частные пути, скриншоты, аккаунты и raw-журнал не перенесены."

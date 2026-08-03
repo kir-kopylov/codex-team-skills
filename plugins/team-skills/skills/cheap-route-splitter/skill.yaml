@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: >-
   Собирает межстрановой маршрут дешевле единого билета: живой baseline и kill-gate,
@@ -26,4 +29,5 @@ example_files:
   - "examples/good-03-polnyy-perebor-po-gate.md"
   - "examples/anti-01-baseline-v-limite.md"
   - "examples/anti-02-bagazh-pod-zashchitoy.md"
-last_reviewed: "2026-07-24"
+last_reviewed: "2026-08-04"
+source_asset: "Методика сравнения единого билета с составными межстрановыми маршрутами, проверкой каждого плеча и явными рисками самостоятельных стыковок; частные поездки и контакты не включены."
