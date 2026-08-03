@@ -1,7 +1,7 @@
 interface:
-  display_name: "Верификатор актуальных данных"
-  short_description: "Проверка наличия, цены и контакта перед действием"
-  default_prompt: "Вызови verify или скажи «проверь по моменту: наличие, цена, контакт»."
+  display_name: "Проверка актуальности"
+  short_description: "Подтверждает текущие наличие, цену и способ связи"
+  default_prompt: "Перед покупкой проверь прямо сейчас наличие, цену и способ связи."
 
 policy:
   allow_implicit_invocation: true

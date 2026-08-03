@@ -36,6 +36,7 @@ def test_skill_yaml_schema() -> None:
 
 def test_owner_and_optional_authors_are_not_placeholders() -> None:
     forbidden_owners = {"@owner", "@github-login", "@needs-owner", "@todo"}
+    forbidden_author_accounts = {"@author", "@github-login", "@todo"}
 
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
@@ -47,6 +48,20 @@ def test_owner_and_optional_authors_are_not_placeholders() -> None:
                 f"{skill_dir.name} authors should preserve human authorship, not duplicate owner handles"
             )
             assert registry.get("source_asset"), f"{skill_dir.name} with authors should explain source_asset"
+
+        if "author_github" in registry:
+            account = registry["author_github"]
+            assert isinstance(account, str) and re.fullmatch(
+                r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?",
+                account,
+            ), f"{skill_dir.name} author_github must be a GitHub-style @account"
+            if registry.get("status") != "draft":
+                assert account not in forbidden_author_accounts, (
+                    f"{skill_dir.name} has placeholder author_github"
+                )
+            assert registry.get("authors") and registry.get("source_asset"), (
+                f"{skill_dir.name} with author_github must preserve human authorship and its source"
+            )
 
 
 def test_deprecated_skills_explain_replacement_or_reason() -> None:

@@ -39,7 +39,18 @@ def test_optional_openai_yaml_is_parseable() -> None:
         assert interface.get("display_name")
         assert interface.get("short_description")
         prompt = interface.get("default_prompt", "")
-        assert skill_dir.name in prompt or "сделай" in prompt.lower() or "use " in prompt.lower()
+        registry = load_registry(skill_dir)
+        natural_triggers = registry.get("natural_triggers", [])
+        prompt_lower = prompt.lower()
+        assert (
+            skill_dir.name in prompt
+            or "сделай" in prompt_lower
+            or "use " in prompt_lower
+            or any(trigger.lower() in prompt_lower for trigger in natural_triggers)
+        ), (
+            f"{path}: default_prompt должен содержать внутреннее имя, понятную "
+            "команду или естественную фразу запуска из skill.yaml"
+        )
 
 
 def test_team_ready_and_experimental_skills_have_no_template_todos() -> None:

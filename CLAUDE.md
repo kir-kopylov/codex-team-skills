@@ -234,8 +234,11 @@ language keys); a generic, interface-independent failure does not need one.
   `last_reviewed` (`YYYY-MM-DD`, a valid date). Every path in `example_files`
   must exist. Optional `authors` (human authorship, must NOT be `@`-handles) and
   `source_asset` go together — if you set `authors`, set `source_asset` too.
-  Don't invent an unconfirmed GitHub handle for `owner`; keep the real author in
-  `authors`/`source_asset` and put a confirmed maintainer in `owner`.
+  Optional `author_github` is a separately confirmed GitHub account for the
+  method author and is the only author value shown in a user-facing consent
+  card. It may equal `owner` only when the same person is both author and
+  maintainer. Don't infer `author_github` from `owner`, and don't invent either
+  handle; keep human attribution in `authors`/`source_asset`.
 - **Examples** (`examples/*.md`) must each contain the sections `## Вход`,
   `## Ожидаемое Поведение`, `## Нельзя` (enforced by
   `tests/test_examples.py`). Good examples prove applicability; anti-examples
