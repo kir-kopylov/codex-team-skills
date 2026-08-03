@@ -23,8 +23,6 @@ def test_all_skills_have_usage_feedback_survey() -> None:
         section = survey_section(skill_dir)
         name = skill_dir.name
         required = [
-            f"1. Что в этом использовании {name} было полезно?",
-            "2. Что стоит доработать в skill или его формате?",
             '"пропустить"',
             f"~/.codex/skill-runs/{name}/usage-feedback.jsonl",
             "scripts/log_usage_feedback.py",
@@ -33,6 +31,13 @@ def test_all_skills_have_usage_feedback_survey() -> None:
         ]
         for phrase in required:
             assert phrase in section, f"{name}: в секции опроса нет обязательной строки {phrase!r}"
+        assert re.search(r"(?m)^1\. Что .+ было полезно\?$", section), (
+            f"{name}: первый вопрос должен обычными словами спрашивать, "
+            "что было полезно"
+        )
+        assert re.search(r"(?m)^2\. Что стоит доработать .+\?$", section), (
+            f"{name}: второй вопрос должен спрашивать, что доработать"
+        )
 
 
 def heading_position(content: str, heading: str, context: str) -> int:
