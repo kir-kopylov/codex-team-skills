@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@Rubulat"
 authors:
   - "Дмитрий Гвоздецкий"
 status: "team-ready"
@@ -26,5 +27,5 @@ example_files:
   - "examples/good-03-template-process-contract.md"
   - "examples/anti-01-repo-publication.md"
   - "examples/anti-02-one-off-or-conceptual.md"
-last_reviewed: "2026-07-09"
+last_reviewed: "2026-08-04"
 source_asset: "Исходный skill_methodologist.md передан Дмитрием Гвоздецким; repo-пакет сохраняет авторство и адаптирует материал в короткий процесс, reference и проверяемые examples."

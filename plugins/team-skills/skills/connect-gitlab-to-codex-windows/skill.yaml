@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Пошагово подключает одну учётную запись GitLab к локальному Git в Codex на Windows через HTTPS, Personal Access Token и Git Credential Manager без раскрытия токена и ложных API-проверок."
 use_cases:
@@ -22,5 +25,5 @@ example_files:
   - "examples/good-03-private-repo-verification.md"
   - "examples/anti-01-api-or-public-repo-proof.md"
   - "examples/anti-02-guessed-repo-or-multi-account.md"
-last_reviewed: "2026-07-15"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из обезличенного диалога подключения GitLab на новом Windows-компьютере: создание repository-only PAT, удаление старого Windows credential, сохранение через GCM и разбор ложных проверок через API и публичный repo."

@@ -50,8 +50,11 @@ def test_goal_contract_shaper_v3_is_explicit_experimental_completion_gate_varian
 
     assert registry["status"] == "experimental"
     for fragment in (
-        "экспериментальный team skill `goal-contract-shaper-v3`",
-        "@kir-kopylov",
+        "Для вашей задачи —",
+        "Усиленная проверка контракта цели",
+        "Автор навыка — **@kir-kopylov**.",
+        "Статус навыка — **экспериментальный**.",
+        "Вопросы и обратная связь — **@kir-kopylov**.",
         "## Completion Gate",
         "user-visible success",
         "direct evidence",

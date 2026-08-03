@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Исполнитель шага вооружения для браузерных целей: инвентаризация доменов, сверка грантов по следу на странице расширения, обход сломанной кнопки «Always allow», проба тишины окон согласия и вердикт «цикл можно отпускать»."
 use_cases:
@@ -20,5 +23,5 @@ natural_triggers:
 example_files:
   - "examples/good-01-full-preflight.md"
   - "examples/anti-01-allow-once-loop.md"
-last_reviewed: "2026-07-06"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из рабочей сессии диагностики разрешений расширения Claude-in-Chrome (46 нажатий «Always allow» впустую, обход через консоль service worker, баг anthropics/claude-code#74715); приватные пути и данные аккаунтов в skill не переносились."

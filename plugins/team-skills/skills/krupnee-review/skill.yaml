@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Аудирует применение krupnee Lift как offline/manual evaluator на явно переданном диалоге, trace, feedback inbox row, GitHub Issue body или eval fixture."
 use_cases:
@@ -29,5 +32,5 @@ example_files:
   - "examples/anti-01.md"
   - "examples/anti-02.md"
   - "examples/anti-03.md"
-last_reviewed: "2026-06-28"
+last_reviewed: "2026-08-04"
 source_asset: "Спецификация krupnee Lift 0.2.0, переданная пользователем; review-пакет сохраняет аналитический слой отдельно от короткого runtime."

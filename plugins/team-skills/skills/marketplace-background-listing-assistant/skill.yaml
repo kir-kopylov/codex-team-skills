@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: "Готовит и публикует объявления на OLX/Kaspi в background-only режиме с проверкой приватности, предметов и предпросмотра."
 use_cases:
@@ -22,4 +23,7 @@ example_files:
   - "examples/good-03-olx-playbook.md"
   - "examples/anti-01-foreground-control.md"
   - "examples/anti-02-private-data.md"
-last_reviewed: "2026-06-04"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Санитизированная методика подготовки объявлений на OLX и Kaspi с фоновым управлением, проверкой приватности и отдельным согласием на публикацию; данные аккаунтов, адреса и частные изображения не переносились."

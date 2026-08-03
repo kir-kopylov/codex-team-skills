@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: "Добавляет на фото слои комичного фотобомбинга, сохраняя исходных людей, объекты и фон."
 use_cases:
@@ -23,4 +24,7 @@ example_files:
   - "examples/good-03-escalation.md"
   - "examples/anti-01-do-not-change-subjects.md"
   - "examples/anti-02-no-horror-disaster.md"
-last_reviewed: "2026-05-11"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Санитизированная методика управляемого фотобомбинга с уровнями усиления и сохранением исходной сцены; частные фотографии и сведения об изображённых людях не переносились."

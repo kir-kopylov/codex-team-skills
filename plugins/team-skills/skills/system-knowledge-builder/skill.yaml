@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Строит воспроизводимую карту системы из claims, evidence, unknowns, graph и stable-doc promotions."
 use_cases:
@@ -20,4 +23,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-12"
+last_reviewed: "2026-08-04"
+source_asset: "Санитизированная методика построения воспроизводимой карты системы из утверждений, доказательств и неизвестных вопросов; сведения о частных системах и доступах не переносились."

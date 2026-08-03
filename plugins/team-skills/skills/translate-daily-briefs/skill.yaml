@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@etazhycommerce"
 authors:
   - "коллега, ведущий ежедневные операционные сводки"
 status: "team-ready"
@@ -23,5 +24,5 @@ example_files:
   - "examples/good-03-unclear-terms.md"
   - "examples/anti-01-summary-request.md"
   - "examples/anti-02-live-state-claim.md"
-last_reviewed: "2026-06-05"
+last_reviewed: "2026-08-04"
 source_asset: "Исходный skill передан коллегой, ведущим ежедневные операционные сводки; опубликован как командный asset после repo-contract обвязки."
