@@ -27,5 +27,4 @@ example_files:
 last_reviewed: "2026-08-04"
 authors:
   - "Пользователь Codex"
-  - "Кирилл Копылов"
 source_asset: "Санитизированный workflow из диалога о проверке git worktree, переносе локального WIP в PR и уборке веток."

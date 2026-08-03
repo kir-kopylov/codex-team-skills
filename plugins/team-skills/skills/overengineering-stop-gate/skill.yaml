@@ -25,6 +25,5 @@ example_files:
   - "examples/anti-02.md"
 last_reviewed: "2026-08-04"
 authors:
-  - "Кирилл Копылов"
   - "Пользователь Codex"
 source_asset: "Санитизированный workflow из диалога о сокращении updater и остановке преждевременного production-hardening небольшой библиотеки скиллов."
