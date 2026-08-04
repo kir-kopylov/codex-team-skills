@@ -358,7 +358,7 @@ Push и Pull Request — это обычное завершение workflow д�
 2. проверьте `git status`;
 3. сделайте commit с осмысленным сообщением;
 4. push в branch (не в `main`);
-5. подготовьте title и body PR в отдельных временных файлах, соберите временный event JSON и отдельным вызовом выполните `python3 scripts/check_pr_governance.py metadata --event-path <file>`;
+5. подготовьте title и body PR в отдельных временных файлах, соберите временный event JSON точной формы `{"pull_request":{"title":"...","body":"..."}}` и отдельным вызовом выполните `python3 scripts/check_pr_governance.py metadata --event-path <file> --require-pull-request`;
 6. только после наблюдаемого кода возврата `0` отдельным вызовом выполните `gh pr create --body-file <file>` или `gh pr edit --body-file <file>`. Проверку и внешнее изменение нельзя объединять в последовательный shell-блок: падение проверки должно физически исключать публикацию;
 7. прочитайте сохранённые title и body обратно через `gh pr view` и сравните с проверенными файлами;
 8. подтвердите опубликованную голову ветки через `git ls-remote --heads origin <branch>` или `gh pr view --json headRefName,headRefOid`; локальный `git fetch`, настроенный только на `main`, не доказывает состояние PR-ветки;
