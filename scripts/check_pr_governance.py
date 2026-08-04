@@ -105,10 +105,14 @@ def check_russian_text(label: str, value: str) -> list[str]:
     return errors
 
 
-def check_pr_metadata(event: dict) -> list[str]:
+def check_pr_metadata(event: dict, *, require_pull_request: bool = False) -> list[str]:
     if "pull_request" not in event:
+        if require_pull_request:
+            return ["event: отсутствует обязательный объект pull_request"]
         return []
     pr = event["pull_request"]
+    if not isinstance(pr, dict):
+        return ["event: pull_request должен быть JSON-объектом"]
     title = pr.get("title") or ""
     body = pr.get("body") or ""
     errors = [*check_russian_text("PR title", title), *check_russian_text("PR body", body)]
@@ -126,10 +130,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("metadata",))
     parser.add_argument("--event-path", type=Path, default=Path(os.environ.get("GITHUB_EVENT_PATH", "")))
+    parser.add_argument(
+        "--require-pull-request",
+        action="store_true",
+        help="Отклонить event без JSON-объекта pull_request; используйте для локального PR-гейта.",
+    )
     args = parser.parse_args(argv)
     if not args.event_path:
         parser.error("GITHUB_EVENT_PATH is required")
-    errors = check_pr_metadata(load_event(args.event_path))
+    errors = check_pr_metadata(
+        load_event(args.event_path),
+        require_pull_request=args.require_pull_request,
+    )
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

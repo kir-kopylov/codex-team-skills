@@ -29,3 +29,8 @@ exceptions:
     root_cause: "Результат CI не был привязан к event payload, на котором реально выполнялся."
     do_next_time: "Снова проверить текущий текст локально и не называть старый job актуальным; rerun может сохранить прежний payload, поэтому CI-подтверждение требует нового штатного PR event."
     source_example: "examples/good-05-safe-pr-transaction.md"
+  - id: "malformed-local-pr-event-skips-validation"
+    symptom: "Локальный event JSON не содержит pull_request, но governance завершается успешно как для обычного push event."
+    root_cause: "Локальный PR-гейт использовал совместимый с CI режим, где события без pull_request намеренно пропускаются."
+    do_next_time: "Собирать точный объект pull_request с title и body и запускать governance с --require-pull-request, чтобы пустой или повреждённый event завершался ошибкой."
+    source_example: "examples/good-05-safe-pr-transaction.md"
