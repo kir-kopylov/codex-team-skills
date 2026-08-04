@@ -1,1 +1,11 @@
-exceptions: []
+exceptions:
+  - id: "passive-log-mistaken-for-automation"
+    symptom: "Наличие приватного журнала описывается так, будто его содержимое автоматически анализируется и влияет на следующие запуски."
+    root_cause: "Не разделены пассивное хранение карточек и явный запуск reviewer-а."
+    do_next_time: "Прямо назвать журналы пассивными, указать NOT_REVIEWED до явного вызова и не обещать автоматический обход."
+    source_example: "examples/anti-03-passive-log-auto-review.md"
+  - id: "ambiguous-review-scope"
+    symptom: "Запрос про журналы без названия skill приводит к неоговорённому обходу всей библиотеки или, наоборот, только одного каталога."
+    root_cause: "До чтения файлов не выбран режим ONE_SKILL или LIBRARY_WIDE."
+    do_next_time: "Зафиксировать режим; при неоднозначности задать один вопрос, а для широкого обхода показать карту охвата и статусы файлов."
+    source_example: "examples/good-04-library-wide.md"

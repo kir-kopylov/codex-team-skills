@@ -166,3 +166,38 @@ def test_goal_contract_shaper_promotes_recent_known_exceptions() -> None:
     for item in data["exceptions"]:
         if item["source_example"] in expected_sources:
             assert (SKILL_DIR / item["source_example"]).is_file()
+
+
+def test_goal_contract_shaper_requires_complete_execution_chain() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    for required in (
+        "### Цепочка Исполнимости Внешнего Действия",
+        "исполнитель → аккаунт или канал → доступ сейчас → явное разрешение → действие → наблюдаемый результат → путь возврата результата в цикл",
+        "Название канала само по себе не доказывает исполнимость",
+        "пометьте действие `UNEXECUTABLE`",
+        "не описывайте ручную работу пользователя как работу агента",
+        "не разрешает масштабирование",
+    ):
+        assert required in content
+
+
+def test_goal_contract_shaper_rejects_unowned_seller_confirmation() -> None:
+    registry = load_registry(SKILL_DIR)
+    relative_path = "examples/anti-10-unowned-seller-confirmation.md"
+    assert relative_path in registry["example_files"]
+
+    example = (SKILL_DIR / relative_path).read_text(encoding="utf-8")
+    for required in (
+        "15 предложений",
+        "WhatsApp",
+        "исполнитель",
+        "аккаунт",
+        "UNEXECUTABLE",
+        "Phase-0",
+        "Нельзя маскировать ручную работу пользователя",
+    ):
+        assert required in example
+
+    data = yaml.safe_load((SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8"))
+    assert any(item["source_example"] == relative_path for item in data["exceptions"])
