@@ -60,6 +60,29 @@ def test_russian_pr_metadata_passes_with_allowed_technical_terms() -> None:
     assert errors == []
 
 
+def test_non_pr_event_is_skipped_for_push_but_rejected_by_local_pr_gate() -> None:
+    assert check_pr_governance.check_pr_metadata({}) == []
+
+    errors = check_pr_governance.check_pr_metadata({}, require_pull_request=True)
+    assert errors == ["event: отсутствует обязательный объект pull_request"]
+
+
+def test_local_pr_gate_rejects_malformed_pull_request_payload(tmp_path: Path) -> None:
+    event_path = tmp_path / "event.json"
+    event_path.write_text('{"pull_request": null}', encoding="utf-8")
+
+    exit_code = check_pr_governance.main(
+        [
+            "metadata",
+            "--event-path",
+            str(event_path),
+            "--require-pull-request",
+        ]
+    )
+
+    assert exit_code == 1
+
+
 def test_pull_request_template_does_not_introduce_forbidden_latin_words() -> None:
     template = PR_TEMPLATE_PATH.read_text(encoding="utf-8")
     assert check_pr_governance.latin_offenders(template) == []

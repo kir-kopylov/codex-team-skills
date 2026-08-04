@@ -26,7 +26,8 @@ def test_add_team_skill_gates_pr_mutation_on_separate_validation():
     text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
 
     for required in (
-        "check_pr_governance.py metadata --event-path",
+        "check_pr_governance.py metadata --event-path <file> --require-pull-request",
+        '`{"pull_request":{"title":"...","body":"..."}}`',
         "наблюдаемого кода возврата `0`",
         "отдельным вызовом выполните `gh pr create --body-file",
         "gh pr view",
