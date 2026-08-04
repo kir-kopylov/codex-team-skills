@@ -73,6 +73,32 @@ def test_runtime_success_requires_a_new_session() -> None:
     assert "`INSTALLED_ON_DISK` и `LEGACY_QUARANTINED` не равны завершению" in content
 
 
+def test_first_install_is_gated_by_legacy_detection_and_external_bootstrap() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    for required in (
+        "START_HERE_CONNECT_CODEX_SKILLS.md",
+        "START_HERE_RECONNECT_CODEX_SKILLS.md",
+        "не может запустить сам себя",
+        "LEGACY_TRANSITION_REQUIRED",
+        "BLOCKED_LEGACY_OWNERSHIP",
+        "# BEGIN codex-team-skills managed block",
+        "Codex Team Skills Auto Update",
+        "com.codex-team-skills.autoupdate",
+        "до любой команды `marketplace add` или `plugin add`",
+    ):
+        assert required in content
+
+
+def test_experimental_status_requires_live_end_to_end_acceptance() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    metadata = yaml.safe_load((SKILL_DIR / "skill.yaml").read_text(encoding="utf-8"))
+
+    assert metadata["status"] == "experimental"
+    assert "update → reinstall → quarantine → restart → new-session visibility" in content
+    assert "CI и native smoke" in content
+
+
 def test_known_exceptions_cover_delivery_duplicates_and_restart() -> None:
     data = yaml.safe_load((SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8"))
     exceptions = data["exceptions"]
@@ -81,12 +107,14 @@ def test_known_exceptions_cover_delivery_duplicates_and_restart() -> None:
         for item in exceptions
     )
 
-    assert len(exceptions) >= 5
+    assert len(exceptions) >= 7
     for required in (
         "ENOENT",
         "plugin add team-skills@codex-team-skills",
         "BLOCKED_DUPLICATE_REVIEW",
         "RESTART_PENDING",
         "BLOCKED_RESTART_UNAVAILABLE",
+        "LEGACY_TRANSITION_REQUIRED",
+        "START_HERE_CONNECT_CODEX_SKILLS.md",
     ):
         assert required in combined

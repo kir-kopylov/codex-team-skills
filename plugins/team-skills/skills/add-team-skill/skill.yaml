@@ -10,6 +10,7 @@ use_cases:
   - "Интегрировать чужой draft или методику в существующий skill без потери авторства и без создания дубля."
   - "Довести draft skill до team-ready: registry, examples, catalog, tests и PR."
   - "Проверить существующий skill перед публикацией и исправить нарушения правил repo или CI."
+  - "Безопасно проверить тестовую среду и опубликовать PR так, чтобы невалидный текст не мог пройти к внешнему изменению."
 do_not_use_for:
   - "Разовые инструкции, которые не будут повторяться и не требуют отдельного командного skill."
   - "Секретные, клиентские или приватные workflows, которые нельзя хранить в публичном repo."
@@ -31,5 +32,7 @@ example_files:
   - "examples/good-04-colleague-draft.md"
   - "examples/anti-01-one-off-prompt.md"
   - "examples/anti-02-private-data.md"
+  - "examples/good-05-safe-pr-transaction.md"
+  - "examples/anti-03-unsafe-test-environment.md"
 last_reviewed: "2026-08-05"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."

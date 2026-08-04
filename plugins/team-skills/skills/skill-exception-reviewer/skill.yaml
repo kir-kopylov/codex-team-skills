@@ -3,9 +3,10 @@ author_github: "@kir-kopylov"
 authors:
   - "Кирилл Копылов"
 status: "team-ready"
-summary: "Анализирует приватные карточки сбоев skill и предлагает безопасный patch proposal без применения изменений."
+summary: "По явному запросу анализирует приватные журналы одного skill или всей библиотеки и предлагает безопасный patch proposal."
 use_cases:
   - "Разобрать exception-log.jsonl или очищенные карточки ошибок существующего skill."
+  - "В явном режиме LIBRARY_WIDE проверить стандартные журналы всех skills и найти общие повторяющиеся сбои."
   - "Сгруппировать повторяющиеся или дорогие сбои и предложить known-exceptions правило."
   - "Подготовить patch proposal к SKILL.md, known-exceptions.yaml, examples и tests без применения изменений."
 do_not_use_for:
@@ -18,11 +19,15 @@ natural_triggers:
   - "преврати карточки ошибок в patch proposal"
   - "что добавить в known-exceptions"
   - "skill снова повторил ошибку"
+  - "проверь все журналы библиотеки"
+  - "разбери журналы одного навыка"
 example_files:
   - "examples/good-01.md"
   - "examples/good-02.md"
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-08-04"
+  - "examples/good-04-library-wide.md"
+  - "examples/anti-03-passive-log-auto-review.md"
+last_reviewed: "2026-08-05"
 source_asset: "Обезличенная методика превращения карточек сбоев и обратной связи в проект точечных улучшений; приватные журналы, пути и клиентские данные не переносились."
