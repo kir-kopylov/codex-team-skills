@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 base_version: "goal-contract-shaper (plugin team-skills), snapshot 2026-07-04"
 summary: "ЭКСПЕРИМЕНТАЛЬНАЯ v3: формирует проверяемый /goal-контракт из сырой цели; дополнительно жёстко закрывает достижимость финала, completion gate, предикат-над-прокси, BLOCKED, вооружение предпосылок, цепочку полномочий, сквозную пробу, единый источник правды, провенанс и эпистемический гейт. Для независимого A/B-тестирования против базовой версии."
@@ -46,5 +49,5 @@ example_files:
   - "examples/good-04-value-creation-cycle.md"
   - "examples/anti-01-execute-task.md"
   - "examples/anti-02-one-shot-rewrite.md"
-last_reviewed: "2026-07-09"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из обезличенного рабочего чата о shaping /goal-контракта; raw transcript, личные пути и приватные данные в repo не переносились."

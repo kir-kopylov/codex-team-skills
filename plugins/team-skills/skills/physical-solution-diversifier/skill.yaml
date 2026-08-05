@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "experimental"
 summary: "Строит 5–7 пригодных физических концепций: сначала проверяет hard constraints, затем покрывает разные материалы и технологии и формирует evidence-based Pareto shortlist."
 use_cases:
@@ -24,7 +25,9 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-16"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
 source_asset: "Сформирован из санированного диалога о настольной памятке и усилен forensic-аудитом: diversity переведено из цели в coverage после feasibility, добавлены convergence, economics, safety и eval gates. Исходные локальные файлы и изображения не перенесены."
 evaluation:
   status: "not-run"

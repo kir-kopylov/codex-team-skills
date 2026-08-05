@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Ищет небезопасные копии секретов и платёжных данных, выводит только безопасные указатели и ведёт revoke-first очистку через подтверждение."
 use_cases:
@@ -25,5 +28,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-12"
+last_reviewed: "2026-08-04"
 source_asset: "Обобщено из обезличенного запроса на path-only поиск и безопасную очистку секретов; реальные источники, аккаунты, пути и значения в repo не переносились."

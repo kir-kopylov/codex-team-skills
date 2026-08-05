@@ -1,4 +1,5 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
 status: "team-ready"
 summary: "Безопасно проверяет и удаляет локальные следы macOS-приложений после явного подтверждения."
 use_cases:
@@ -21,4 +22,7 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-05-21"
+last_reviewed: "2026-08-04"
+authors:
+  - "Кирилл Копылов"
+source_asset: "Санитизированная методика инвентаризации и подтверждаемого удаления локальных следов приложений macOS; личные пути, содержимое приложений и пользовательские документы не переносились."

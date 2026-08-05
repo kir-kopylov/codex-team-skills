@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Дерево диагностики для случая «терминал не видит интернет, а браузер видит» при VPN: класс маяка (внутристрановой + внешний) → транспорт git (https или ssh) → залипшие переменные и git config → безусловная проба в обход → обход одной командой или один переключатель VPN-приложения, с контрольной пробой; команды даны парами под Git Bash и PowerShell/cmd."
 use_cases:
@@ -20,5 +23,5 @@ natural_triggers:
 example_files:
   - "examples/good-01-stale-proxy-vars.md"
   - "examples/anti-01-toggle-blindly.md"
-last_reviewed: "2026-07-06"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из рабочей сессии, где git/gh не видели сеть при живом браузере: залипшие переменные прокси на мёртвый локальный порт при активном туннельном режиме; обход env -u подтверждён контрольной пробой. Приватные адреса и аккаунты в skill не переносились."

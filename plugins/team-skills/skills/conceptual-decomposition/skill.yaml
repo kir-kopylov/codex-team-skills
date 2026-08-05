@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Разбирает идею на внутреннюю логику, скрытые допущения, системный контекст и усиленную формулировку."
 use_cases:
@@ -22,4 +25,5 @@ example_files:
   - "examples/good-03-strategic-concept.md"
   - "examples/anti-01-simple-rewrite.md"
   - "examples/anti-02-live-fact-check.md"
-last_reviewed: "2026-05-22"
+last_reviewed: "2026-08-04"
+source_asset: "Методика концептуального разбора идеи через её логику, допущения, системные рамки, следствия и усиленную формулировку; пользовательские идеи в пакет не переносятся."

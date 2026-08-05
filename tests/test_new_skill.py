@@ -48,7 +48,7 @@ def _generate(mod, monkeypatch, tmp_path, name, **opts):
     monkeypatch.setattr(mod, "SKILLS_DIR", skills_dir)
     argv = ["new_skill.py", name]
     for key, value in opts.items():
-        argv += [f"--{key}", value]
+        argv += [f"--{key.replace('_', '-')}", value]
     monkeypatch.setattr("sys.argv", argv)
     mod.main()
     return skills_dir / mod.normalize_name(name)
@@ -120,9 +120,36 @@ def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     headings = [line for line in body.splitlines() if line.startswith("## ")]
     assert headings[0] == "## Согласие На Запуск"
     gate = body.split("## Согласие На Запуск", 1)[1].split("\n## ", 1)[0]
-    assert "team skill `shape-check`" in gate
-    for phrase in ("без вопроса", "Применить или решить без него?", "выйдите из skill молча"):
+    for phrase in (
+        "без вопроса",
+        "Применить **«TODO: понятное русское название навыка»** (@author) для",
+        "действие пользователя",
+        "конкретный объект",
+        "**С навыком:**",
+        "**Без навыка:**",
+        "ровно три содержательные строки",
+        "не более 45 слов",
+        "по одной строке и одному предложению",
+        "не повторяют запрос",
+        "неизвестное не придумывайте",
+        "`Annotation N`",
+        "выйдите из skill молча",
+    ):
         assert phrase in gate
+    assert "| С навыком |" not in gate
+    assert "Автор навыка —" not in gate
+    assert "**Применить навык?**" not in gate
+
+    question = re.search(r"(?m)^Применить \*\*«.*»\*\* \(@author\) для .*\?$", gate)
+    with_skill = re.search(r"(?m)^\*\*С навыком:\*\* [^\n]+\.$", gate)
+    without_skill = re.search(r"(?m)^\*\*Без навыка:\*\* [^\n]+\.$", gate)
+    assert question and with_skill and without_skill
+    card = (
+        f"{question.group(0)}\n\n{with_skill.group(0)}\n\n"
+        f"{without_skill.group(0)}"
+    )
+    assert card in gate
+    assert len([line for line in card.splitlines() if line]) == 3
 
     # контракт логирования сбоев
     assert "## Логирование Сбоев" in body
@@ -134,8 +161,8 @@ def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     assert body.index("## Опрос После Использования") < body.index("## Логирование Сбоев")
     survey = body.split("## Опрос После Использования", 1)[1].split("\n## ", 1)[0]
     for phrase in (
-        "1. Что в этом использовании shape-check было полезно?",
-        "2. Что стоит доработать в skill или его формате?",
+        "1. Что в работе этого навыка было полезно?",
+        "2. Что стоит доработать в процедуре или формате ответа?",
         '"пропустить"',
         "~/.codex/skill-runs/shape-check/usage-feedback.jsonl",
         "scripts/log_usage_feedback.py",
@@ -170,11 +197,19 @@ def test_generated_registry_has_required_keys_and_threads_options(monkeypatch, t
     mod = _load_module()
     skill_dir = _generate(
         mod, monkeypatch, tmp_path, "reg-check",
-        owner="@octocat", summary="Коротко: что делает skill",
+        owner="@octocat",
+        author="Ирина Примерова",
+        author_github="@irina-example",
+        display_name="Проверка формы",
+        source_asset="Обезличенный рабочий процесс проверки формы.",
+        summary="Коротко: что делает skill",
     )
     registry = yaml.safe_load((skill_dir / "skill.yaml").read_text(encoding="utf-8"))
     assert REGISTRY_REQUIRED_KEYS <= set(registry)
     assert registry["owner"] == "@octocat"
+    assert registry["author_github"] == "@irina-example"
+    assert registry["authors"] == ["Ирина Примерова"]
+    assert registry["source_asset"] == "Обезличенный рабочий процесс проверки формы."
     assert registry["summary"] == "Коротко: что делает skill"
     assert registry["status"] == "draft"
     # все пути example_files должны реально существовать

@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "experimental"
 summary: "Диагностирует split-brain-ситуации, когда конкретное Windows GUI-приложение не видит сеть при спорных VPN/proxy/DNS слоях."
 use_cases:
@@ -22,5 +25,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-07-09"
+last_reviewed: "2026-08-04"
 source_asset: "Сформирован из очищенных архитектурных уроков Telegram/Happ repair-чата: raw transcript, личные пути, приватные скрины, аккаунты и токены в repo не переносились."

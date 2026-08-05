@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "draft"
 summary: "Нижний слой рендера: готовая структура или markdown в .docx по стандарту (Times New Roman, A4, поля 2/2/2.5/1.5, пустые графы «____», таблица подписей без рамок)."
 use_cases:
@@ -21,4 +24,5 @@ example_files:
   - "examples/good-03.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-06-22"
+last_reviewed: "2026-08-04"
+source_asset: "Обобщённая методика рендеринга готовых договоров, расписок и актов в DOCX; исходные документы и персональные реквизиты в репозиторий не переносились."

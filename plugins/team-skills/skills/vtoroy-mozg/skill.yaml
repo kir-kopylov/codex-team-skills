@@ -1,4 +1,7 @@
 owner: "@kir-kopylov"
+author_github: "@kir-kopylov"
+authors:
+  - "Кирилл Копылов"
 status: "team-ready"
 summary: "Захватывает личные обязательства в живой список: задачи в таблицу, встречи и дедлайны в календарь, с утренним и вечерним разбором и подсветкой назревающих проёбов."
 use_cases:
@@ -21,4 +24,5 @@ example_files:
   - "examples/good-03-byurokratiya-do-dveri.md"
   - "examples/anti-01-sdelay-za-menya.md"
   - "examples/anti-02-zhivoy-status.md"
-last_reviewed: "2026-06-23"
+last_reviewed: "2026-08-04"
+source_asset: "Санитизированная методика захвата личных обязательств в таблицу и календарь с утренним и вечерним разбором; реальные задачи, контакты и календарные данные не переносились."
