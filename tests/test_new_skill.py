@@ -122,22 +122,34 @@ def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     gate = body.split("## Согласие На Запуск", 1)[1].split("\n## ", 1)[0]
     for phrase in (
         "без вопроса",
-        "Для вашей задачи —",
-        "может пригодиться командный навык",
-        "Автор навыка — **@author**.",
+        "Применить **«TODO: понятное русское название навыка»** (@author) для",
         "действие пользователя",
         "конкретный объект",
-        "запрошенное количество",
-        "проверяемые сведения",
-        "> **С навыком**",
-        "> **Без навыка**",
-        "в обоих блоках повторены объект, количество",
+        "**С навыком:**",
+        "**Без навыка:**",
+        "ровно три содержательные строки",
+        "не более 45 слов",
+        "по одной строке и одному предложению",
+        "не повторяют запрос",
         "неизвестное не придумывайте",
-        "**Применить навык?**",
+        "`Annotation N`",
         "выйдите из skill молча",
     ):
         assert phrase in gate
     assert "| С навыком |" not in gate
+    assert "Автор навыка —" not in gate
+    assert "**Применить навык?**" not in gate
+
+    question = re.search(r"(?m)^Применить \*\*«.*»\*\* \(@author\) для .*\?$", gate)
+    with_skill = re.search(r"(?m)^\*\*С навыком:\*\* [^\n]+\.$", gate)
+    without_skill = re.search(r"(?m)^\*\*Без навыка:\*\* [^\n]+\.$", gate)
+    assert question and with_skill and without_skill
+    card = (
+        f"{question.group(0)}\n\n{with_skill.group(0)}\n\n"
+        f"{without_skill.group(0)}"
+    )
+    assert card in gate
+    assert len([line for line in card.splitlines() if line]) == 3
 
     # контракт логирования сбоев
     assert "## Логирование Сбоев" in body
