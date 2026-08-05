@@ -34,5 +34,7 @@ example_files:
   - "examples/anti-02-private-data.md"
   - "examples/good-05-safe-pr-transaction.md"
   - "examples/anti-03-unsafe-test-environment.md"
+  - "examples/good-06-compact-consent-card.md"
+  - "examples/anti-04-verbose-consent-card.md"
 last_reviewed: "2026-08-05"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."
