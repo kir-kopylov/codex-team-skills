@@ -218,13 +218,15 @@ def test_total_size_limit_is_enforced(tmp_path: Path, packager, monkeypatch) -> 
         packager.build_archive(source, tmp_path / "too-large.zip")
 
 
-def test_missing_referenced_file_is_blocked(tmp_path: Path, packager) -> None:
+@pytest.mark.parametrize("managed_root", ["scripts", "references", "assets", "resources"])
+def test_missing_referenced_file_is_blocked(tmp_path: Path, packager, managed_root: str) -> None:
+    missing_path = f"{managed_root}/missing.txt"
     source = write_skill(
         tmp_path,
-        body="# Инструкция\n\nЗапусти `scripts/missing.py` после проверки.",
+        body=f"# Инструкция\n\nПрочитай `{missing_path}` перед работой.",
     )
 
-    with pytest.raises(packager.PackageError, match="scripts/missing.py"):
+    with pytest.raises(packager.PackageError, match=missing_path):
         packager.build_archive(source, tmp_path / "missing.zip")
 
 
@@ -394,6 +396,7 @@ def test_skill_contract_keeps_export_minimal_and_out_of_scope_actions_separate()
         "Не добавляйте автоматически `LICENSE.txt`",
         "не переименовывайте его молча",
         "Claude Code не является целевой поверхностью",
+        "`scripts/`, `references/`, `assets/` или `resources/`",
         "исходная папка после выполнения байтово не изменилась",
         "Загрузка в Claude: не выполнялась",
         "https://support.claude.com/en/articles/12512198-how-to-create-custom-skills",
