@@ -222,6 +222,28 @@ language keys); a generic, interface-independent failure does not need one.
 
 ## Key Conventions & Hard Rules
 
+### Counterfactual question gate
+
+Any skill that interviews the user or gathers several task inputs through a
+sequence of questions must keep the following canonical gate next to that
+working question loop. Evaluate it privately; do not show likely answers or the
+decision map to the user.
+
+```text
+Перед любым вопросом проведи контрфактическую проверку:
+Представь наиболее вероятные ответы пользователя.
+Назови, какое решение, действие или часть результата изменит каждый ответ.
+Если следующий шаг при всех ответах одинаков — вопрос запрещён.
+Если пользователь уже зафиксировал выбор — запиши его, не открывай заново.
+Если неизвестное техническое и его можно проверить самостоятельно — проверь, не спрашивай.
+Задавай только ближайший вопрос, ответ на который реально меняет результат.
+```
+
+After every answer, recompute whether another question still changes the work.
+This rule does not replace the consent gate, authority confirmation, or the
+mandatory post-use survey. `tests/test_question_gate.py` keeps the canonical
+text synchronized in the explicit set of question-driven skills.
+
 - **`SKILL.md` frontmatter** may only contain these keys: `name`,
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
   `tests/test_skill_structure.py`). `name` must equal the folder name and be
