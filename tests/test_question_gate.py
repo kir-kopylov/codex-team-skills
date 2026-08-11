@@ -24,6 +24,7 @@ QUESTION_DRIVEN_SKILLS = (
     "goal-contract-shaper",
     "goal-contract-shaper-v3",
     "krupnee-runtime",
+    "kak-drugie-reshili",
     "marketplace-lot-verifier",
     "photo-photobomb-director",
     "raspiska-o-poluchenii-deneg",

@@ -3,3 +3,7 @@ exceptions:
     root_cause: "Агент перепутал промежуточный proxy-признак с причинным успехом и не сменил слой гипотезы после повторного no-outcome."
     do_next_time: "До нового действия заполнить outcome, current_state, state_fingerprint, layer_ledger, false_positive_signals и Pivot gate. Если same_state_count >= 2, запретить третье действие в old_layer; использовать external_case_matrix только когда кейс даёт local_observable; вернуть action_owner, expected_observation, falsifier, rollback и stop_condition."
     source_example: "Санированный repair-loop: app-level proxy принимал локальные соединения, но UI заработал только после перехода на system-level TUN."
+  - symptom: "Одна просьба «найди, как другие решили» запускает полный reframe, хотя нет повторённой локальной диагностики, state fingerprint и закрываемой ветки."
+    root_cause: "Одинаковая фраза стояла в триггерах поиска внешней практики и выхода из repair-loop, хотя эти workflow дают разные результаты."
+    do_next_time: "Без повторённого local no-outcome не предлагать reframe. Получить CandidatePacket v1 через kak-drugie-reshili и передавать его в reframe только как external_practice_candidate с local_status NOT_TESTED."
+    source_example: "examples/anti-01.md"

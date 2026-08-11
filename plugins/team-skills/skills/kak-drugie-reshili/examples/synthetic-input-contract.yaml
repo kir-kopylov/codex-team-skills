@@ -1,0 +1,32 @@
+# Синтетический fixture для проверки схемы. Не является реальным контрактом.
+outcome: Получить устойчивую голосовую связь через существующий номер.
+research_question: Как люди использовали операторский номер из другой страны?
+current_context: Тестов кандидата ещё не было.
+acceptance_evidence:
+  - Реальный звонок
+  - Подтверждение оператора
+do_not_fixate_on:
+  - Client X
+must_preserve:
+  - Существующий номер
+rejected_assumptions:
+  - Client X является целью
+allowed_actions:
+  - Читать открытые источники
+approval_required_actions:
+  - Расходы
+  - Установка
+research_budget:
+  max_active_minutes: 30
+  max_queries: 8
+  max_opened_sources: 6
+  language_spaces:
+    - ru
+    - en
+  max_fetch_attempts_per_source: 2
+  paid_access_allowed: false
+contract_ref: inline:test-contract
+contract_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+state_ref: inline:test-state
+state_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+observed_at: "2026-07-26T10:00:00+05:00"
