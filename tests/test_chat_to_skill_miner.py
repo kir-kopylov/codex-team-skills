@@ -28,6 +28,7 @@ def test_chat_to_skill_miner_template_stops_before_contract_design() -> None:
     assert "## Передача После Выбора" in template
     assert "skill-methodologist" in template
     assert "Полный контракт" in template
+    assert "признаки проверяемости" in template
     assert "Implementation-Ready" not in template
 
 

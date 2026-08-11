@@ -18,6 +18,7 @@ QUESTION_DRIVEN_SKILLS = (
     "add-team-skill",
     "browser-preflight",
     "cheap-route-splitter",
+    "chat-to-skill-miner",
     "codex-quick-launch",
     "dopsoglasheniya-po-oplate",
     "goal-contract-shaper",
