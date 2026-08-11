@@ -1,6 +1,6 @@
 {
   "name": "team-skills",
-  "version": "0.5.9",
+  "version": "0.6.0",
   "description": "Командный plugin с переиспользуемыми Codex skills, практическими примерами и registry-метаданными.",
   "license": "UNLICENSED",
   "keywords": [
