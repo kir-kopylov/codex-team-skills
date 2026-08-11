@@ -161,7 +161,7 @@ def parse_timecode(text, total):
     return seconds
 
 
-def parse_plan(plan_path, total, allow_gaps):
+def parse_plan(plan_path, total, allow_gaps, tail_tolerance=0.05):
     if not plan_path.exists():
         raise Fail(EXIT_INPUT,
                    f"нет файла плана: {plan_path}\nОбразец: references/plan.example.txt")
@@ -210,10 +210,19 @@ def parse_plan(plan_path, total, allow_gaps):
                        f"дыра в плане: {prev['end']:.3f}–{cur['start']:.3f} с ничем не покрыты — "
                        f"этот материал потеряется молча. Закройте дыру ступенью, вырежьте строкой "
                        f"cut или запустите с --allow-gaps.")
-    if steps[-1]["end"] < total - 0.5 and not allow_gaps:
+    # Хвост проверяем в обе стороны: недобор молча теряет последние кадры,
+    # перебор добавляет замороженный кадр и тишину. Допуск — один кадр.
+    tail_drift = steps[-1]["end"] - total
+    if abs(tail_drift) > tail_tolerance and not allow_gaps:
+        if tail_drift < 0:
+            raise Fail(EXIT_INPUT,
+                       f"план обрывается на {steps[-1]['end']:.3f} с, а исходник длится "
+                       f"{total:.3f} с: последние {-tail_drift:.3f} с потеряются молча. "
+                       f"Поставьте end последней меткой или запустите с --allow-gaps.")
         raise Fail(EXIT_INPUT,
-                   f"план обрывается на {steps[-1]['end']:.3f} с, а исходник длится {total:.3f} с. "
-                   f"Допишите ступень до end или запустите с --allow-gaps.")
+                   f"план заходит за конец исходника на {tail_drift:.3f} с: в хвосте получится "
+                   f"замороженный кадр и тишина. Поставьте end последней меткой "
+                   f"или запустите с --allow-gaps.")
 
     cuts.sort()
     for prev, cur in zip(cuts, cuts[1:]):
@@ -482,34 +491,41 @@ def verify(cfg, src, pieces, work, finals, checks):
     checks.add("суммарный разбег картинки с планом",
                abs(sum_video - sum_plan) <= cfg.tol_total_sec,
                f"{sum_video - sum_plan:+.4f} с", f"{cfg.tol_total_sec} с")
-    # 8-9
-    final_main = finals[0]
-    dur = stream_durations(final_main)
-    if cfg.audio:
-        both = dur["video"] is not None and dur["audio"] is not None
-        gap = abs((dur["audio"] or 0) - (dur["video"] or 0))
-        checks.add("в финале обе дорожки, звук не разъехался с картинкой",
-                   both and gap <= 0.15, f"расхождение {gap:.3f} с", "0.15 с")
-    else:
-        checks.add("в финале обе дорожки, звук не разъехался с картинкой", True, "режим без звука — пропущено")
+    # 8-9 — приёмку проходит КАЖДЫЙ выходной файл. Выравнивание громкости
+    # перекодирует звук и может сдвинуть его длину, а вес второго файла свой.
     combined_dur = stream_durations(combined)["format"] or 0
-    final_dur = dur["format"] or 0
-    checks.add("длина финала совпала с длиной склейки",
-               abs(final_dur - combined_dur) <= 0.1,
-               f"{final_dur:.3f} против {combined_dur:.3f}", "0.1 с")
+    final_main = finals[0]
+    final_dur = stream_durations(final_main)["format"] or 0
+    for out_file in finals:
+        tag = out_file.name
+        dur = stream_durations(out_file)
+        if cfg.audio:
+            both = dur["video"] is not None and dur["audio"] is not None
+            gap = abs((dur["audio"] or 0) - (dur["video"] or 0))
+            checks.add(f"{tag}: обе дорожки на месте, звук не разъехался с картинкой",
+                       both and gap <= 0.15, f"расхождение {gap:.3f} с", "0.15 с")
+        else:
+            checks.add(f"{tag}: обе дорожки на месте, звук не разъехался с картинкой",
+                       True, "режим без звука — пропущено")
+        this_dur = dur["format"] or 0
+        checks.add(f"{tag}: длина совпала с длиной склейки",
+                   abs(this_dur - combined_dur) <= 0.1,
+                   f"{this_dur:.3f} против {combined_dur:.3f}", "0.1 с")
 
-    # 10 — сверка содержания на стыках: арифметика не отличит правильный кусок от смещённого
+    # 10 — сверка содержания: арифметика не отличит правильный кусок от смещённого,
+    # поэтому проверяется КАЖДЫЙ кусок, а не только первый и последний.
     spots, out_clock = [], 0.0
     marks = []
     for piece in pieces:
-        marks.append((piece["n"], piece["start"], out_clock, piece["speed"]))
+        marks.append((piece["n"], piece["start"], out_clock, piece["speed"], piece["outdur"]))
         out_clock += piece["outdur"]
-    wanted = [marks[0]] + ([marks[-1]] if len(marks) > 1 else [])
     tmp = work / "_spot"
     tmp.mkdir(exist_ok=True)
     worst_psnr = None
-    for n, src_t, out_t, speed in wanted:
-        probe_out, probe_src = out_t + 0.5, src_t + 0.5 * speed
+    for n, src_t, out_t, speed, outdur in marks:
+        # смещение внутрь куска: на коротком куске полсекунды уводят в соседний
+        offset = min(0.5, outdur / 2)
+        probe_out, probe_src = out_t + offset, src_t + offset * speed
         if probe_src >= src["duration"]:
             continue
         a, b = tmp / f"o{n}.png", tmp / f"s{n}.png"
@@ -520,7 +536,8 @@ def verify(cfg, src, pieces, work, finals, checks):
         spots.append({"segment": n, "out_time": probe_out, "src_time": probe_src, "psnr": value})
         if value is not None:
             worst_psnr = value if worst_psnr is None else min(worst_psnr, value)
-    checks.add("содержание стыков совпало с исходником (PSNR)",
+    checks.add(f"содержание совпало с исходником во всех кусках, проверено {len(spots)} из "
+               f"{len(pieces)} (PSNR)",
                worst_psnr is not None and worst_psnr >= 30.0,
                f"худший {worst_psnr:.1f} дБ" if worst_psnr is not None else "не измерен", "30 дБ")
 
@@ -538,9 +555,10 @@ def verify(cfg, src, pieces, work, finals, checks):
                now.st_size == src["size"] and abs(now.st_mtime - src["mtime"]) < 1,
                f"{now.st_size} Б", f"{src['size']} Б, mtime тот же")
     if cfg.target_mb:
-        got_mb = final_main.stat().st_size / 1024 ** 2
-        checks.add("итог уложился в заявленный лимит веса",
-                   got_mb <= cfg.target_mb, f"{got_mb:.1f} МБ", f"{cfg.target_mb:.0f} МБ")
+        for out_file in finals:
+            got_mb = out_file.stat().st_size / 1024 ** 2
+            checks.add(f"{out_file.name}: уложился в заявленный лимит веса",
+                       got_mb <= cfg.target_mb, f"{got_mb:.1f} МБ", f"{cfg.target_mb:.0f} МБ")
 
     return {"rows": rows, "table": "\n".join(table), "spots": spots,
             "sum_plan": sum_plan, "sum_video": sum_video,
@@ -750,7 +768,7 @@ def main(argv=None):
     print()
 
     plan_path = Path(cfg.plan).expanduser() if cfg.plan else out_dir / "plan.txt"
-    steps, cuts = parse_plan(plan_path, src["duration"], cfg.allow_gaps)
+    steps, cuts = parse_plan(plan_path, src["duration"], cfg.allow_gaps, 1.0 / cfg.fps)
     pieces = apply_cuts(steps, cuts)
 
     if cfg.dry_run:
