@@ -1,0 +1,668 @@
+contract_version: "1.1"
+contract_id: "synthetic-reconciliation-draft-v1"
+contract_status: "DRAFT"
+objective: "Проверить форму воспроизводимой синтетической сверки банковских строк и заявок CRM."
+
+scope:
+  included:
+    - "Получение двух объявленных файлов и проверка их полноты."
+    - "Подготовка кандидатов сопоставления и очереди исключений."
+  excluded:
+    - "Проведение бухгалтерских или управленческих операций."
+    - "Автоматическое подтверждение сопоставлений."
+
+evidence_boundary:
+  observed_inputs:
+    - "synthetic-bank-schema-v1"
+    - "synthetic-crm-schema-v1"
+  unverified_assumptions:
+    - "Реальные форматы и качество данных ещё не наблюдались."
+  production_readiness_claim: false
+
+roles:
+  - role_id: "source_operator"
+    responsibility: "Передаёт файлы и разбирает технические ошибки поставки."
+    may_close_run: false
+    may_reopen_run: false
+    may_approve_exceptions: false
+    may_change_rules: false
+    may_select_pilot: false
+    may_approve_data_governance: false
+  - role_id: "finance_owner"
+    responsibility: "Утверждает смысловые решения, правила, пилот, закрытие и переоткрытие."
+    may_close_run: true
+    may_reopen_run: true
+    may_approve_exceptions: true
+    may_change_rules: true
+    may_select_pilot: true
+    may_approve_data_governance: true
+
+source_passports:
+  - source_id: "bank_statement"
+    business_meaning: "Денежные движения по тестовому банковскому каналу."
+    owner_role: "source_operator"
+    required_mode: "REQUIRED"
+    condition:
+      status: "NOT_APPLICABLE"
+      rule: "ALWAYS"
+      evidence_refs: []
+    delivery_rule: "Один файл за полный недельный период до начала запуска."
+    format_evidence:
+      level: "SYNTHETIC_ONLY"
+      evidence_refs:
+        - "synthetic-bank-schema-v1"
+      observed_at: "2026-08-12"
+    row_grain: "Одна строка движения банка."
+    file_identity:
+      key_fields:
+        - "source_id"
+        - "period_start"
+        - "period_end"
+        - "file_hash"
+      hash_algorithm: "SHA256"
+      duplicate_action: "REUSE_PRIOR_INPUT_REFERENCE"
+    record_identity:
+      key_fields:
+        - "bank_operation_id"
+      version_fields:
+        - "source_record_version"
+      stable_source_id:
+        status: "PRESENT"
+        field: "bank_operation_id"
+        absent_action: "NOT_APPLICABLE"
+      canonical_id_template: "{source_id}:{bank_operation_id}:{source_record_version}"
+      collision_action: "BLOCK_RUN"
+      correction_action: "NEW_VERSION_WITH_PREDECESSOR"
+    period_rule:
+      event_time_field: "posted_at"
+      timezone: "Asia/Almaty"
+      allocation_rule_id: "bank-posting-date-v1"
+    completeness_rule: "Непрерывный период и совпадение количества, оборотов и остатков с манифестом."
+    zero_activity_evidence:
+      status: "UNKNOWN"
+      rule: "Нулевая выписка за тот же период."
+      evidence_refs: []
+    control_totals:
+      - "record_count"
+      - "sum_by_currency_and_sign"
+      - "opening_and_closing_balance"
+    privacy_class: "FINANCIAL_RESTRICTED"
+  - source_id: "crm_bookings"
+    business_meaning: "Заявки и синтетические периоды оказания услуги."
+    owner_role: "source_operator"
+    required_mode: "REQUIRED"
+    condition:
+      status: "NOT_APPLICABLE"
+      rule: "ALWAYS"
+      evidence_refs: []
+    delivery_rule: "Один полный экспорт заявок, пересекающих недельный период."
+    format_evidence:
+      level: "SYNTHETIC_ONLY"
+      evidence_refs:
+        - "synthetic-crm-schema-v1"
+      observed_at: "2026-08-12"
+    row_grain: "Одна версия заявки CRM."
+    file_identity:
+      key_fields:
+        - "source_id"
+        - "exported_at"
+        - "file_hash"
+      hash_algorithm: "SHA256"
+      duplicate_action: "REUSE_PRIOR_INPUT_REFERENCE"
+    record_identity:
+      key_fields:
+        - "booking_id"
+      version_fields:
+        - "booking_version"
+      stable_source_id:
+        status: "PRESENT"
+        field: "booking_id"
+        absent_action: "NOT_APPLICABLE"
+      canonical_id_template: "{source_id}:{booking_id}:{booking_version}"
+      collision_action: "CREATE_EXCEPTION"
+      correction_action: "NEW_VERSION_WITH_PREDECESSOR"
+    period_rule:
+      event_time_field: "service_day"
+      timezone: "Asia/Almaty"
+      allocation_rule_id: "service-day-allocation-v1"
+    completeness_rule: "Экспорт включает все заявки, хотя бы одни сутки которых пересекают период."
+    zero_activity_evidence:
+      status: "UNKNOWN"
+      rule: "Пустой экспорт с сохранёнными параметрами периода."
+      evidence_refs: []
+    control_totals:
+      - "booking_count"
+      - "sum_by_currency"
+      - "earliest_and_latest_service_day"
+    privacy_class: "CUSTOMER_RESTRICTED"
+
+run_identity:
+  run_id:
+    template: "{period_start}__{attempt}__{input_manifest_hash}"
+    required_components:
+      - "period_start"
+      - "attempt"
+      - "input_manifest_hash"
+    uniqueness_scope: "ALL_RUNS"
+  manifest:
+    required_fields:
+      - "source_id"
+      - "file_hash"
+      - "received_at"
+      - "parser_version"
+      - "record_count"
+      - "control_totals"
+    hash_algorithm: "SHA256"
+    immutable_snapshot: true
+  normalized_record_id:
+    template: "{source_id}:{source_record_key}:{source_record_version}"
+    required_components:
+      - "source_id"
+      - "source_record_key"
+      - "source_record_version"
+    collision_action: "BLOCK_RUN"
+    correction_action: "NEW_VERSION_WITH_PREDECESSOR"
+  idempotency:
+    key_components:
+      - "source_id"
+      - "file_hash"
+      - "parser_version"
+      - "source_record_key"
+    duplicate_action: "REUSE_PRIOR_NORMALIZED_RECORD"
+
+lifecycle:
+  states:
+    - "WAITING_INPUTS"
+    - "INPUTS_INCOMPLETE"
+    - "READY_TO_RUN"
+    - "RUNNING"
+    - "TECHNICAL_FAILURE"
+    - "EXCEPTIONS_OPEN"
+    - "READY_FOR_REVIEW"
+    - "CLOSED"
+    - "REOPEN_REQUIRED"
+    - "SUPERSEDED"
+  transitions:
+    - from: "WAITING_INPUTS"
+      to: "INPUTS_INCOMPLETE"
+      gate_code: "INPUT_DEADLINE_MISSED"
+      signal: "Истёк срок поставки обязательного источника."
+      owner_role: "source_operator"
+      recovery_check: "Новый манифест снова проверен на полный периметр."
+    - from: "INPUTS_INCOMPLETE"
+      to: "WAITING_INPUTS"
+      gate_code: "REUPLOAD_REQUESTED"
+      signal: "Владелец источника подтвердил повторную поставку."
+      owner_role: "source_operator"
+      recovery_check: "Ожидание связано с конкретным source_id и сроком."
+    - from: "WAITING_INPUTS"
+      to: "READY_TO_RUN"
+      gate_code: "INPUTS_COMPLETE"
+      signal: "Все обязательные источники, хэши и контрольные итоги зафиксированы."
+      owner_role: "source_operator"
+      recovery_check: "Снимок входов повторно читается и даёт тот же manifest hash."
+    - from: "READY_TO_RUN"
+      to: "RUNNING"
+      gate_code: "RUN_ID_CREATED"
+      signal: "Создан неизменяемый снимок входов и уникальный run_id."
+      owner_role: "source_operator"
+      recovery_check: "run_id содержит обязательные компоненты и отсутствует в журнале."
+    - from: "RUNNING"
+      to: "TECHNICAL_FAILURE"
+      gate_code: "TECHNICAL_ERROR"
+      signal: "Расчёт завершился с ненулевым техническим статусом."
+      owner_role: "source_operator"
+      recovery_check: "Сохранены этап сбоя и неизменяемый входной снимок."
+    - from: "TECHNICAL_FAILURE"
+      to: "READY_TO_RUN"
+      gate_code: "RECOVERY_VERIFIED"
+      signal: "Причина устранена и проверка восстановления прошла."
+      owner_role: "source_operator"
+      recovery_check: "Новая попытка получает новый run_id, старый запуск не меняется."
+    - from: "RUNNING"
+      to: "EXCEPTIONS_OPEN"
+      gate_code: "EXCEPTIONS_CREATED"
+      signal: "Детерминированные проверки создали открытые исключения."
+      owner_role: "source_operator"
+      recovery_check: "Каждое расхождение имеет карточку, владельца и evidence."
+    - from: "RUNNING"
+      to: "READY_FOR_REVIEW"
+      gate_code: "RUN_CONTROLS_PASSED"
+      signal: "Расчёт завершён, контроли сошлись, открытых исключений нет."
+      owner_role: "source_operator"
+      recovery_check: "Итоговый снимок воспроизводится из входов и версий правил."
+    - from: "EXCEPTIONS_OPEN"
+      to: "READY_FOR_REVIEW"
+      gate_code: "EXCEPTIONS_APPROVED"
+      signal: "Все исключения разрешены или отдельно утверждены."
+      owner_role: "finance_owner"
+      recovery_check: "История, прежние значения и approvals сохранены."
+    - from: "READY_FOR_REVIEW"
+      to: "CLOSED"
+      gate_code: "CLOSE_APPROVED"
+      signal: "Уполномоченный владелец подтвердил закрывающие гейты."
+      owner_role: "finance_owner"
+      recovery_check: "Закрытый output snapshot имеет полный provenance."
+    - from: "CLOSED"
+      to: "REOPEN_REQUIRED"
+      gate_code: "LATE_OR_MATERIAL_CHANGE"
+      signal: "Обнаружен поздний вход или существенная ошибка."
+      owner_role: "finance_owner"
+      recovery_check: "Изменение связано с закрытым run_id и затронутым периодом."
+    - from: "REOPEN_REQUIRED"
+      to: "READY_TO_RUN"
+      gate_code: "REOPEN_APPROVED"
+      signal: "Переоткрытие утверждено, создан новый манифест."
+      owner_role: "finance_owner"
+      recovery_check: "Новый запуск получит новый run_id и supersedes_run_id."
+    - from: "CLOSED"
+      to: "SUPERSEDED"
+      gate_code: "REPLACEMENT_CLOSED"
+      signal: "Новый закрытый запуск ссылается на прежний."
+      owner_role: "finance_owner"
+      recovery_check: "Старый и новый результаты доступны для сравнения."
+
+completeness:
+  perimeter_source_ids:
+    - "bank_statement"
+    - "crm_bookings"
+  coverage_rules:
+    - source_id: "bank_statement"
+      evidence_ref: "bank-manifest-controls-v1"
+      missing_action: "BLOCK_RUN"
+    - source_id: "crm_bookings"
+      evidence_ref: "crm-export-controls-v1"
+      missing_action: "BLOCK_RUN"
+  hard_close_gate_codes:
+    - "ALL_SOURCES_ACCOUNTED_FOR"
+    - "CONTROL_TOTALS_MATCH"
+    - "TRUE_COVERAGE_DENOMINATOR_KNOWN"
+    - "NO_UNAPPROVED_MATERIAL_EXCEPTION"
+  true_coverage:
+    metric_id: "true_coverage_rate"
+    included_record_statuses:
+      - "CONFIRMED_MATCH"
+    excluded_exception_statuses:
+      - "OPEN"
+      - "ASSIGNED"
+      - "WAITING_EVIDENCE"
+      - "WAIVED"
+    exceptions_count_as_covered: false
+  exception_registration:
+    metric_id: "exception_registration_rate"
+    registered_exception_statuses:
+      - "OPEN"
+      - "ASSIGNED"
+      - "WAITING_EVIDENCE"
+      - "RESOLVED"
+      - "WAIVED"
+      - "CLOSED"
+
+exceptions:
+  queue_states:
+    - "OPEN"
+    - "ASSIGNED"
+    - "WAITING_EVIDENCE"
+    - "RESOLVED"
+    - "WAIVED"
+    - "CLOSED"
+  required_fields:
+    - "exception_id"
+    - "run_id"
+    - "source_ids"
+    - "amount"
+    - "currency"
+    - "period"
+    - "reason_code"
+    - "observed_evidence"
+    - "owner_role"
+    - "status"
+    - "opened_at"
+    - "resolution"
+    - "resolved_at"
+    - "approver_role"
+    - "previous_value"
+    - "new_value"
+  reason_codes:
+    - "MISSING_SOURCE"
+    - "AMBIGUOUS_MATCH"
+    - "CONTROL_TOTAL_MISMATCH"
+    - "LATE_DATA"
+  default_owner_role: "source_operator"
+  closure_owner_role: "finance_owner"
+  waiver_owner_role: "finance_owner"
+  closure_rule_code: "HUMAN_APPROVAL_WITH_EVIDENCE"
+  waiver_rule_code: "HUMAN_APPROVAL_NO_COVERAGE"
+
+decision_boundaries:
+  automation_mode: "PROPOSE_ONLY"
+  deterministic_actions:
+    - "VALIDATE_FORMAT"
+    - "VALIDATE_IDENTITY"
+    - "DETECT_DUPLICATE"
+    - "VALIDATE_CONTROL_TOTALS"
+    - "VALIDATE_LIFECYCLE_GATE"
+    - "ROUTE_TO_EXCEPTION_QUEUE"
+  ai_actions:
+    - "EXTRACT_CANDIDATE_VALUES"
+    - "PROPOSE_MATCH"
+    - "EXPLAIN_AMBIGUITY"
+  human_approvals:
+    - action: "ACCEPT_MATCH"
+      role_id: "finance_owner"
+    - action: "POST_CLASSIFICATION"
+      role_id: "finance_owner"
+    - action: "CLOSE_EXCEPTION"
+      role_id: "finance_owner"
+    - action: "CLOSE_RUN"
+      role_id: "finance_owner"
+    - action: "CHANGE_RULE"
+      role_id: "finance_owner"
+    - action: "APPROVE_WAIVER"
+      role_id: "finance_owner"
+    - action: "REOPEN_RUN"
+      role_id: "finance_owner"
+    - action: "APPROVE_DATA_GOVERNANCE"
+      role_id: "finance_owner"
+  prohibited_ai_actions:
+    - "ACCEPT_MATCH"
+    - "POST_CLASSIFICATION"
+    - "CLOSE_EXCEPTION"
+    - "CLOSE_RUN"
+    - "CHANGE_RULE"
+    - "APPROVE_WAIVER"
+    - "REOPEN_RUN"
+    - "APPROVE_DATA_GOVERNANCE"
+  model_self_assessment_is_evidence: false
+  automatic_ai_posting: false
+
+provenance:
+  required_links:
+    - "source_file_hash"
+    - "source_record_identity"
+    - "normalized_record_id"
+    - "rule_version"
+    - "transform_version"
+    - "decision_record"
+    - "allocation_record"
+    - "output_record"
+  model_record_fields:
+    - "source_ids"
+    - "proposed_values_or_action"
+    - "observed_evidence"
+    - "ambiguity"
+    - "candidate_count"
+    - "validation_flags"
+    - "prompt_version"
+    - "visible_model_label"
+    - "run_time"
+    - "session_link"
+  retained_artifacts:
+    - "input_manifest"
+    - "immutable_source_snapshot"
+    - "normalized_records"
+    - "transform_log"
+    - "decision_log"
+    - "exception_snapshot"
+    - "output_snapshot"
+  external_provider_version_policy: "UNKNOWN_IF_UNAVAILABLE"
+  stable_provider_call_id_policy: "UNKNOWN_IF_UNAVAILABLE"
+
+rerun_and_late_data:
+  new_run_id_required: true
+  prior_run_immutable: true
+  supersession_link_required: true
+  comparison_required: true
+  late_data_policy:
+    status: "UNKNOWN"
+    rule: null
+    evidence_refs: []
+  reopen_owner_role: "finance_owner"
+  recovery_check: "Новый результат сравнен со старым, ссылки происхождения полны, старый снимок доступен."
+
+failure_controls:
+  - failure_code: "MISSING_FILE"
+    signal: "Истёк expected_by обязательного источника."
+    blocked_states: ["READY_TO_RUN", "CLOSED"]
+    owner_role: "source_operator"
+    retry_policy: {strategy: "MANUAL_RETRY", max_attempts: 1, backoff_seconds: 0}
+    fallback_action: "REQUEST_REUPLOAD"
+    alert_deadline_minutes: 60
+    recovery_check: "Файл и контрольные итоги появились в новом манифесте."
+  - failure_code: "NEW_FORMAT"
+    signal: "Версия схемы или обязательные поля не распознаны."
+    blocked_states: ["RUNNING", "CLOSED"]
+    owner_role: "source_operator"
+    retry_policy: {strategy: "NONE", max_attempts: 0, backoff_seconds: 0}
+    fallback_action: "BLOCK_RUN"
+    alert_deadline_minutes: 60
+    recovery_check: "Новый формат подтверждён образцом, parser version и контрольным тестом."
+  - failure_code: "CONTROL_MISMATCH"
+    signal: "Количество, обороты или остаток не сошлись с манифестом."
+    blocked_states: ["READY_FOR_REVIEW", "CLOSED"]
+    owner_role: "finance_owner"
+    retry_policy: {strategy: "MANUAL_RETRY", max_attempts: 1, backoff_seconds: 0}
+    fallback_action: "MANUAL_QUEUE"
+    alert_deadline_minutes: 60
+    recovery_check: "Повторная проверка сходится, а причина и изменения сохранены."
+  - failure_code: "AI_UNAVAILABLE"
+    signal: "ИИ-вызов не вернул разбираемый ответ в установленный срок."
+    blocked_states: ["READY_FOR_REVIEW"]
+    owner_role: "source_operator"
+    retry_policy: {strategy: "BOUNDED_AUTOMATIC", max_attempts: 2, backoff_seconds: 30}
+    fallback_action: "MANUAL_QUEUE"
+    alert_deadline_minutes: 120
+    recovery_check: "Ручная очередь содержит все необработанные source_ids без автопринятия."
+  - failure_code: "LATE_DATA"
+    signal: "Получен новый file_hash после CLOSED."
+    blocked_states: ["CLOSED"]
+    owner_role: "finance_owner"
+    retry_policy: {strategy: "NONE", max_attempts: 0, backoff_seconds: 0}
+    fallback_action: "REOPEN_REVIEW"
+    alert_deadline_minutes: 240
+    recovery_check: "Создано решение о периоде, новый run_id и supersedes_run_id."
+  - failure_code: "TECHNICAL_CRASH"
+    signal: "Процесс завершился с технической ошибкой."
+    blocked_states: ["RUNNING", "READY_FOR_REVIEW"]
+    owner_role: "source_operator"
+    retry_policy: {strategy: "BOUNDED_AUTOMATIC", max_attempts: 2, backoff_seconds: 60}
+    fallback_action: "BLOCK_RUN"
+    alert_deadline_minutes: 60
+    recovery_check: "Новая попытка воспроизводится из прежнего снимка и получает новый run_id."
+  - failure_code: "ACCESS_OR_BACKUP_FAILURE"
+    signal: "Не читается утверждённое хранилище или резервный снимок."
+    blocked_states: ["READY_TO_RUN", "RUNNING", "CLOSED"]
+    owner_role: "finance_owner"
+    retry_policy: {strategy: "MANUAL_RETRY", max_attempts: 1, backoff_seconds: 0}
+    fallback_action: "RESTORE_ACCESS"
+    alert_deadline_minutes: 60
+    recovery_check: "Доступ восстановлен и контрольный restore-test прошёл."
+
+data_governance:
+  status: "UNKNOWN"
+  owner_role: "finance_owner"
+  data_classes:
+    - "FINANCIAL_RESTRICTED"
+    - "CUSTOMER_RESTRICTED"
+  allowed_storage:
+    - "LOCAL_ENCRYPTED_WORKSPACE"
+  access_control:
+    read_roles:
+      - "source_operator"
+      - "finance_owner"
+    export_roles:
+      - "finance_owner"
+    least_privilege: true
+  retention:
+    status: "UNKNOWN"
+    days: null
+    deletion_method: "UNKNOWN"
+  backup:
+    status: "UNKNOWN"
+    destination_class: "UNKNOWN"
+    encrypted: true
+    restore_test_status: "NOT_RUN"
+    last_restore_test_at: null
+  external_ai:
+    input_mode: "REDACTED_ONLY"
+    raw_personal_data_allowed: false
+    approved_processors: []
+  redaction:
+    required: true
+    protected_fields:
+      - "guest_name"
+      - "phone"
+      - "personal_card_number"
+      - "bank_account"
+    verification_method: "Детерминированная проверка отсутствия защищённых полей до AI-вызова."
+
+metrics:
+  definitions:
+    - metric_id: "true_coverage_rate"
+      class: "TRUE_COVERAGE"
+      kind: "RATE"
+      definition: "Подтверждённо связанные записи / все записи подтверждённого периметра."
+      numerator: {status: "UNKNOWN", value: null, unit: "records", evidence_refs: []}
+      denominator: {status: "UNKNOWN", value: null, unit: "records", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "ratio", evidence_refs: []}
+      data_source_refs: ["input_manifest", "decision_log"]
+      frequency: "PER_RUN"
+      owner_role: "finance_owner"
+    - metric_id: "exception_registration_rate"
+      class: "EXCEPTION_REGISTRATION"
+      kind: "RATE"
+      definition: "Расхождения с карточкой и владельцем / все обнаруженные расхождения."
+      numerator: {status: "UNKNOWN", value: null, unit: "exceptions", evidence_refs: []}
+      denominator: {status: "UNKNOWN", value: null, unit: "exceptions", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "ratio", evidence_refs: []}
+      data_source_refs: ["transform_log", "exception_snapshot"]
+      frequency: "PER_RUN"
+      owner_role: "finance_owner"
+    - metric_id: "unresolved_amount"
+      class: "QUALITY"
+      kind: "AMOUNT"
+      definition: "Открытая сумма отдельно по каждой валюте."
+      numerator: {status: "UNKNOWN", value: null, unit: "currency-separated", evidence_refs: []}
+      denominator: {status: "NOT_APPLICABLE", value: null, unit: "none", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "currency-separated", evidence_refs: []}
+      data_source_refs: ["exception_snapshot"]
+      frequency: "PER_RUN"
+      owner_role: "finance_owner"
+    - metric_id: "exception_age"
+      class: "QUALITY"
+      kind: "DURATION"
+      definition: "Максимальный возраст открытого исключения."
+      numerator: {status: "UNKNOWN", value: null, unit: "hours", evidence_refs: []}
+      denominator: {status: "NOT_APPLICABLE", value: null, unit: "none", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "hours", evidence_refs: []}
+      data_source_refs: ["exception_snapshot"]
+      frequency: "DAILY_DURING_PILOT"
+      owner_role: "finance_owner"
+    - metric_id: "rework_rate"
+      class: "QUALITY"
+      kind: "RATE"
+      definition: "Повторно открытые решения / все подтверждённые решения."
+      numerator: {status: "UNKNOWN", value: null, unit: "decisions", evidence_refs: []}
+      denominator: {status: "UNKNOWN", value: null, unit: "decisions", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "ratio", evidence_refs: []}
+      data_source_refs: ["decision_log"]
+      frequency: "PER_RUN"
+      owner_role: "finance_owner"
+    - metric_id: "run_duration"
+      class: "OPERATIONS"
+      kind: "DURATION"
+      definition: "Время от READY_TO_RUN до READY_FOR_REVIEW без ожидания человека."
+      numerator: {status: "UNKNOWN", value: null, unit: "minutes", evidence_refs: []}
+      denominator: {status: "NOT_APPLICABLE", value: null, unit: "none", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "minutes", evidence_refs: []}
+      data_source_refs: ["lifecycle_log"]
+      frequency: "PER_RUN"
+      owner_role: "source_operator"
+    - metric_id: "manual_minutes"
+      class: "EFFORT"
+      kind: "DURATION"
+      definition: "Сумма измеренных минут ручного разбора и утверждения."
+      numerator: {status: "UNKNOWN", value: null, unit: "minutes", evidence_refs: []}
+      denominator: {status: "NOT_APPLICABLE", value: null, unit: "none", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "minutes", evidence_refs: []}
+      data_source_refs: ["decision_log"]
+      frequency: "PER_RUN"
+      owner_role: "finance_owner"
+    - metric_id: "material_error_rate"
+      class: "QUALITY"
+      kind: "RATE"
+      definition: "Существенные ошибки / проверенные итоговые записи пилота."
+      numerator: {status: "UNKNOWN", value: null, unit: "errors", evidence_refs: []}
+      denominator: {status: "UNKNOWN", value: null, unit: "records", evidence_refs: []}
+      result: {status: "UNKNOWN", value: null, unit: "ratio", evidence_refs: []}
+      data_source_refs: ["pilot_gold_review"]
+      frequency: "PILOT_END"
+      owner_role: "finance_owner"
+
+pilot:
+  selection_owner_role: "finance_owner"
+  selection_method: "Ручной выбор контролируемых периодов уполномоченной ролью."
+  periods:
+    - "synthetic-period-01"
+  baseline_required: true
+  baseline_evidence_refs:
+    - "synthetic-manual-baseline-v1"
+  gold_review_required: true
+  acceptance_gates:
+    - "Все входы воспроизводятся из неизменяемого манифеста."
+    - "Каждая итоговая запись трассируется до источника и решения."
+    - "Все расхождения с ручной базой сохранены и объяснены."
+  measured_results_status: "NOT_RUN"
+  result_metric_ids:
+    - "true_coverage_rate"
+    - "exception_registration_rate"
+    - "manual_minutes"
+    - "material_error_rate"
+  production_readiness_claim: false
+
+economics:
+  inputs:
+    - {input_id: "baseline_manual_minutes_per_month", status: "UNKNOWN", value: null, unit: "minutes/month", currency_code: "NOT_APPLICABLE", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "target_manual_minutes_per_month", status: "UNKNOWN", value: null, unit: "minutes/month", currency_code: "NOT_APPLICABLE", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "loaded_labor_cost_per_minute", status: "UNKNOWN", value: null, unit: "currency/minute", currency_code: "UNKNOWN", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "baseline_material_error_cost_per_month", status: "UNKNOWN", value: null, unit: "currency/month", currency_code: "UNKNOWN", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "target_material_error_cost_per_month", status: "UNKNOWN", value: null, unit: "currency/month", currency_code: "UNKNOWN", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "development_cost", status: "UNKNOWN", value: null, unit: "currency", currency_code: "UNKNOWN", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "monthly_operating_cost", status: "UNKNOWN", value: null, unit: "currency/month", currency_code: "UNKNOWN", evidence_refs: [], observed_at: "UNKNOWN"}
+    - {input_id: "payback_threshold_months", status: "UNKNOWN", value: null, unit: "months", currency_code: "NOT_APPLICABLE", evidence_refs: [], observed_at: "UNKNOWN"}
+  decision:
+    status: "UNKNOWN"
+    monthly_net_benefit: null
+    payback_months: null
+    currency_code: "UNKNOWN"
+    formula_version: "PAYBACK_V1"
+    evidence_refs: []
+
+unresolved:
+  business_questions:
+    - item_id: "BQ-001"
+      statement: "Утвердить правило периода для позднего документа."
+      owner_role: "finance_owner"
+      status: "OPEN"
+      blocks_maturity: ["PILOT_READY"]
+      establish_by: "Решение владельца о переоткрытии или следующем периоде."
+      resolution: null
+      evidence_refs: []
+  pending_context:
+    - item_id: "PC-001"
+      statement: "Наблюдать реальные форматы банка и CRM."
+      owner_role: "source_operator"
+      status: "OPEN"
+      blocks_maturity: ["PILOT_READY"]
+      establish_by: "Загрузить по одному обезличенному реальному образцу каждого источника."
+      resolution: null
+      evidence_refs: []
+  unknown_facts:
+    - item_id: "UF-001"
+      statement: "Фактическое ручное время и стоимость текущего процесса."
+      owner_role: "finance_owner"
+      status: "OPEN"
+      blocks_maturity: ["PILOT_EVALUATED"]
+      establish_by: "Измерить на выбранных реальных периодах пилота."
+      resolution: null
+      evidence_refs: []

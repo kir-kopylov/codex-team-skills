@@ -1,0 +1,697 @@
+schema_name: "TrustedReconciliationRunContract"
+schema_version: "1.1"
+contract_version: "1.1"
+
+root_required:
+  - contract_version
+  - contract_id
+  - contract_status
+  - objective
+  - scope
+  - evidence_boundary
+  - roles
+  - source_passports
+  - run_identity
+  - lifecycle
+  - completeness
+  - exceptions
+  - decision_boundaries
+  - provenance
+  - rerun_and_late_data
+  - failure_controls
+  - data_governance
+  - metrics
+  - pilot
+  - economics
+  - unresolved
+
+contract_statuses:
+  - DRAFT
+  - PILOT_READY
+  - PILOT_EVALUATED
+
+maturity_targets:
+  - PILOT_READY
+  - PILOT_EVALUATED
+
+scope_required:
+  - included
+  - excluded
+
+evidence_boundary_required:
+  - observed_inputs
+  - unverified_assumptions
+  - production_readiness_claim
+
+role_required:
+  - role_id
+  - responsibility
+  - may_close_run
+  - may_reopen_run
+  - may_approve_exceptions
+  - may_change_rules
+  - may_select_pilot
+  - may_approve_data_governance
+
+source_passport_required:
+  - source_id
+  - business_meaning
+  - owner_role
+  - required_mode
+  - condition
+  - delivery_rule
+  - format_evidence
+  - row_grain
+  - file_identity
+  - record_identity
+  - period_rule
+  - completeness_rule
+  - zero_activity_evidence
+  - control_totals
+  - privacy_class
+
+source_required_modes:
+  - REQUIRED
+  - CONDITIONAL
+
+condition_required:
+  - status
+  - rule
+  - evidence_refs
+
+condition_statuses:
+  - APPROVED
+  - UNKNOWN
+  - NOT_APPLICABLE
+
+format_evidence_required:
+  - level
+  - evidence_refs
+  - observed_at
+
+format_evidence_levels:
+  - SYNTHETIC_ONLY
+  - OBSERVED_REAL_SAMPLE
+  - PRODUCTION_CONFIRMED
+
+file_identity_required:
+  - key_fields
+  - hash_algorithm
+  - duplicate_action
+
+record_identity_required:
+  - key_fields
+  - version_fields
+  - stable_source_id
+  - canonical_id_template
+  - collision_action
+  - correction_action
+
+stable_source_id_required:
+  - status
+  - field
+  - absent_action
+
+stable_source_id_statuses:
+  - PRESENT
+  - ABSENT
+
+stable_source_id_absent_actions:
+  - NOT_APPLICABLE
+  - MANUAL_CANDIDATE_ONLY
+  - CREATE_EXCEPTION
+
+identity_hash_algorithms:
+  - SHA256
+
+file_duplicate_actions:
+  - REJECT_DUPLICATE_DELIVERY
+  - REUSE_PRIOR_INPUT_REFERENCE
+
+record_collision_actions:
+  - BLOCK_RUN
+  - CREATE_EXCEPTION
+
+record_correction_actions:
+  - NEW_VERSION_WITH_PREDECESSOR
+
+period_rule_required:
+  - event_time_field
+  - timezone
+  - allocation_rule_id
+
+zero_activity_required:
+  - status
+  - rule
+  - evidence_refs
+
+privacy_classes:
+  - FINANCIAL_RESTRICTED
+  - CUSTOMER_RESTRICTED
+  - EMPLOYEE_RESTRICTED
+  - INTERNAL
+
+run_identity_required:
+  - run_id
+  - manifest
+  - normalized_record_id
+  - idempotency
+
+run_id_required:
+  - template
+  - required_components
+  - uniqueness_scope
+
+required_run_id_components:
+  - period_start
+  - attempt
+  - input_manifest_hash
+
+manifest_required:
+  - required_fields
+  - hash_algorithm
+  - immutable_snapshot
+
+required_manifest_fields:
+  - source_id
+  - file_hash
+  - received_at
+  - parser_version
+  - record_count
+  - control_totals
+
+normalized_record_id_required:
+  - template
+  - required_components
+  - collision_action
+  - correction_action
+
+required_normalized_record_components:
+  - source_id
+  - source_record_key
+  - source_record_version
+
+idempotency_required:
+  - key_components
+  - duplicate_action
+
+required_idempotency_components:
+  - source_id
+  - file_hash
+  - parser_version
+  - source_record_key
+
+idempotency_duplicate_actions:
+  - REUSE_PRIOR_NORMALIZED_RECORD
+  - BLOCK_CONFLICTING_DUPLICATE
+
+required_states:
+  - WAITING_INPUTS
+  - INPUTS_INCOMPLETE
+  - READY_TO_RUN
+  - RUNNING
+  - TECHNICAL_FAILURE
+  - EXCEPTIONS_OPEN
+  - READY_FOR_REVIEW
+  - CLOSED
+  - REOPEN_REQUIRED
+  - SUPERSEDED
+
+terminal_states:
+  - CLOSED
+  - SUPERSEDED
+
+required_transition_pairs:
+  - [WAITING_INPUTS, INPUTS_INCOMPLETE]
+  - [INPUTS_INCOMPLETE, WAITING_INPUTS]
+  - [WAITING_INPUTS, READY_TO_RUN]
+  - [READY_TO_RUN, RUNNING]
+  - [RUNNING, TECHNICAL_FAILURE]
+  - [TECHNICAL_FAILURE, READY_TO_RUN]
+  - [RUNNING, EXCEPTIONS_OPEN]
+  - [RUNNING, READY_FOR_REVIEW]
+  - [EXCEPTIONS_OPEN, READY_FOR_REVIEW]
+  - [READY_FOR_REVIEW, CLOSED]
+  - [CLOSED, REOPEN_REQUIRED]
+  - [REOPEN_REQUIRED, READY_TO_RUN]
+  - [CLOSED, SUPERSEDED]
+
+transition_required:
+  - from
+  - to
+  - gate_code
+  - signal
+  - owner_role
+  - recovery_check
+
+completeness_required:
+  - perimeter_source_ids
+  - coverage_rules
+  - hard_close_gate_codes
+  - true_coverage
+  - exception_registration
+
+coverage_rule_required:
+  - source_id
+  - evidence_ref
+  - missing_action
+
+coverage_missing_actions:
+  - BLOCK_RUN
+  - CREATE_EXCEPTION
+
+coverage_definition_required:
+  - metric_id
+  - included_record_statuses
+  - excluded_exception_statuses
+  - exceptions_count_as_covered
+
+exception_registration_definition_required:
+  - metric_id
+  - registered_exception_statuses
+
+required_exception_states:
+  - OPEN
+  - ASSIGNED
+  - WAITING_EVIDENCE
+  - RESOLVED
+  - WAIVED
+  - CLOSED
+
+exceptions_required:
+  - queue_states
+  - required_fields
+  - reason_codes
+  - default_owner_role
+  - closure_owner_role
+  - waiver_owner_role
+  - closure_rule_code
+  - waiver_rule_code
+
+required_exception_fields:
+  - exception_id
+  - run_id
+  - source_ids
+  - amount
+  - currency
+  - period
+  - reason_code
+  - observed_evidence
+  - owner_role
+  - status
+  - opened_at
+  - resolution
+  - resolved_at
+  - approver_role
+  - previous_value
+  - new_value
+
+exception_closure_rule_codes:
+  - HUMAN_APPROVAL_WITH_EVIDENCE
+
+exception_waiver_rule_codes:
+  - HUMAN_APPROVAL_NO_COVERAGE
+
+decision_boundaries_required:
+  - automation_mode
+  - deterministic_actions
+  - ai_actions
+  - human_approvals
+  - prohibited_ai_actions
+  - model_self_assessment_is_evidence
+  - automatic_ai_posting
+
+automation_modes:
+  - PROPOSE_ONLY
+
+allowed_deterministic_actions:
+  - VALIDATE_FORMAT
+  - VALIDATE_IDENTITY
+  - DETECT_DUPLICATE
+  - VALIDATE_CONTROL_TOTALS
+  - VALIDATE_LIFECYCLE_GATE
+  - ROUTE_TO_EXCEPTION_QUEUE
+
+required_deterministic_actions:
+  - VALIDATE_FORMAT
+  - VALIDATE_IDENTITY
+  - DETECT_DUPLICATE
+  - VALIDATE_CONTROL_TOTALS
+  - VALIDATE_LIFECYCLE_GATE
+  - ROUTE_TO_EXCEPTION_QUEUE
+
+allowed_ai_actions:
+  - EXTRACT_CANDIDATE_VALUES
+  - PROPOSE_MATCH
+  - EXPLAIN_AMBIGUITY
+
+human_approval_required:
+  - action
+  - role_id
+
+required_human_actions:
+  - ACCEPT_MATCH
+  - POST_CLASSIFICATION
+  - CLOSE_EXCEPTION
+  - CLOSE_RUN
+  - CHANGE_RULE
+  - APPROVE_WAIVER
+  - REOPEN_RUN
+  - APPROVE_DATA_GOVERNANCE
+
+forbidden_ai_actions:
+  - ACCEPT_MATCH
+  - POST_CLASSIFICATION
+  - CLOSE_EXCEPTION
+  - CLOSE_RUN
+  - CHANGE_RULE
+  - APPROVE_WAIVER
+  - REOPEN_RUN
+  - APPROVE_DATA_GOVERNANCE
+
+provenance_required:
+  - required_links
+  - model_record_fields
+  - retained_artifacts
+  - external_provider_version_policy
+  - stable_provider_call_id_policy
+
+required_provenance_links:
+  - source_file_hash
+  - source_record_identity
+  - normalized_record_id
+  - rule_version
+  - transform_version
+  - decision_record
+  - allocation_record
+  - output_record
+
+required_model_record_fields:
+  - source_ids
+  - proposed_values_or_action
+  - observed_evidence
+  - ambiguity
+  - candidate_count
+  - validation_flags
+  - prompt_version
+  - visible_model_label
+  - run_time
+  - session_link
+
+required_retained_artifacts:
+  - input_manifest
+  - immutable_source_snapshot
+  - normalized_records
+  - transform_log
+  - decision_log
+  - exception_snapshot
+  - output_snapshot
+
+unavailable_provider_policies:
+  - UNKNOWN_IF_UNAVAILABLE
+
+rerun_required:
+  - new_run_id_required
+  - prior_run_immutable
+  - supersession_link_required
+  - comparison_required
+  - late_data_policy
+  - reopen_owner_role
+  - recovery_check
+
+late_data_policy_required:
+  - status
+  - rule
+  - evidence_refs
+
+late_data_policy_statuses:
+  - APPROVED
+  - UNKNOWN
+
+late_data_rules:
+  - REOPEN_AFFECTED_PERIOD
+  - POST_TO_NEXT_PERIOD_BY_APPROVED_RULE
+
+failure_control_required:
+  - failure_code
+  - signal
+  - blocked_states
+  - owner_role
+  - retry_policy
+  - fallback_action
+  - alert_deadline_minutes
+  - recovery_check
+
+required_failure_codes:
+  - MISSING_FILE
+  - NEW_FORMAT
+  - CONTROL_MISMATCH
+  - AI_UNAVAILABLE
+  - LATE_DATA
+  - TECHNICAL_CRASH
+  - ACCESS_OR_BACKUP_FAILURE
+
+retry_policy_required:
+  - strategy
+  - max_attempts
+  - backoff_seconds
+
+retry_strategies:
+  - NONE
+  - MANUAL_RETRY
+  - BOUNDED_AUTOMATIC
+
+fallback_actions:
+  - BLOCK_RUN
+  - MANUAL_QUEUE
+  - REQUEST_REUPLOAD
+  - REOPEN_REVIEW
+  - RESTORE_ACCESS
+
+data_governance_required:
+  - status
+  - owner_role
+  - data_classes
+  - allowed_storage
+  - access_control
+  - retention
+  - backup
+  - external_ai
+  - redaction
+
+governance_statuses:
+  - APPROVED
+  - UNKNOWN
+
+allowed_storage_classes:
+  - LOCAL_ENCRYPTED_WORKSPACE
+  - APPROVED_ENCRYPTED_CORPORATE_STORAGE
+
+access_control_required:
+  - read_roles
+  - export_roles
+  - least_privilege
+
+retention_required:
+  - status
+  - days
+  - deletion_method
+
+retention_statuses:
+  - APPROVED
+  - UNKNOWN
+
+backup_required:
+  - status
+  - destination_class
+  - encrypted
+  - restore_test_status
+  - last_restore_test_at
+
+backup_statuses:
+  - APPROVED
+  - UNKNOWN
+
+backup_destination_classes:
+  - APPROVED_ENCRYPTED_BACKUP
+  - UNKNOWN
+
+restore_test_statuses:
+  - PASSED
+  - FAILED
+  - NOT_RUN
+  - UNKNOWN
+
+external_ai_required:
+  - input_mode
+  - raw_personal_data_allowed
+  - approved_processors
+
+external_ai_input_modes:
+  - REDACTED_ONLY
+  - NO_EXTERNAL_AI
+
+redaction_required:
+  - required
+  - protected_fields
+  - verification_method
+
+metrics_required:
+  - definitions
+
+metric_required:
+  - metric_id
+  - class
+  - kind
+  - definition
+  - numerator
+  - denominator
+  - result
+  - data_source_refs
+  - frequency
+  - owner_role
+
+required_metric_ids:
+  - true_coverage_rate
+  - exception_registration_rate
+  - unresolved_amount
+  - exception_age
+  - rework_rate
+  - run_duration
+  - manual_minutes
+  - material_error_rate
+
+metric_classes:
+  - TRUE_COVERAGE
+  - EXCEPTION_REGISTRATION
+  - QUALITY
+  - OPERATIONS
+  - EFFORT
+
+metric_kinds:
+  - RATE
+  - COUNT
+  - AMOUNT
+  - DURATION
+
+measurement_required:
+  - status
+  - value
+  - unit
+  - evidence_refs
+
+measurement_statuses:
+  - KNOWN
+  - UNKNOWN
+  - NOT_APPLICABLE
+
+metric_frequencies:
+  - PER_RUN
+  - DAILY_DURING_PILOT
+  - PILOT_END
+
+pilot_required:
+  - selection_owner_role
+  - selection_method
+  - periods
+  - baseline_required
+  - baseline_evidence_refs
+  - gold_review_required
+  - acceptance_gates
+  - measured_results_status
+  - result_metric_ids
+  - production_readiness_claim
+
+pilot_result_statuses:
+  - NOT_RUN
+  - EVALUATED
+
+pilot_required_metric_results:
+  - true_coverage_rate
+  - exception_registration_rate
+  - manual_minutes
+  - material_error_rate
+
+economics_required:
+  - inputs
+  - decision
+
+economic_input_required:
+  - input_id
+  - status
+  - value
+  - unit
+  - currency_code
+  - evidence_refs
+  - observed_at
+
+economic_statuses:
+  - KNOWN
+  - UNKNOWN
+
+required_economic_inputs:
+  - baseline_manual_minutes_per_month
+  - target_manual_minutes_per_month
+  - loaded_labor_cost_per_minute
+  - baseline_material_error_cost_per_month
+  - target_material_error_cost_per_month
+  - development_cost
+  - monthly_operating_cost
+  - payback_threshold_months
+
+economic_units:
+  baseline_manual_minutes_per_month: "minutes/month"
+  target_manual_minutes_per_month: "minutes/month"
+  loaded_labor_cost_per_minute: "currency/minute"
+  baseline_material_error_cost_per_month: "currency/month"
+  target_material_error_cost_per_month: "currency/month"
+  development_cost: "currency"
+  monthly_operating_cost: "currency/month"
+  payback_threshold_months: "months"
+
+economic_decision_required:
+  - status
+  - monthly_net_benefit
+  - payback_months
+  - currency_code
+  - formula_version
+  - evidence_refs
+
+economic_decision_statuses:
+  - UNKNOWN
+  - ACCEPT
+  - REJECT
+
+economic_formula_versions:
+  - PAYBACK_V1
+
+unresolved_required:
+  - business_questions
+  - pending_context
+  - unknown_facts
+
+unresolved_record_required:
+  - item_id
+  - statement
+  - owner_role
+  - status
+  - blocks_maturity
+  - establish_by
+  - resolution
+  - evidence_refs
+
+unresolved_statuses:
+  - OPEN
+  - RESOLVED
+
+invariants:
+  - "Статус зрелости подтверждается зависимыми гейтами, а не одним enum."
+  - "YAML с повторяющимися ключами отклоняется до проверки контракта."
+  - "Все нетерминальные состояния имеют путь к CLOSED или SUPERSEDED."
+  - "ИИ использует закрытый allowlist предложений и не принимает решения."
+  - "Покрытие и экономика используют типизированные числа и ссылки на доказательства."
+  - "PRESENT stable_source_id называет поле из key_fields; ABSENT запрещает автоматическую идентификацию."
+  - "Время наблюдения имеет формат ISO date или ISO timestamp."
+  - "Каждая unresolved-запись блокирует хотя бы один следующий уровень зрелости."
+  - "Пилот на реальных данных блокируется неизвестным data governance."
+  - "VALID подтверждает только форму и внутреннюю согласованность."

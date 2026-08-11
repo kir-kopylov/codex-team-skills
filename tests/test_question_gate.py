@@ -21,6 +21,7 @@ QUESTION_DRIVEN_SKILLS = (
     "chat-to-skill-miner",
     "codex-quick-launch",
     "dopsoglasheniya-po-oplate",
+    "evidence-bound-decision-register",
     "goal-contract-shaper",
     "goal-contract-shaper-v3",
     "krupnee-runtime",
@@ -33,6 +34,7 @@ QUESTION_DRIVEN_SKILLS = (
     "remont-smeta-builder",
     "screencast-speedup",
     "str-direct-semantika",
+    "trusted-reconciliation-run-contract-builder",
     "vtoroy-mozg",
 )
 
