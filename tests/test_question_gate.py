@@ -30,6 +30,7 @@ QUESTION_DRIVEN_SKILLS = (
     "razbor-bardaka",
     "remont-dogovor-i-raspiski",
     "remont-smeta-builder",
+    "screencast-speedup",
     "str-direct-semantika",
     "vtoroy-mozg",
 )
