@@ -16,7 +16,7 @@ same_state_count: 2
 false_positive_signals: listener, TCP established, VPN UI connected, welcome screen
 ```
 
-Затем агент строит `state_fingerprint`, `layer_ledger` и `external_case_matrix`. Внешний кандидат получается отдельным workflow и сохраняет `local_status: NOT_TESTED`. Похожий кейс попадает в action, только если даёт `local_observable`, например TUN interface, маршруты, VPN core process или DNS path. Новый `Pivot gate`:
+Затем агент строит `state_fingerprint`, `layer_ledger` и `external_case_matrix`. Внешний `CandidatePacket v1` получается из `kak-drugie-reshili` и сохраняет `local_status: NOT_TESTED`. Похожий кейс попадает в action, только если даёт `local_observable`, например TUN interface, маршруты, VPN core process или DNS path. Новый `Pivot gate`:
 
 ```text
 gate: проверить system-level route-interface/vpn-core вместо app-level proxy

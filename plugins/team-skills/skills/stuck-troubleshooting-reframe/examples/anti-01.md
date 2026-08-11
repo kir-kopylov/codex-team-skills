@@ -6,10 +6,10 @@
 
 ## Ожидаемое Поведение
 
-Skill не запускается. Агент передаёт запрос в отдельный workflow поиска внешней практики:
+Skill не запускается. Агент передаёт запрос в `kak-drugie-reshili`:
 
 ```text
-route: external-practice search
+route: kak-drugie-reshili
 reframe: not started
 reason: нет повторённой локальной диагностики и закрываемой ветки
 handoff_result: source-backed candidate с local_status NOT_TESTED

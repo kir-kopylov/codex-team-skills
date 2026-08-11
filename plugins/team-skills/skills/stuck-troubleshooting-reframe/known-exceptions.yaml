@@ -5,5 +5,5 @@ exceptions:
     source_example: "Санированный repair-loop: app-level proxy принимал локальные соединения, но UI заработал только после перехода на system-level TUN."
   - symptom: "Одна просьба «найди, как другие решили» запускает полный reframe, хотя нет повторённой локальной диагностики, state fingerprint и закрываемой ветки."
     root_cause: "Одинаковая фраза стояла в триггерах поиска внешней практики и выхода из repair-loop, хотя эти workflow дают разные результаты."
-    do_next_time: "Без повторённого local no-outcome не предлагать reframe. Получить кандидата отдельным workflow и передавать его в reframe только как external_practice_candidate с local_status NOT_TESTED."
+    do_next_time: "Без повторённого local no-outcome не предлагать reframe. Получить CandidatePacket v1 через kak-drugie-reshili и передавать его в reframe только как external_practice_candidate с local_status NOT_TESTED."
     source_example: "examples/anti-01.md"

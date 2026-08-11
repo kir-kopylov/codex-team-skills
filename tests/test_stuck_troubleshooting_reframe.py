@@ -15,7 +15,8 @@ def test_plain_external_practice_request_does_not_trigger_reframe() -> None:
     assert "Одна просьба найти чужой опыт без repair-loop" in body
     assert "просьба найти похожие кейсы не открывает reframe" in body
     assert "reframe: not started" in anti_example
-    assert "route: external-practice search" in anti_example
+    assert "route: kak-drugie-reshili" in anti_example
+    assert (ROOT / "plugins" / "team-skills" / "skills" / "kak-drugie-reshili").is_dir()
 
 
 def test_external_candidate_is_only_an_input_to_local_gate() -> None:
@@ -32,3 +33,10 @@ def test_external_candidate_is_only_an_input_to_local_gate() -> None:
 
     assert "`local_status: NOT_TESTED`" in good_example
     assert "`local_observable`" in good_example
+
+
+def test_reframe_requires_repeated_no_outcome() -> None:
+    body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Одиночный ложный зелёный сигнал не открывает reframe" in body
+    assert "повторный no-outcome при ложных зелёных сигналах" in body
