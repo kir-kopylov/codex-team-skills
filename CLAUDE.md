@@ -143,11 +143,24 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 
 ### Skill statuses
 
+The ladder into the team is `draft` → `experimental` → `team-ready`; a working
+recipe does not have to reach `team-ready` before it is shared.
+
 - `draft` — early; structure exists, team should not rely on it yet.
+- `experimental` — a working recipe without guarantees: shipped to the team, so
+  it already needs a `catalog.md` row and no template placeholders / `TODO`
+  (`tests/test_catalog.py`, `tests/test_skill_structure.py`). Its consent gate
+  must present the skill as experimental and name the `owner` for feedback —
+  see the consent-gate rules below.
 - `team-ready` — has an owner, a `catalog.md` row, ≥3 `good-*` examples, ≥2
   `anti-*` examples, no template placeholders / `TODO`, and green tests.
+  Promotion from `experimental` comes after colleague feedback or review, and
+  the experimental label must be dropped from the gate.
 - `internal-only` — useful but needs internal context or special limits.
 - `deprecated` — must carry a `replacement` or `deprecation_reason` key.
+
+The full ladder rationale lives in the «Лестница Статусов» section of
+`CONTRIBUTING.md`; the allowed values are enforced by `tests/test_registry.py`.
 
 ### Native Codex plugin install
 
@@ -222,6 +235,41 @@ language keys); a generic, interface-independent failure does not need one.
 
 ## Key Conventions & Hard Rules
 
+### Consent gate
+
+**Every `SKILL.md` body must open with `## Согласие На Запуск`, and it must be
+the FIRST H2** — before the overview and before any working instruction
+(enforced by `tests/test_consent_gate.py`, which reads the section from that
+heading to the next H2). A skill is offered, never self-started: an explicit
+call runs immediately, a semantic auto-match shows a card built from the current
+request and waits for the answer, and a refusal ends the skill silently.
+
+Invariants shared by every accepted format: the phrase «без вопроса» for the
+explicit call, a «ждите ответ…» instruction after the card, and «выйдите из
+skill молча» for the refusal path. The card itself is user-facing — no internal
+folder name, no `team skill` / `live-state` jargon, no table or code fence.
+
+Three formats are legal today; the test picks one by its marker:
+
+- **compact** (`Применить **«…»** (@author) для …?` plus one-line
+  `**С навыком:**` / `**Без навыка:**`) — what `scripts/new_skill.py` scaffolds
+  and the format to use for any new or substantially rewritten gate. It requires
+  a confirmed `author_github` in `skill.yaml`; never substitute `owner` for it.
+- **verbose** (`Для вашей задачи —` …) — the older user-contract card, still
+  legal until that skill's gate is substantially edited.
+- **legacy** (neither marker) — must name the skill as ``team skill `<folder>` ``
+  and contain «Применить или решить без него?».
+
+`status: experimental` in `skill.yaml` additionally requires the gate to present
+the skill as experimental and to name the `owner` for feedback (legacy gates do
+it literally as ``экспериментальный team skill `<folder>` ``). **For every other
+status the word «экспериментальн» is forbidden in the gate** — remember to drop
+it when promoting a skill to `team-ready`.
+
+Don't reconstruct the wording from memory: the canonical template and the full
+card requirements live in the «Согласие На Запуск» section of `CONTRIBUTING.md`
+(rationale and pilot boundaries in `docs/compact-consent-card.md`).
+
 ### Counterfactual question gate
 
 Any skill that interviews the user or gathers several task inputs through a
@@ -247,9 +295,10 @@ text synchronized in the explicit set of question-driven skills.
 - **`SKILL.md` frontmatter** may only contain these keys: `name`,
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
   `tests/test_skill_structure.py`). `name` must equal the folder name and be
-  `kebab-case`. Keep the body short and procedural (overview, natural inputs,
-  process, boundaries/safety, `## Опрос После Использования`,
-  `## Логирование Сбоев`) — push long reference material into `references/`.
+  `kebab-case`. Keep the body short and procedural (`## Согласие На Запуск`
+  first, then overview, natural inputs, process, boundaries/safety,
+  `## Опрос После Использования`, `## Логирование Сбоев`) — push long reference
+  material into `references/`.
 - **`skill.yaml` schema** requires: `owner` (starts with `@`, not a placeholder
   like `@owner`/`@github-login`), `status` (one of the allowed values),
   `summary`, `use_cases`, `do_not_use_for`, `natural_triggers`, `example_files`,
