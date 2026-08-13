@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -66,7 +65,6 @@ class PackageFile:
 class BuildResult:
     archive: Path
     files: tuple[str, ...]
-    sha256: str
 
 
 def _parse_inline_scalar(raw_value: str, field: str) -> str:
@@ -298,14 +296,6 @@ def _zip_info(archive_name: str, mode: int) -> zipfile.ZipInfo:
     return info
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def build_archive(source: Path, output: Path) -> BuildResult:
     source_input = source.expanduser()
     if source_input.is_symlink():
@@ -353,7 +343,6 @@ def build_archive(source: Path, output: Path) -> BuildResult:
         return BuildResult(
             archive=output,
             files=tuple(item.relative_path.as_posix() for item in files),
-            sha256=_sha256(output),
         )
     except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as exc:
         raise PackageError(f"Не удалось создать или проверить ZIP: {exc}") from exc
@@ -376,7 +365,6 @@ def _print_success(result: BuildResult) -> None:
     print(f"Архив: {result.archive}")
     print(f"Состав: {', '.join(result.files)}")
     print("Адаптации: не выполнялись упаковщиком; их перечисляет вызывающий skill")
-    print(f"SHA-256: {result.sha256}")
     print("Загрузка в Claude: не выполнялась")
 
 
@@ -385,7 +373,6 @@ def _print_blocked(reason: str) -> None:
     print("Архив: —", file=sys.stderr)
     print("Состав: —", file=sys.stderr)
     print("Адаптации: не выполнялись упаковщиком", file=sys.stderr)
-    print("SHA-256: —", file=sys.stderr)
     print("Загрузка в Claude: не выполнялась", file=sys.stderr)
     print(f"Причина: {reason}", file=sys.stderr)
 

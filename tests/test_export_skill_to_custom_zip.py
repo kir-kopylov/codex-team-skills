@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -56,7 +55,7 @@ def snapshot(source: Path) -> dict[str, bytes]:
     }
 
 
-def test_minimal_archive_has_exact_root_hash_and_unchanged_source(tmp_path: Path, packager) -> None:
+def test_minimal_archive_has_exact_root_and_unchanged_source(tmp_path: Path, packager) -> None:
     source = write_skill(tmp_path)
     before = snapshot(source)
     output = tmp_path / "dist" / "forensic-auditor-claude-custom.zip"
@@ -65,7 +64,7 @@ def test_minimal_archive_has_exact_root_hash_and_unchanged_source(tmp_path: Path
 
     assert result.files == ("SKILL.md",)
     assert snapshot(source) == before
-    assert result.sha256 == hashlib.sha256(output.read_bytes()).hexdigest()
+    assert not hasattr(result, "sha256")
     with zipfile.ZipFile(output) as archive:
         assert archive.namelist() == ["forensic-auditor/SKILL.md"]
         assert archive.testzip() is None
@@ -99,7 +98,7 @@ def test_cli_reports_static_validation_without_claiming_upload(tmp_path: Path, p
     stdout = capsys.readouterr().out
     assert "Статус: STATIC_VALIDATED" in stdout
     assert "Состав: SKILL.md" in stdout
-    assert f"SHA-256: {hashlib.sha256(output.read_bytes()).hexdigest()}" in stdout
+    assert "SHA-256" not in stdout
     assert stdout.rstrip().endswith("Загрузка в Claude: не выполнялась")
 
 
@@ -386,7 +385,7 @@ def test_blocked_cli_uses_honest_result_contract(tmp_path: Path, packager, capsy
     stderr = capsys.readouterr().err
     assert "Статус: BLOCKED" in stderr
     assert "Архив: —" in stderr
-    assert "SHA-256: —" in stderr
+    assert "SHA-256" not in stderr
     assert "Загрузка в Claude: не выполнялась" in stderr
 
 
