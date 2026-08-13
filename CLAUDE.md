@@ -124,9 +124,12 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    trigger phrases so users don't need to remember the internal skill name
    (max 1024 chars, no `TODO`).
 
-3. **Update `catalog.md`** with a row — required for any `team-ready` skill. The
-   row must carry a real, non-empty "Первая фраза для Codex" cell (the phrase a
-   colleague pastes to route to the skill) and link to the skill's `SKILL.md`.
+3. **Update `catalog.md`** with a row — required for any `team-ready` *and* any
+   `experimental` skill (`tests/test_catalog.py` enforces both; an
+   `experimental` skill is already shipped to the team, so it must be findable).
+   The row must carry a real, non-empty "Первая фраза для Codex" cell (the
+   phrase a colleague pastes to route to the skill) and link to the skill's
+   `SKILL.md`.
 
 4. **Run the checks** and fix the *cause* of any failure (never bypass a check):
 
@@ -246,8 +249,13 @@ request and waits for the answer, and a refusal ends the skill silently.
 
 Invariants shared by every accepted format: the phrase «без вопроса» for the
 explicit call, a «ждите ответ…» instruction after the card, and «выйдите из
-skill молча» for the refusal path. The card itself is user-facing — no internal
-folder name, no `team skill` / `live-state` jargon, no table or code fence.
+skill молча» for the refusal path.
+
+In the two card formats (compact and verbose) the card is user-facing, so the
+test forbids the internal folder name, the words `team skill` / `live-state`,
+tables and code fences inside it. That prohibition is scoped to those cards —
+a legacy gate is the opposite case and *must* name the skill as
+``team skill `<folder>` ``.
 
 Three formats are legal today; the test picks one by its marker:
 
