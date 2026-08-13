@@ -99,6 +99,7 @@ def test_cli_reports_static_validation_without_claiming_upload(tmp_path: Path, p
     assert "Статус: STATIC_VALIDATED" in stdout
     assert "Состав: SKILL.md" in stdout
     assert "SHA-256" not in stdout
+    assert "Адаптации" not in stdout
     assert stdout.rstrip().endswith("Загрузка в Claude: не выполнялась")
 
 
@@ -384,8 +385,9 @@ def test_blocked_cli_uses_honest_result_contract(tmp_path: Path, packager, capsy
 
     stderr = capsys.readouterr().err
     assert "Статус: BLOCKED" in stderr
-    assert "Архив: —" in stderr
+    assert "Причина:" in stderr
     assert "SHA-256" not in stderr
+    assert "—" not in stderr
     assert "Загрузка в Claude: не выполнялась" in stderr
 
 

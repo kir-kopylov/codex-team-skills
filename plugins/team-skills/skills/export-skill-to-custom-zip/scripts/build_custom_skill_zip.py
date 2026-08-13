@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-import json
 import os
 from pathlib import Path, PurePosixPath
 import re
 import sys
 import zipfile
+
+import yaml
 
 
 MAX_NAME_LENGTH = 64
@@ -24,12 +25,7 @@ MANAGED_ROOTS = ("scripts", "references", "assets", "resources")
 RESERVED_NAME_WORDS = ("anthropic", "claude")
 BLOCKED_SERVICE_NAMES = {"__MACOSX", "__pycache__"}
 TRAILING_REFERENCE_PUNCTUATION = ".,;:!?)]}«»"
-YAML_NON_STRING_WORDS = {"~", "null", "true", "false", "yes", "no", "on", "off", ".nan", ".inf", "+.inf", "-.inf"}
-YAML_NUMBER_RE = re.compile(
-    r"[-+]?(?:(?:0[xob][0-9a-f_]+)|(?:\d[\d_]*(?::\d[\d_]*)+)|(?:\d[\d_]*(?:\.[\d_]*)?(?:e[-+]?\d+)?)|(?:\.\d[\d_]*(?:e[-+]?\d+)?))",
-    re.IGNORECASE,
-)
-YAML_DATE_RE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}(?:[Tt ]\S+)?")
+YAML_BLOCK_INDICATORS = {"|", ">", "|-", ">-", "|+", ">+"}
 
 SECRET_PATTERNS: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     ("private key", re.compile(rb"-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----")),
@@ -69,39 +65,20 @@ class BuildResult:
 
 def _parse_inline_scalar(raw_value: str, field: str) -> str:
     value = raw_value.strip()
-    if not value or value in {"|", ">", "|-", ">-", "|+", ">+"}:
+    if not value or value in YAML_BLOCK_INDICATORS:
         raise PackageError(f"Поле {field} должно быть непустой однострочной строкой")
+    if " #" in value:
+        raise PackageError(f"Поле {field} не должно содержать YAML-комментарий")
 
-    if value[0] == '"':
-        try:
-            parsed = json.loads(value)
-        except (json.JSONDecodeError, TypeError) as exc:
-            raise PackageError(f"Поле {field} содержит некорректную строку") from exc
-        if not isinstance(parsed, str):
-            raise PackageError(f"Поле {field} должно быть строкой")
-        return parsed
+    try:
+        parsed = yaml.safe_load(f"{field}: {value}")
+    except yaml.YAMLError as exc:
+        raise PackageError(f"Поле {field} содержит некорректную строку") from exc
 
-    if value[0] == "'":
-        if len(value) < 2 or value[-1] != "'":
-            raise PackageError(f"Поле {field} содержит некорректную строку")
-        inner = value[1:-1]
-        if "'" in inner.replace("''", ""):
-            raise PackageError(f"Поле {field} содержит некорректную строку")
-        return inner.replace("''", "'")
-
-    lowered = value.lower()
-    if (
-        lowered in YAML_NON_STRING_WORDS
-        or YAML_NUMBER_RE.fullmatch(value)
-        or YAML_DATE_RE.fullmatch(value)
-        or value[0] in "[{!&*"
-        or value in {"---", "..."}
-        or ": " in value
-        or " #" in value
-    ):
+    parsed_value = parsed.get(field) if isinstance(parsed, dict) else None
+    if not isinstance(parsed_value, str):
         raise PackageError(f"Поле {field} должно быть YAML-строкой, а не другим типом")
-
-    return value
+    return parsed_value
 
 
 def read_metadata(skill_md: Path) -> tuple[str, str, str]:
@@ -364,17 +341,13 @@ def _print_success(result: BuildResult) -> None:
     print("Статус: STATIC_VALIDATED")
     print(f"Архив: {result.archive}")
     print(f"Состав: {', '.join(result.files)}")
-    print("Адаптации: не выполнялись упаковщиком; их перечисляет вызывающий skill")
     print("Загрузка в Claude: не выполнялась")
 
 
 def _print_blocked(reason: str) -> None:
     print("Статус: BLOCKED", file=sys.stderr)
-    print("Архив: —", file=sys.stderr)
-    print("Состав: —", file=sys.stderr)
-    print("Адаптации: не выполнялись упаковщиком", file=sys.stderr)
-    print("Загрузка в Claude: не выполнялась", file=sys.stderr)
     print(f"Причина: {reason}", file=sys.stderr)
+    print("Загрузка в Claude: не выполнялась", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
