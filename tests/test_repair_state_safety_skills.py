@@ -50,11 +50,8 @@ def test_goal_contract_shaper_v3_is_explicit_experimental_completion_gate_varian
 
     assert registry["status"] == "experimental"
     for fragment in (
-        "Для вашей задачи —",
-        "Усиленная проверка контракта цели",
-        "Автор навыка — **@kir-kopylov**.",
-        "Статус навыка — **экспериментальный**.",
-        "Вопросы и обратная связь — **@kir-kopylov**.",
+        "Применить **«Усиленная проверка контракта цели»** "
+        "(@kir-kopylov; экспериментальный; обратная связь @kir-kopylov) для",
         "## Completion Gate",
         "user-visible success",
         "direct evidence",

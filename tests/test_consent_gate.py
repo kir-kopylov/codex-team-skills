@@ -7,34 +7,20 @@ from conftest import load_frontmatter, load_registry, skill_dirs
 
 GATE_HEADING = "## Согласие На Запуск"
 
-# Общие инварианты всех форматов; полный шаблон — в CONTRIBUTING.md.
+# Общие инварианты гейта; полный шаблон — в CONTRIBUTING.md.
 GATE_REQUIRED_PHRASES = [
     "без вопроса",
     "выйдите из skill молча",
 ]
 
-LEGACY_REQUIRED_PHRASES = ["Применить или решить без него?"]
-
 COMPACT_USER_CONTRACT_MARKER = "Применить **«"
-VERBOSE_USER_CONTRACT_MARKER = "Для вашей задачи —"
-
-VERBOSE_USER_CONTRACT_REQUIRED_PHRASES = [
-    VERBOSE_USER_CONTRACT_MARKER,
-    "может пригодиться командный навык",
-    "Автор навыка — **",
-    "> **С навыком**",
-    "> **Без навыка**",
-    "**Применить навык?**",
-]
-
-REQUEST_DETAIL_PHRASES = [
-    "действие пользователя",
-    "конкретный объект",
-    "запрошенное количество",
-    "проверяемые сведения",
+FORBIDDEN_USER_CONTRACT_MARKERS = [
+    "Для вашей задачи —",
+    "Применить или решить без него?",
 ]
 
 AUTHOR_RE = re.compile(r"@[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
+SELF_CHECK_RE = re.compile(r"(?m)^Перед отправкой\b")
 
 
 def gate_section(skill_dir) -> str:
@@ -47,14 +33,6 @@ def gate_section(skill_dir) -> str:
     )
     assert match, f"{skill_dir.name}: SKILL.md не содержит секцию «{GATE_HEADING}»"
     return match.group(1)
-
-
-def gate_format(gate: str) -> str:
-    if COMPACT_USER_CONTRACT_MARKER in gate:
-        return "compact"
-    if VERBOSE_USER_CONTRACT_MARKER in gate:
-        return "verbose"
-    return "legacy"
 
 
 def valid_author(skill_dir) -> tuple[dict, str]:
@@ -89,26 +67,25 @@ def test_consent_gate_has_canonical_contract() -> None:
         assert re.search(r"ждите ответ(?:а)?", gate), (
             f"{skill_dir.name}: гейт не требует дождаться ответа пользователя"
         )
-
-        format_name = gate_format(gate)
-        if format_name == "compact":
-            _assert_compact_contract(skill_dir, gate)
-        elif format_name == "verbose":
-            _assert_verbose_contract(skill_dir, gate)
-        else:
-            assert f"team skill `{skill_dir.name}`" in gate, (
-                f"{skill_dir.name}: старый гейт должен называть skill "
-                "по имени в backticks"
+        for marker in FORBIDDEN_USER_CONTRACT_MARKERS:
+            assert marker not in gate, (
+                f"{skill_dir.name}: старый маркер {marker!r} больше не допустим"
             )
-            for phrase in LEGACY_REQUIRED_PHRASES:
-                assert phrase in gate, (
-                    f"{skill_dir.name}: в старом гейте нет обязательной "
-                    f"фразы «{phrase}»"
-                )
+        assert COMPACT_USER_CONTRACT_MARKER in gate, (
+            f"{skill_dir.name}: допустима только короткая карточка"
+        )
+        _assert_compact_contract(skill_dir, gate)
 
 
 def _assert_compact_contract(skill_dir, gate: str) -> None:
     registry, author_github = valid_author(skill_dir)
+    if registry.get("status") == "experimental":
+        question_meta = (
+            f"{author_github}; экспериментальный; "
+            f"обратная связь {registry['owner']}"
+        )
+    else:
+        question_meta = author_github
 
     for phrase in (
         "ровно три содержательные строки",
@@ -125,7 +102,7 @@ def _assert_compact_contract(skill_dir, gate: str) -> None:
     question_matches = list(
         re.finditer(
             rf"(?m)^Применить \*\*«(?P<title>[^»\n]+)»\*\* "
-            rf"\((?P<meta>{re.escape(author_github)}(?:; [^)\n]+)?)\) "
+            rf"\((?P<meta>{re.escape(question_meta)})\) "
             r"для (?P<task>[^\n]+)\?$",
             gate,
         )
@@ -144,12 +121,30 @@ def _assert_compact_contract(skill_dir, gate: str) -> None:
     question = question_matches[0].group(0)
     with_line = with_matches[0].group(0)
     without_line = without_matches[0].group(0)
-    card = f"{question}\n\n{with_line}\n\n{without_line}"
-    assert card in gate, (
-        f"{skill_dir.name}: три строки карточки должны идти подряд "
-        "без дополнительного абзаца"
+    if registry.get("status") == "experimental":
+        card_preamble = gate[: question_matches[0].start()]
+        assert "экспериментальн" not in card_preamble.lower(), (
+            f"{skill_dir.name}: экспериментальный статус нельзя дублировать "
+            "отдельным абзацем перед первой строкой карточки"
+        )
+        assert registry["owner"] not in card_preamble, (
+            f"{skill_dir.name}: контакт owner нельзя выносить в отдельный "
+            "абзац перед первой строкой карточки"
+        )
+    self_check = SELF_CHECK_RE.search(gate, question_matches[0].end())
+    assert self_check, (
+        f"{skill_dir.name}: после карточки нет инструкции самопроверки"
     )
-    assert len([line for line in card.splitlines() if line]) == 3
+    visible_lines = [
+        line.strip()
+        for line in gate[question_matches[0].start() : self_check.start()].splitlines()
+        if line.strip()
+    ]
+    assert visible_lines == [question, with_line, without_line], (
+        f"{skill_dir.name}: между вопросом и инструкцией самопроверки должны быть "
+        "ровно три непустые видимые строки: вопрос, «С навыком» и «Без навыка»"
+    )
+    card = "\n".join(visible_lines)
 
     words = re.findall(r"(?u)\b[\w@][\w@-]*\b", card)
     assert len(words) <= 45, (
@@ -191,113 +186,28 @@ def _assert_compact_contract(skill_dir, gate: str) -> None:
         )
 
 
-def _assert_verbose_contract(skill_dir, gate: str) -> None:
-    for phrase in VERBOSE_USER_CONTRACT_REQUIRED_PHRASES:
-        assert phrase in gate, (
-            f"{skill_dir.name}: в подробной карточке нет обязательной "
-            f"фразы «{phrase}»"
-        )
-
-    registry, author_github = valid_author(skill_dir)
-    assert f"Автор навыка — **{author_github}**." in gate, (
-        f"{skill_dir.name}: карточка должна показывать GitHub-аккаунт "
-        "автора, а не имя, фамилию или owner"
-    )
-
-    for phrase in REQUEST_DETAIL_PHRASES:
-        assert phrase in gate, (
-            f"{skill_dir.name}: гейт не требует перенести из запроса {phrase!r}"
-        )
-
-    match = re.search(
-        rf"({re.escape(VERBOSE_USER_CONTRACT_MARKER)}.*?"
-        r"\*\*Применить навык\?\*\*)",
-        gate,
-        re.DOTALL,
-    )
-    assert match, (
-        f"{skill_dir.name}: не найдена цельная Markdown-карточка "
-        "от подводки к задаче до вопроса"
-    )
-    user_block = match.group(1)
-
-    assert user_block.index("> **С навыком**") < user_block.index(
-        "> **Без навыка**"
-    ), (
-        f"{skill_dir.name}: сначала покажите результат с навыком, "
-        "затем ограничение без навыка"
-    )
-    with_skill = re.search(
-        r"> \*\*С навыком\*\*\n>\n(?P<text>.*?)(?=\n\n> \*\*Без навыка\*\*)",
-        user_block,
-        re.DOTALL,
-    )
-    without_skill = re.search(
-        r"> \*\*Без навыка\*\*\n>\n(?P<text>.*?)(?=\n\n\*\*)",
-        user_block,
-        re.DOTALL,
-    )
-    assert with_skill and without_skill, (
-        f"{skill_dir.name}: оба блока сравнения должны содержать "
-        "отдельный полный текст"
-    )
-    for label, comparison in (
-        ("С навыком", with_skill.group("text")),
-        ("Без навыка", without_skill.group("text")),
-    ):
-        for detail in ("действие пользователя", "количеств", "проверяем"):
-            assert detail in comparison, (
-                f"{skill_dir.name}: блок «{label}» должен явно повторять "
-                f"{detail!r} из запроса"
-            )
-    assert not re.search(r"(?m)^\s*\|.*\|\s*$", user_block), (
-        f"{skill_dir.name}: карточка не должна использовать таблицу"
-    )
-
-    assert skill_dir.name not in user_block, (
-        f"{skill_dir.name}: пользовательский блок не должен "
-        "показывать внутреннее имя"
-    )
-    if registry.get("status") != "experimental" and registry["owner"] != author_github:
-        assert registry["owner"] not in user_block, (
-            f"{skill_dir.name}: owner нельзя выдавать за автора"
-        )
-    for jargon in ("team skill", "live-state", "Пользовательский контракт"):
-        assert jargon not in user_block, (
-            f"{skill_dir.name}: пользовательский блок содержит "
-            f"служебное выражение {jargon!r}"
-        )
-    assert "полных предложен" in gate, (
-        f"{skill_dir.name}: сравнение должно состоять из полных предложений"
-    )
-    assert "в обоих блоках повторены объект, количество" in gate, (
-        f"{skill_dir.name}: подробный гейт должен требовать повторить детали"
-    )
-    assert "неизвестное не придумывайте" in gate, (
-        f"{skill_dir.name}: неизвестные детали запроса нельзя достраивать"
-    )
-
-
 def test_experimental_gate_carries_label_and_owner() -> None:
-    # Экспериментальный skill обязан представляться пометкой и owner-ом.
+    # Статус experimental и контакт owner показываются внутри строки вопроса.
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
         gate = gate_section(skill_dir)
-        format_name = gate_format(gate)
         if registry.get("status") == "experimental":
-            if format_name in {"compact", "verbose"}:
-                assert "экспериментальн" in gate.lower(), (
-                    f"{skill_dir.name}: пользовательская карточка experimental "
-                    "skill должна показывать экспериментальный статус"
-                )
-            else:
-                assert f"экспериментальный team skill `{skill_dir.name}`" in gate, (
-                    f"{skill_dir.name}: старый гейт experimental skill должен "
-                    "представляться как «экспериментальный team skill»"
-                )
-            assert registry["owner"] in gate, (
-                f"{skill_dir.name}: гейт experimental skill должен называть owner "
-                "для обратной связи"
+            _, author_github = valid_author(skill_dir)
+            expected_meta = (
+                f"({author_github}; экспериментальный; "
+                f"обратная связь {registry['owner']})"
+            )
+            question_line = next(
+                (
+                    line
+                    for line in gate.splitlines()
+                    if line.startswith(COMPACT_USER_CONTRACT_MARKER)
+                ),
+                "",
+            )
+            assert expected_meta in question_line, (
+                f"{skill_dir.name}: статус experimental и контакт owner должны "
+                "находиться внутри первой строки карточки"
             )
         else:
             assert "экспериментальн" not in gate.lower(), (

@@ -247,36 +247,30 @@ heading to the next H2). A skill is offered, never self-started: an explicit
 call runs immediately, a semantic auto-match shows a card built from the current
 request and waits for the answer, and a refusal ends the skill silently.
 
-Invariants shared by every accepted format: the phrase «без вопроса» for the
-explicit call, a «ждите ответ…» instruction after the card, and «выйдите из
-skill молча» for the refusal path.
+Every gate uses one compact user-facing card: a first-line question
+(`Применить **«…»** (@author) для …?`) followed by one-line `**С навыком:**`
+and `**Без навыка:**` comparisons. These are exactly three non-empty visible
+lines and at most 45 words in total. The question names the current action and
+object once; the comparison lines state only the procedural difference and do
+not repeat the request.
 
-In the two card formats (compact and verbose) the card is user-facing, so the
-test forbids the internal folder name, the words `team skill` / `live-state`,
-tables and code fences inside it. That prohibition is scoped to those cards —
-a legacy gate is the opposite case and *must* name the skill as
-``team skill `<folder>` ``.
+The card requires a confirmed `author_github` from `skill.yaml`; never
+substitute `owner` for it. The test forbids internal folder names, the words
+`team skill` / `live-state`, tables, code fences, a separate limitation line,
+and the retired markers `Для вашей задачи —` and
+`Применить или решить без него?`.
 
-Three formats are legal today; the test picks one by its marker:
-
-- **compact** (`Применить **«…»** (@author) для …?` plus one-line
-  `**С навыком:**` / `**Без навыка:**`) — what `scripts/new_skill.py` scaffolds
-  and the format to use for any new or substantially rewritten gate. It requires
-  a confirmed `author_github` in `skill.yaml`; never substitute `owner` for it.
-- **verbose** (`Для вашей задачи —` …) — the older user-contract card, still
-  legal until that skill's gate is substantially edited.
-- **legacy** (neither marker) — must name the skill as ``team skill `<folder>` ``
-  and contain «Применить или решить без него?».
-
-`status: experimental` in `skill.yaml` additionally requires the gate to present
-the skill as experimental and to name the `owner` for feedback (legacy gates do
-it literally as ``экспериментальный team skill `<folder>` ``). **For every other
-status the word «экспериментальн» is forbidden in the gate** — remember to drop
-it when promoting a skill to `team-ready`.
+The surrounding gate keeps the phrase «без вопроса» for the explicit call, a
+«ждите ответ…» instruction after the card, and «выйдите из skill молча» for the
+refusal path. `status: experimental` additionally places both the experimental
+label and the feedback `owner` inside the first line's parentheses, never in a
+fourth visible line. **For every other status the word «экспериментальн» is
+forbidden in the gate** — remember to drop it when promoting a skill to
+`team-ready`.
 
 Don't reconstruct the wording from memory: the canonical template and the full
 card requirements live in the «Согласие На Запуск» section of `CONTRIBUTING.md`
-(rationale and pilot boundaries in `docs/compact-consent-card.md`).
+(the completed common contract is in `docs/compact-consent-card.md`).
 
 ### Counterfactual question gate
 
