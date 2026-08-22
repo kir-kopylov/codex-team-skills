@@ -11,6 +11,7 @@ use_cases:
   - "Довести draft skill до team-ready: registry, examples, catalog, tests и PR."
   - "Проверить существующий skill перед публикацией и исправить нарушения правил repo или CI."
   - "Безопасно проверить тестовую среду и опубликовать PR так, чтобы невалидный текст не мог пройти к внешнему изменению."
+  - "До commit независимо проверить первый ответ нового или существенно изменённого skill на дословной пользовательской фразе запуска."
 do_not_use_for:
   - "Разовые инструкции, которые не будут повторяться и не требуют отдельного командного skill."
   - "Секретные, клиентские или приватные workflows, которые нельзя хранить в публичном repo."
@@ -36,5 +37,5 @@ example_files:
   - "examples/anti-03-unsafe-test-environment.md"
   - "examples/good-06-compact-consent-card.md"
   - "examples/anti-04-verbose-consent-card.md"
-last_reviewed: "2026-08-05"
+last_reviewed: "2026-08-22"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."

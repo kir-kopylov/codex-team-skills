@@ -34,3 +34,8 @@ exceptions:
     root_cause: "Шаблон оптимизировал полноту пересказа вместо цены пользовательского решения."
     do_next_time: "Показывать формат «решение первым»: три содержательные строки, задача только в первом вопросе, ниже только различие с навыком и без него."
     source_example: "examples/anti-04-verbose-consent-card.md"
+  - id: "static-green-wrong-first-response"
+    symptom: "Структура skill и pytest зелёные, но первый реальный ответ нарушает прямое намерение пользователя."
+    root_cause: "Проверены файлы и статические контракты, но не наблюдаемое поведение skill на дословной фразе запуска."
+    do_next_time: "До commit зафиксировать критерии, передать свежему агенту только target skill и точную фразу, оценить первый ответ и запретить commit, push и PR при BEHAVIOR_PROBE_FAIL или BEHAVIOR_PROBE_BLOCKED."
+    source_example: "examples/good-02-team-ready.md"

@@ -39,3 +39,33 @@ def test_chat_to_skill_miner_is_team_ready_and_has_five_examples() -> None:
     assert len(registry["example_files"]) == 5
     for relative_path in registry["example_files"]:
         assert (SKILL_DIR / relative_path).is_file()
+
+
+def test_chat_to_skill_miner_compares_candidates_with_existing_library() -> None:
+    text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    template = (SKILL_DIR / "references" / "output-template.md").read_text(
+        encoding="utf-8"
+    )
+    example = (SKILL_DIR / "examples" / "good-03.md").read_text(
+        encoding="utf-8"
+    )
+
+    verdicts = (
+        "`new skill`",
+        "`patch existing skill`",
+        "`shared reference/test`",
+        "`no library change`",
+    )
+    for verdict in verdicts:
+        assert verdict in text
+        assert verdict in template
+
+    for field in (
+        "существующий ближайший skill",
+        "поведенческая дельта",
+        "вердикт относительно библиотеки",
+    ):
+        assert field in template
+
+    assert "с теми же входом, результатом и точкой остановки" in text
+    assert "не превращаются в три новых skills" in example
