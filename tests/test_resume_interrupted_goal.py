@@ -22,6 +22,9 @@ def test_resume_skill_keeps_read_only_reconstruction_contract() -> None:
         "Разведите четыре независимых состояния",
         "Сам шаг не выполняйте",
         "Изменения: нет",
+        "Не завершайте первый ответ уведомлением",
+        "сразу выполните доступный read-only поиск текущей `/goal`",
+        "верните `AMBIGUOUS_TARGET` и один ближайший вопрос",
     ):
         assert required in content
 
