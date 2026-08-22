@@ -31,13 +31,20 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
     for invariant in (
         "не добавляет отдельный вопрос об одобрении",
         "пользователь явно потребовал",
-        "точный `git diff --cached`",
         "staged tree из `git write-tree`",
         "удалённых base и target",
         "подтверждённое отсутствие target",
-        "Перед `commit` и перед `push`",
+        "HEAD как будущего parent",
+        "merge-base между base и HEAD",
+        "git diff --cached <merge-base-oid> --",
+        "git diff --cached <target-oid> --",
+        "Непосредственно перед `commit`",
+        "получите все пять значений",
         "Ошибка обновления или любое изменение запрещает `commit`, `push`, создание и обновление PR",
-        "Tree commit должен совпасть с одобренным tree",
+        "прямой parent — с одобренным HEAD",
+        "merge-base base и commit — с одобренным merge-base",
+        "Перед `push` снова обновите remote refs, сравните OID удалённых base и target",
+        "отсутствие target с одобренными",
         "После `push`, но до работы с PR, снова успешно обновите remote refs",
         "OID target — указывать ровно на этот commit",
         "OID head PR должен совпасть с проверенным OID target",
@@ -46,6 +53,6 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
     ):
         assert invariant in section
 
-    assert section.index("Получите явное одобрение") < section.index(
-        "Перед `commit` и перед `push`"
+    assert section.index("git diff --cached <merge-base-oid> --") < section.index(
+        "Получите явное одобрение"
     )
