@@ -20,3 +20,32 @@ def test_pr_metadata_edit_requires_fresh_pull_request_event() -> None:
         "Не создавайте бессодержательный commit только ради нового события",
     ):
         assert invariant in normalized
+
+
+def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
+    text = SKILL.read_text(encoding="utf-8")
+    section = text.split("## Явная Граница Одобрения Перед Публикацией", 1)[1]
+    section = section.split("\n## ", 1)[0]
+    section = " ".join(section.split())
+
+    for invariant in (
+        "не добавляет отдельный вопрос об одобрении",
+        "пользователь явно потребовал",
+        "точный `git diff --cached`",
+        "staged tree из `git write-tree`",
+        "удалённых base и target",
+        "подтверждённое отсутствие target",
+        "Перед `commit` и перед `push`",
+        "Ошибка обновления или любое изменение запрещает `commit`, `push`, создание и обновление PR",
+        "Tree commit должен совпасть с одобренным tree",
+        "После `push`, но до работы с PR, снова успешно обновите remote refs",
+        "OID target — указывать ровно на этот commit",
+        "OID head PR должен совпасть с проверенным OID target",
+        "OID base PR — с одобренным OID base",
+        "получите новое одобрение",
+    ):
+        assert invariant in section
+
+    assert section.index("Получите явное одобрение") < section.index(
+        "Перед `commit` и перед `push`"
+    )

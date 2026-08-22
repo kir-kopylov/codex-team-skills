@@ -82,3 +82,22 @@ def test_add_team_skill_gates_commit_on_observed_first_response():
     assert text.index("До запуска зафиксируйте") < text.index("Откройте свежий контекст")
     assert "не предлагает оплату" in example
     assert "открывает commit" in example
+
+
+def test_add_team_skill_keeps_one_schema_for_structured_outputs_only():
+    text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    examples_section = text.split("## Examples", maxsplit=1)[1].split(
+        "## Known Exceptions", maxsplit=1
+    )[0]
+    for required in (
+        "структурированный результат",
+        "одну каноническую схему",
+        "во всех examples и tests",
+        "каждый структурированный example",
+        "отдельной испорченной копии",
+        "изменённым полем, типом или формой",
+        "проверка падает",
+        "обычным текстовым ответом искусственную схему не вводите",
+    ):
+        assert required in examples_section
