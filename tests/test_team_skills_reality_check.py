@@ -64,6 +64,23 @@ def test_reality_check_traces_visible_text_without_inventing_session_source():
     assert "Не сравнивайте URL или имя ветки с commit SHA" in text
 
 
+def test_reality_check_first_response_is_a_snapshot_not_only_a_notice():
+    text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    launch = text.split("## Запуск Навыка", 1)[1].split("\n## ", 1)[0]
+
+    for required in (
+        "Уведомление или обещание проверки не считается рабочим шагом",
+        "до отправки первого ответа выполните доступный read-only снимок",
+        "repo/remote main, marketplace/plugin source, установленный plugin",
+        "наблюдаемый partial/blocked результат",
+        "один ближайший вопрос, какой runtime считать целевым",
+        "первое действие — не текст, а вызов доступного терминала",
+        "До получения фактического tool result отправлять пользователю",
+        "зафиксируйте её ошибку как наблюдаемый `unknown` или `blocked`",
+    ):
+        assert required in launch
+
+
 def test_reality_check_package_is_complete_and_experimental():
     metadata = yaml.safe_load((SKILL_DIR / "skill.yaml").read_text(encoding="utf-8"))
     exceptions = yaml.safe_load(

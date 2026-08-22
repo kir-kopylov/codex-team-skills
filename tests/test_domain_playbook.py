@@ -47,3 +47,18 @@ def test_marketplace_background_listing_assistant_has_olx_acceptance_playbook() 
         "алып кету",
     ):
         assert expected in content
+
+
+def test_marketplace_listing_launch_notice_cannot_replace_inventory() -> None:
+    skill = (
+        ROOT
+        / "plugins"
+        / "team-skills"
+        / "skills"
+        / "marketplace-background-listing-assistant"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Не завершайте первый ответ уведомлением" in skill
+    assert "Сразу начните доступную read-only инвентаризацию" in skill
+    assert "задайте один ближайший вопрос" in skill

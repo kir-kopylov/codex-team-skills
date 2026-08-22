@@ -7,6 +7,7 @@ SPLIT_BRAIN = ROOT / "plugins" / "team-skills" / "skills" / "windows-app-connect
 GOAL_SHAPER = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper"
 GOAL_SHAPER_V3 = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper-v3"
 SKILL_METHODOLOGIST = ROOT / "plugins" / "team-skills" / "skills" / "skill-methodologist"
+GIT_REALITY_CHECK = ROOT / "plugins" / "team-skills" / "skills" / "git-worktree-reality-check"
 
 
 def test_windows_app_connectivity_split_brain_declares_layer_matrix_and_evidence_refs() -> None:
@@ -50,8 +51,13 @@ def test_goal_contract_shaper_v3_is_explicit_experimental_completion_gate_varian
 
     assert registry["status"] == "experimental"
     for fragment in (
-        "Применить **«Усиленная проверка контракта цели»** "
-        "(@kir-kopylov; экспериментальный; обратная связь @kir-kopylov) для",
+        "только при явном вызове `goal-contract-shaper-v3`",
+        "Смысловой запрос без прямого вызова маршрутизируйте в базовый "
+        "`goal-contract-shaper`",
+        "не запускайте v3 и не спрашивайте о его применении",
+        "Применяю экспериментальный навык **«Усиленная проверка контракта цели»** "
+        "(обратная связь — @kir-kopylov):",
+        "продолжайте работу в том же ответе, не ожидая реакции",
         "## Completion Gate",
         "user-visible success",
         "direct evidence",
@@ -75,3 +81,11 @@ def test_skill_methodologist_routes_incidents_without_skill_inflation() -> None:
     ):
         assert fragment in body
     assert "Incident-To-Library Decision" in methodology
+
+
+def test_git_reality_launch_notice_cannot_replace_read_only_snapshot() -> None:
+    body = (GIT_REALITY_CHECK / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Не завершайте ответ одной строкой уведомления" in body
+    assert "до отправки первого ответа обязательно выполните через терминал read-only снимок Git" in body
+    assert "верните наблюдаемые факты в этом ответе" in body
