@@ -34,6 +34,12 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "staged tree из `git write-tree`",
         "удалённых base и target",
         "подтверждённое отсутствие target",
+        "при существующем target OID HEAD должен точно совпадать с OID target",
+        "при отсутствии target OID HEAD должен точно совпадать с OID base",
+        "пересоберите кандидата от точного удалённого состояния",
+        "если существует `MERGE_HEAD`, он должен содержать ровно один OID",
+        "совпадающий с OID base",
+        "Дополнительные merge parents требуют пересборки",
         "HEAD как первого будущего parent",
         "все OID из него как остальных будущих parents",
         "ожидаемый merge-base base и будущего commit",
@@ -42,6 +48,8 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "Merge без base среди будущих parents этим правилом не публикуйте",
         "git diff --cached <expected-merge-base-oid> --",
         "git diff --cached <target-oid> --",
+        "tree diff не доказывает отсутствие промежуточной неопубликованной истории",
+        "не заменяет точное совпадение HEAD с target или base",
         "Непосредственно перед `commit`",
         "сравните все зафиксированные значения",
         "полный список будущих parents",
@@ -59,6 +67,10 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
     ):
         assert invariant in section
 
-    assert section.index("git diff --cached <expected-merge-base-oid> --") < section.index(
-        "Получите явное одобрение"
-    )
+    approval_index = section.index("Получите явное одобрение")
+    for preapproval_gate in (
+        "при существующем target OID HEAD должен точно совпадать с OID target",
+        "если существует `MERGE_HEAD`, он должен содержать ровно один OID",
+        "git diff --cached <expected-merge-base-oid> --",
+    ):
+        assert section.index(preapproval_gate) < approval_index

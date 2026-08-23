@@ -70,6 +70,11 @@ git -C <repo> branch -r --no-merged origin/main
 1. После окончательного staging успешно обновите remote refs и зафиксируйте:
    - OID staged tree из `git write-tree`;
    - OID удалённых base и target либо подтверждённое отсутствие target;
+   - при существующем target OID HEAD должен точно совпадать с OID target; при
+     отсутствии target OID HEAD должен точно совпадать с OID base. Иначе сначала
+     пересоберите кандидата от точного удалённого состояния;
+   - если существует `MERGE_HEAD`, он должен содержать ровно один OID,
+     совпадающий с OID base. Дополнительные merge parents требуют пересборки;
    - OID текущего HEAD как первого будущего parent и, если существует
      `MERGE_HEAD`, все OID из него как остальных будущих parents;
    - ожидаемый merge-base base и будущего commit: для обычного commit это
@@ -79,6 +84,8 @@ git -C <repo> branch -r --no-merged origin/main
    `git diff --cached <expected-merge-base-oid> --`; при существующем target
    также покажите изменение относительно него через
    `git diff --cached <target-oid> --`.
+   Итоговый tree diff не доказывает отсутствие промежуточной неопубликованной
+   истории и не заменяет точное совпадение HEAD с target или base.
 2. Получите явное одобрение этого снимка. Непосредственно перед `commit` снова
    обновите remote refs и сравните все зафиксированные значения, включая полный
    список будущих parents, с одобренными. Ошибка обновления или любое изменение
