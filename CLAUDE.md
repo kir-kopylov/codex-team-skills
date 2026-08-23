@@ -149,16 +149,19 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 The ladder into the team is `draft` → `experimental` → `team-ready`; a working
 recipe does not have to reach `team-ready` before it is shared.
 
-- `draft` — early; structure exists, team should not rely on it yet.
+- `draft` — early; structure exists, team should not rely on it yet. It is
+  explicit-only: a semantic match must not invoke it automatically, while a
+  direct call runs immediately with the draft label and feedback `owner`.
 - `experimental` — a working recipe without guarantees: shipped to the team, so
   it already needs a `catalog.md` row and no template placeholders / `TODO`
-  (`tests/test_catalog.py`, `tests/test_skill_structure.py`). Its consent gate
-  must present the skill as experimental and name the `owner` for feedback —
-  see the consent-gate rules below.
+  (`tests/test_catalog.py`, `tests/test_skill_structure.py`). An unambiguous
+  semantic match invokes it automatically; the notice must identify it as
+  experimental and name the feedback `owner`.
 - `team-ready` — has an owner, a `catalog.md` row, ≥3 `good-*` examples, ≥2
   `anti-*` examples, no template placeholders / `TODO`, and green tests.
-  Promotion from `experimental` comes after colleague feedback or review, and
-  the experimental label must be dropped from the gate.
+  Promotion from `experimental` comes after colleague feedback or review. An
+  unambiguous semantic match invokes it automatically with a short contextual
+  notice that omits the author and `owner`.
 - `internal-only` — useful but needs internal context or special limits.
 - `deprecated` — must carry a `replacement` or `deprecation_reason` key.
 
@@ -238,39 +241,48 @@ language keys); a generic, interface-independent failure does not need one.
 
 ## Key Conventions & Hard Rules
 
-### Consent gate
+### Transparent skill launch
 
-**Every `SKILL.md` body must open with `## Согласие На Запуск`, and it must be
-the FIRST H2** — before the overview and before any working instruction
-(enforced by `tests/test_consent_gate.py`, which reads the section from that
-heading to the next H2). A skill is offered, never self-started: an explicit
-call runs immediately, a semantic auto-match shows a card built from the current
-request and waits for the answer, and a refusal ends the skill silently.
+**Every `SKILL.md` body must open with `## Запуск Навыка`, and it must be the
+FIRST H2** — before the overview and before any working instruction (enforced
+by `tests/test_skill_launch_policy.py`, which reads the section from that
+heading to the next H2).
 
-Every gate uses one compact user-facing card: a first-line question
-(`Применить **«…»** (@author) для …?`) followed by one-line `**С навыком:**`
-and `**Без навыка:**` comparisons. These are exactly three non-empty visible
-lines and at most 45 words in total. The question names the current action and
-object once; the comparison lines state only the procedural difference and do
-not repeat the request.
+For `team-ready` and `experimental`, either an explicit call or an unambiguous
+semantic match invokes the skill immediately. Before the first working step,
+show one contextual notice of at most 30 words and continue in the same
+response without waiting for user reaction. The notice names the additional
+procedure or verifiable result for the current request without restating the
+request, exposing the folder name, asking whether to use the skill, or
+comparing two modes.
 
-The card requires a confirmed `author_github` from `skill.yaml`; never
-substitute `owner` for it. The test forbids internal folder names, the words
-`team skill` / `live-state`, tables, code fences, a separate limitation line,
-and the retired markers `Для вашей задачи —` and
-`Применить или решить без него?`.
+The canonical `team-ready` notice is:
 
-The surrounding gate keeps the phrase «без вопроса» for the explicit call, a
-«ждите ответ…» instruction after the card, and «выйдите из skill молча» for the
-refusal path. `status: experimental` additionally places both the experimental
-label and the feedback `owner` inside the first line's parentheses, never in a
-fourth visible line. **For every other status the word «экспериментальн» is
-forbidden in the gate** — remember to drop it when promoting a skill to
-`team-ready`.
+`Применяю **«<понятное название>»**: <дополнительная процедура или проверяемый результат>; продолжаю без ожидания.`
 
-Don't reconstruct the wording from memory: the canonical template and the full
-card requirements live in the «Согласие На Запуск» section of `CONTRIBUTING.md`
-(the completed common contract is in `docs/compact-consent-card.md`).
+It must not show `author_github`, `authors`, or `owner`. Preserve those fields
+as authorship and maintenance metadata. `status: experimental` adds the
+experimental label and feedback `owner`; a directly invoked `status: draft`
+adds the draft label and feedback `owner`. Drafts are explicit-only.
+
+Multiple compatible skills are reduced to the smallest useful set and one
+notice. If approaches would produce incompatible results and the request does
+not choose one, ask about the desired result rather than about skill use.
+
+Skill launch does not expand authority. Complete the authorized safe work,
+then ask only immediately before an external or state-changing action that has
+not already been authorized. Do not repeat an authorization already granted or
+duplicate a system approval prompt. The mandatory post-use survey remains a
+separate non-blocking exception after the result or explicit stop.
+
+`goal-contract-shaper-v3` is explicit-only even though its registry status is
+experimental; semantic matches route to `goal-contract-shaper`. Do not add a
+generic `risk` field to `skill.yaml`: risk belongs to the concrete action, not
+the skill name.
+
+Do not reconstruct the wording from memory. The canonical templates and full
+rules live in «Запуск Навыка» in `CONTRIBUTING.md` and
+`docs/transparent-skill-launch.md`.
 
 ### Counterfactual question gate
 
@@ -290,14 +302,14 @@ decision map to the user.
 ```
 
 After every answer, recompute whether another question still changes the work.
-This rule does not replace the consent gate, authority confirmation, or the
+This rule does not replace the launch notice, authority confirmation, or the
 mandatory post-use survey. `tests/test_question_gate.py` keeps the canonical
 text synchronized in the explicit set of question-driven skills.
 
 - **`SKILL.md` frontmatter** may only contain these keys: `name`,
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
   `tests/test_skill_structure.py`). `name` must equal the folder name and be
-  `kebab-case`. Keep the body short and procedural (`## Согласие На Запуск`
+  `kebab-case`. Keep the body short and procedural (`## Запуск Навыка`
   first, then overview, natural inputs, process, boundaries/safety,
   `## Опрос После Использования`, `## Логирование Сбоев`) — push long reference
   material into `references/`.
@@ -308,10 +320,11 @@ text synchronized in the explicit set of question-driven skills.
   must exist. Optional `authors` (human authorship, must NOT be `@`-handles) and
   `source_asset` go together — if you set `authors`, set `source_asset` too.
   Optional `author_github` is a separately confirmed GitHub account for the
-  method author and is the only author value shown in a user-facing consent
-  card. It may equal `owner` only when the same person is both author and
-  maintainer. Don't infer `author_github` from `owner`, and don't invent either
-  handle; keep human attribution in `authors`/`source_asset`.
+  method author. Keep it as authorship metadata, but do not show it in the
+  ordinary `team-ready` launch notice. It may equal `owner` only when the same
+  person is both author and maintainer. Don't infer `author_github` from
+  `owner`, and don't invent either handle; keep human attribution in
+  `authors`/`source_asset`.
 - **Examples** (`examples/*.md`) must each contain the sections `## Вход`,
   `## Ожидаемое Поведение`, `## Нельзя` (enforced by
   `tests/test_examples.py`). Good examples prove applicability; anti-examples

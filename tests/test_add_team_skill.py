@@ -51,7 +51,7 @@ def test_add_team_skill_registry_covers_observed_failure_classes():
         "local-clone-hardlink-failure",
         "pr-mutation-runs-after-failed-validation",
         "stale-pr-governance-after-metadata-edit",
-        "verbose-consent-card-hides-decision",
+        "blocking-consent-stalls-work",
         "static-green-wrong-first-response",
     } <= ids
     for relative_path in metadata["example_files"]:

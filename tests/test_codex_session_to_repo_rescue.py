@@ -20,6 +20,14 @@ rescue = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(rescue)
 
 
+def test_launch_notice_cannot_replace_the_first_working_step() -> None:
+    content = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Не завершайте ответ одной строкой уведомления" in content
+    assert "Сразу после неё в том же ответе начните доступный read-only поиск" in content
+    assert "задайте один ближайший вопрос, который меняет выбор target" in content
+
+
 def git(repo: Path, *arguments: str) -> str:
     completed = subprocess.run(
         ["git", "-C", str(repo), *arguments],

@@ -34,25 +34,31 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "staged tree из `git write-tree`",
         "удалённых base и target",
         "подтверждённое отсутствие target",
-        "HEAD как будущего parent",
-        "merge-base между base и HEAD",
-        "git diff --cached <merge-base-oid> --",
+        "HEAD как первого будущего parent",
+        "все OID из него как остальных будущих parents",
+        "ожидаемый merge-base base и будущего commit",
+        "для обычного commit",
+        "для merge с base среди `MERGE_HEAD`",
+        "Merge без base среди будущих parents этим правилом не публикуйте",
+        "git diff --cached <expected-merge-base-oid> --",
         "git diff --cached <target-oid> --",
         "Непосредственно перед `commit`",
-        "получите все пять значений",
+        "сравните все зафиксированные значения",
+        "полный список будущих parents",
         "Ошибка обновления или любое изменение запрещает `commit`, `push`, создание и обновление PR",
-        "прямой parent — с одобренным HEAD",
-        "merge-base base и commit — с одобренным merge-base",
+        "упорядоченный список его parents — с одобренным списком",
+        "merge-base base и commit — с ожидаемым merge-base",
         "Перед `push` снова обновите remote refs, сравните OID удалённых base и target",
         "отсутствие target с одобренными",
         "После `push`, но до работы с PR, снова успешно обновите remote refs",
         "OID target — указывать ровно на этот commit",
+        "имена head/base PR должны совпасть с ожидаемыми ветками",
         "OID head PR должен совпасть с проверенным OID target",
-        "OID base PR — с одобренным OID base",
+        "OID base PR не заменяет повторную проверку живого OID удалённой base",
         "получите новое одобрение",
     ):
         assert invariant in section
 
-    assert section.index("git diff --cached <merge-base-oid> --") < section.index(
+    assert section.index("git diff --cached <expected-merge-base-oid> --") < section.index(
         "Получите явное одобрение"
     )

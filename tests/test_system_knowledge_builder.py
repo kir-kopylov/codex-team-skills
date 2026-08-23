@@ -36,6 +36,22 @@ def test_skill_is_domain_only_and_uses_goalrt() -> None:
     assert "references/system-knowledge-events.schema.json" in content
 
 
+def test_launch_notice_cannot_replace_initial_read_only_system_map() -> None:
+    content = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    launch = content.split("## Запуск Навыка", 1)[1].split("\n## ", 1)[0]
+
+    for fragment in (
+        "Не завершайте первый ответ уведомлением, планом или обещанием будущей разведки",
+        "самостоятельно определите границу системы",
+        "сами найдите и прочитайте доступные файлы, Git, документы, CSV, журналы",
+        "верните первые `claims`, связанное с ними `evidence`, `unknowns`",
+        "начальные связи `graph`",
+        "задайте один ближайший вопрос, ответ на который меняет target",
+        "не ждут `goalrt` или `SUPERVISED_SOFT_MODE`",
+    ):
+        assert fragment in launch
+
+
 def test_ehous_rules_live_only_in_profile() -> None:
     content = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     profile = json.loads(

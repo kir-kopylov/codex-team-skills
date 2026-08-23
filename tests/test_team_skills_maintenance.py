@@ -42,6 +42,16 @@ def test_exact_catalog_phrase_authorizes_the_whole_cycle() -> None:
         assert stage in content
 
 
+def test_launch_notice_cannot_replace_native_preflight() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Не завершайте первый ответ уведомлением или планом обновления" in content
+    assert "До его отправки обязательно вызовите доступные read-only инструменты" in content
+    assert "Первый ответ без наблюдаемого вывода этих проверок запрещён" in content
+    assert "В этом же ответе верните статус" in content
+    assert "не просите повторно разрешить отдельные стадии" in content
+
+
 def test_duplicate_migration_is_exact_recoverable_and_scoped() -> None:
     content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     for required in (

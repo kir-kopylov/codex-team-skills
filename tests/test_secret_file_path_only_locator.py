@@ -25,6 +25,15 @@ def test_safety_contract_is_explicit() -> None:
         assert phrase in content, f"SKILL.md не содержит safety-инвариант: {phrase}"
 
 
+def test_launch_notice_cannot_replace_safe_coverage_discovery() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "Не завершайте первый ответ уведомлением" in content
+    assert "самостоятельно определите доступные локальные корни" in content
+    assert "верните начальную coverage-матрицу" in content
+    assert "не просите пользователя выполнять техническую проверку за вас" in content
+
+
 def test_domain_playbook_covers_source_surfaces() -> None:
     content = (SKILL_DIR / "references" / "domain-playbook.md").read_text(encoding="utf-8")
     for phrase in ("Local files", "Git", "Mail", "Cloud docs", "Notes", "Backups and sync", "Versions and trash"):
