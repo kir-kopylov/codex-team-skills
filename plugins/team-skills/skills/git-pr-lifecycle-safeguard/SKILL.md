@@ -99,7 +99,13 @@ git -C <repo> branch -r --no-merged origin/main
    - ожидаемый merge-base base и будущего commit: для обычного commit это
      merge-base между base и HEAD, для merge с base среди `MERGE_HEAD` — OID
      base. Merge без base среди будущих parents этим правилом не публикуйте.
-   Покажите полный кандидат PR через
+   - точный снимок будущих метаданных commit: сообщение побайтово, включая
+     trailers, строки author и committer с name, email, date и timezone,
+     режим подписи и полный ожидаемый набор headers с их значениями. Не
+     подменяйте этот снимок текущими значениями Git config. Если значение
+     подписи или другого header нельзя зафиксировать до одобрения, этот commit
+     требует отдельного показа и нового одобрения после создания, но до push.
+   Покажите пользователю этот снимок метаданных и полный кандидат PR через
    `git diff --cached <expected-merge-base-oid> --`; при существующем target
    также покажите изменение относительно него через
    `git diff --cached <target-oid> --`.
@@ -107,28 +113,38 @@ git -C <repo> branch -r --no-merged origin/main
    истории и не заменяет точное совпадение HEAD с target или base.
 2. Получите явное одобрение этого снимка. Непосредственно перед `commit` снова
    обновите remote refs и сравните все зафиксированные значения, включая полный
-   список будущих parents, режим границы, destination и отсутствие
-   URL-подстановок, с одобренными.
+   список будущих parents, метаданные commit, режим границы, destination и
+   отсутствие URL-подстановок, с одобренными.
    Ошибка обновления или любое изменение запрещает `commit`, `push`, создание и
    обновление PR до нового показа и одобрения.
+   Только после успешного сравнения создайте commit из одобренных значений:
+   явно передайте точные bytes сообщения, author/committer identities,
+   timestamps/timezones, режим подписи и ожидаемые headers; не оставляйте их
+   Git config или текущему времени.
 3. Tree нового commit должен совпасть с одобренным tree, упорядоченный список
    его parents — с одобренным списком, а merge-base base и commit — с ожидаемым
-   merge-base. Перед `push` снова сравните destination и отсутствие
+   merge-base. До `push`, не выводя неожиданные raw metadata в tool log,
+   прочитайте полное содержимое объекта через
+   `git cat-file commit "<verified-commit-oid>"` и побайтово сравните его
+   headers и сообщение с одобренным снимком. Любой дополнительный header или
+   изменение author, committer, trailers, подписи либо сообщения, в том числе
+   внесённое hook-ом, делает commit новым кандидатом: не публикуйте его до
+   нового показа и одобрения. Перед `push` снова сравните destination и отсутствие
    URL-подстановок, перечитайте с него base/target и повторите проверки commit.
    Push выполняйте в явно зафиксированный destination и только с явным refspec
-   `<approved-commit-oid>:refs/heads/<target>`. Сам push должен включать точное
+   `<verified-commit-oid>:refs/heads/<target>`. Сам push должен включать точное
    серверное условие target:
 
    ```bash
    # target существовал при одобрении
    git push "--force-with-lease=refs/heads/<target>:<approved-target-oid>" \
      "<approved-push-destination>" \
-     "<approved-commit-oid>:refs/heads/<target>"
+     "<verified-commit-oid>:refs/heads/<target>"
 
    # target отсутствовал при одобрении; пустой expect требует его отсутствия
    git push "--force-with-lease=refs/heads/<target>:" \
      "<approved-push-destination>" \
-     "<approved-commit-oid>:refs/heads/<target>"
+     "<verified-commit-oid>:refs/heads/<target>"
    ```
 
    Точный lease — только server-side CAS для обновляемого target ref;
