@@ -68,8 +68,27 @@ git -C <repo> branch -r --no-merged origin/main
 пользователь явно потребовал сначала показать кандидата, действуйте так:
 
 1. После окончательного staging успешно обновите remote refs и зафиксируйте:
+   - выбранный до одобрения режим границы. По умолчанию `strict-base`:
+     любой сдвиг base запрещает сам push. Режим `target-only` допустим,
+     только если пользователь до одобрения явно согласился, что
+     push защищается по target/destination, а base ограничивает только PR diff.
+     Менять режим после одобрения нельзя;
+   - имя remote, полные имена base/target refs и один фактический
+     destination. Без сырого вывода в tool log получите списки из
+     `git remote get-url --all "<remote>"` и
+     `git remote get-url --push --all "<remote>"`. Для этой границы оба
+     списка должны содержать ровно один и тот же URL, а к этой URL не
+     должна применяться ни одна `url.*.insteadOf` или `url.*.pushInsteadOf`. Иначе не
+     публикуйте: имя `origin` или уже раскрытая URL не исключают
+     повторную подстановку адреса;
+   - destination должен быть без встроенного пароля или token,
+     секретного query/fragment и приватного локального пути, чтобы его можно
+     было безопасно показать пользователю и передать `git ls-remote` и `git push`.
+     Иначе остановитесь до push и настройте credential-free destination;
    - OID staged tree из `git write-tree`;
-   - OID удалённых base и target либо подтверждённое отсутствие target;
+   - OID base и target либо подтверждённое отсутствие target читайте
+     напрямую с этого destination через
+     `git ls-remote --heads "<destination>" "<base-full-ref>" "<target-full-ref>"`;
    - при существующем target OID HEAD должен точно совпадать с OID target; при
      отсутствии target OID HEAD должен точно совпадать с OID base. Иначе сначала
      пересоберите кандидата от точного удалённого состояния;
@@ -88,16 +107,45 @@ git -C <repo> branch -r --no-merged origin/main
    истории и не заменяет точное совпадение HEAD с target или base.
 2. Получите явное одобрение этого снимка. Непосредственно перед `commit` снова
    обновите remote refs и сравните все зафиксированные значения, включая полный
-   список будущих parents, с одобренными. Ошибка обновления или любое изменение
-   запрещает `commit`, `push`, создание и обновление PR до нового показа и
-   одобрения.
+   список будущих parents, режим границы, destination и отсутствие
+   URL-подстановок, с одобренными.
+   Ошибка обновления или любое изменение запрещает `commit`, `push`, создание и
+   обновление PR до нового показа и одобрения.
 3. Tree нового commit должен совпасть с одобренным tree, упорядоченный список
    его parents — с одобренным списком, а merge-base base и commit — с ожидаемым
-   merge-base. Перед `push` снова обновите remote refs, сравните OID удалённых
-   base и target либо отсутствие target с одобренными, затем повторите проверки
-   commit.
-4. После `push`, но до работы с PR, снова успешно обновите remote refs: OID base
-   должен остаться одобренным, а OID target — указывать ровно на этот commit.
+   merge-base. Перед `push` снова сравните destination и отсутствие
+   URL-подстановок, перечитайте с него base/target и повторите проверки commit.
+   Push выполняйте в явно зафиксированный destination и только с явным refspec
+   `<approved-commit-oid>:refs/heads/<target>`. Сам push должен включать точное
+   серверное условие target:
+
+   ```bash
+   # target существовал при одобрении
+   git push "--force-with-lease=refs/heads/<target>:<approved-target-oid>" \
+     "<approved-push-destination>" \
+     "<approved-commit-oid>:refs/heads/<target>"
+
+   # target отсутствовал при одобрении; пустой expect требует его отсутствия
+   git push "--force-with-lease=refs/heads/<target>:" \
+     "<approved-push-destination>" \
+     "<approved-commit-oid>:refs/heads/<target>"
+   ```
+
+   Точный lease — только server-side CAS для обновляемого target ref;
+   при совпадении expect он сам по себе может разрешить non-fast-forward.
+   Поэтому прежние gates обязаны отдельно доказать нужную ancestry и
+   fast-forward от одобренного target.
+
+   Обычный `git push` не умеет атомарно сделать update target зависимым от
+   неизменности base, который не обновляется. Повторный fetch или no-op
+   refspec для base не создают server-side cross-ref CAS. Если одобрение запрещает
+   любую публикацию при сдвиге base, остановитесь до push, пока не доказан
+   такой серверный guard. Только в заранее одобренном режиме `target-only`
+   сдвиг base после target push запрещает работу с PR и требует нового diff
+   и одобрения, но не выдавайте это за server-side запрет самого push.
+4. После `push`, но до работы с PR, прямым `git ls-remote` с одобренного
+   destination снова прочитайте base/target: OID base должен остаться
+   одобренным, а OID target — указывать ровно на этот commit.
    Создайте или обновите PR только для этих веток и прочитайте его обратно: имена
    head/base PR должны совпасть с ожидаемыми ветками, а OID head PR должен
    совпасть с проверенным OID target. OID base PR не заменяет повторную проверку
@@ -138,6 +186,8 @@ git -C <repo> branch -r --no-merged origin/main
 8. Push:
    - обычный `git push -u origin <branch>`;
    - после rebase или amend только `git push --force-with-lease`.
+   Если действует явная граница одобрения, вместо этой сокращённой команды
+   используйте явные destination, refspec и exact lease из раздела выше.
 9. Откройте PR - это стандартное завершение цикла `local-wip-to-clean-pr`, а не
    шаг, ожидающий отдельного запроса на публикацию:
    - title и body должны описывать scope, происхождение WIP и проверки;
