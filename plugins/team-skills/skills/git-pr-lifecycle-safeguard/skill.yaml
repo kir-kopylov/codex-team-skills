@@ -4,6 +4,7 @@ status: "team-ready"
 summary: "Безопасно проводит локальный WIP или старый commit через clean PR, merge и branch cleanup без смешения чужих изменений."
 use_cases:
   - "Вынести локальный WIP или старый commit в отдельную ветку от актуального origin/main, прогнать проверки и открыть draft PR."
+  - "После долгих тестов повторно проверить origin/main перед commit и push, безопасно перенести доказанный WIP и не опираться на устаревший результат."
   - "После merge вернуть repo в чистое состояние: обновить main, удалить merged local branches и безопасно убрать remote branch clutter."
   - "Классифицировать stale remote branches без PR и решить, что удалить, сохранить или пересобрать как новый PR."
 do_not_use_for:
@@ -18,13 +19,15 @@ natural_triggers:
   - "убери branch clutter"
   - "почисти remote branches"
   - "можно архивировать после PR?"
+  - "пока шли тесты, main продвинулся; перед commit ещё раз сверь базу и не потеряй WIP"
 example_files:
   - "examples/good-01.md"
   - "examples/good-02.md"
   - "examples/good-03.md"
+  - "examples/good-04.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-08-04"
+last_reviewed: "2026-08-24"
 authors:
   - "Кирилл Копылов"
 source_asset: "Workflow извлечён из сессии с переносом marketplace/verify WIP в clean PR и последующей уборкой local/remote branches."

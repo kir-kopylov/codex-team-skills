@@ -1,6 +1,6 @@
 ---
 name: git-pr-lifecycle-safeguard
-description: Используйте этот skill, когда нужно безопасно провести локальный WIP или старый commit через цикл clean branch, tests, draft PR, mergeable check и cleanup после merge, либо когда есть риск смешать dirty tree, старую ветку, stale remote branch, merged PR или чужие изменения. Skill сначала выполняет read-only reality check, затем действует только по доказанному scope.
+description: Используйте этот skill, когда нужно безопасно провести локальный WIP или старый commit через цикл clean branch, tests, draft PR, mergeable check и cleanup после merge, либо когда есть риск смешать dirty tree, старую ветку, stale remote branch, merged PR или чужие изменения. Также запускайте его, если main мог продвинуться во время тестов и перед commit или push надо повторно проверить базу без потери WIP. Skill сначала выполняет read-only reality check, затем действует только по доказанному scope.
 ---
 
 # Git PR Lifecycle Safeguard
@@ -36,6 +36,7 @@ Skill защищает цикл `WIP/old commit -> clean PR -> merge -> branch c
 - «можно архивировать после PR?»;
 - «почисти remote branches»;
 - «доведи локальную работу до clean PR»;
+- «пока шли тесты, main продвинулся; перед commit ещё раз сверь базу и не потеряй WIP»;
 - «после merge верни repo в чистое состояние».
 
 ## Общий Первый Шаг
@@ -179,10 +180,16 @@ git -C <repo> branch -r --no-merged origin/main
    - staged, unstaged, untracked;
    - нужные файлы или commit SHA;
    - есть ли чужие изменения в рабочем дереве.
+   - если в одном intended-файле смешаны нужные и чужие hunks и их нельзя
+     безопасно разделить, остановитесь до staging, stash и rebase и запросите
+     один выбор точного состава патча.
 2. Если есть WIP в текущем дереве, сохраните его безопасно:
-   - `git stash push --include-untracked -m "<описание>"`, если нужно перенести весь WIP;
+   - общий `git stash push --include-untracked -m "<описание>"` допустим,
+     только если весь status, включая untracked, доказанно относится к задаче;
+     создание новой записи и глобальную чистоту после неё докажите по
+     `references/late-base-gate.md`;
    - явный `git add <paths>` только после проверки scope, если пользователь подтвердил файлы;
-   - не используйте `git add .` при mixed worktree.
+   - не используйте общий stash или `git add .` при mixed worktree.
 3. Создайте clean branch от актуального `origin/main`:
    - `git switch -c codex/<short-name> origin/main`;
    - для старого commit используйте `git cherry-pick <sha>`.
@@ -195,20 +202,61 @@ git -C <repo> branch -r --no-merged origin/main
    - секция `## Логирование Сбоев`;
    - examples и catalog row для `team-ready`;
    - отсутствие шаблонных заглушек.
-6. Запустите проверки:
-   - `git diff --check`;
-   - релевантный test command, обычно `python3 -m pytest`.
-7. Сформируйте один понятный commit или объясните, почему нужно несколько.
-8. Push:
-   - обычный `git push -u origin <branch>`;
-   - после rebase или amend только `git push --force-with-lease`.
+6. Привяжите проверки к точному состоянию:
+   - обновите refs и сохраните `tested_base_sha`;
+   - разделите clean committed-only состояние и WIP; для WIP проверьте весь
+     status, включая untracked, stage только доказанный intended scope и
+     сохраните `tested_tree=$(git -C <repo> write-tree)`;
+   - не продолжайте автоматически при mixed WIP;
+   - выполните `git diff --check`, `git diff --cached --check`, полную suite и
+     нужные живые пробы.
+7. После тестов выполните поздний гейт базы до любого commit:
+   - после каждого первоначального или повторного test run заново обновите
+     refs, сравните `current_base_sha` с `tested_base_sha` и докажите через
+     `merge-base --is-ancestor`, что база входит в `HEAD`;
+   - только после успешных compare и ancestry, до commit, сохраните
+     `verified_base_sha`; новый drift возвращает процесс к этому же gate;
+   - при drift commit запрещён: clean committed-only переносите без stash, а
+     WIP — только по fail-closed процедуре `references/late-base-gate.md`;
+   - после переноса заново получите `tested_tree`, повторите полную suite,
+     base-sensitive checks и затронутые живые пробы; для изменения Codex
+     plugin явно пересчитайте semver относительно нового `origin/main`, сохранив
+     выбранный до drift тип повышения (`patch`, `minor` или `major`); если тип
+     не доказан, остановитесь для одного выбора до повторных тестов.
+8. Сформируйте commit и свяжите его с тестами:
+   - непосредственно до commit повторно сравните index с `tested_tree`,
+     докажите отсутствие tracked изменений вне index, untracked и unmerged;
+   - после commit сохраните `verified_head_sha` и докажите, что его tree в
+     точности равен `tested_tree`, а staged, unstaged и untracked отсутствуют;
+   - после доказанного commit удалите только созданный процессом
+     recovery-stash: заново найдите его текущий selector по сохранённым object
+     SHA и subject, непосредственно перед `stash drop` ещё раз сверьте SHA и
+     не выполняйте cleanup без исключительного контроля над stash reflog;
+     если точная идентичность или такой контроль не доказаны, сохраните stash
+     и сообщите его SHA и команду восстановления. Исходные stashes не меняйте.
+9. Непосредственно перед push выполните короткий гейт ещё раз:
+   - после fetch база должна равняться `verified_base_sha` и входить в `HEAD`;
+   - текущие HEAD и tree должны равняться `verified_head_sha` и `tested_tree`,
+     а полный status — оставаться пустым;
+   - любой drift возвращает процесс к переносу и повторным проверкам.
+10. Push:
+   - новую ветку публикуйте обычным `git push -u origin <branch>`;
+   - перед переписыванием опубликованной ветки сохраните её remote SHA, а
+     после rebase/amend используйте только явный lease
+     `--force-with-lease=refs/heads/<branch>:<expected_remote_sha>` по правилам
+     `references/late-base-gate.md`.
    Если действует явная граница одобрения, вместо этой сокращённой команды
    используйте явные destination, refspec и exact lease из раздела выше.
-9. Откройте PR - это стандартное завершение цикла `local-wip-to-clean-pr`, а не
+11. После push, но до PR, снова получите `origin/main` и точный remote head:
+   - base drift возвращает процесс к rebase и повторным тестам;
+   - remote head, не равный `verified_head_sha`, останавливает процесс;
+   - оставшийся из-за заблокированного cleanup recovery-stash сохраняйте по
+     object SHA и явно называйте способ восстановления.
+12. Откройте PR - это стандартное завершение цикла `local-wip-to-clean-pr`, а не
    шаг, ожидающий отдельного запроса на публикацию:
    - title и body должны описывать scope, происхождение WIP и проверки;
    - затем проверьте `mergeable`, changed files и checks.
-10. После открытия или обновления PR проверьте автоматическое review от
+13. После открытия или обновления PR проверьте автоматическое review от
     `chatgpt-codex-connector`: если согласны с замечанием - почините и
     запушьте фикс; если не согласны или видите иначе - ответьте на
     комментарий с обоснованием на русском. Не оставляйте замечание бота без
@@ -259,8 +307,11 @@ commit только ради нового события — разделяйт�
 Нельзя:
 
 - использовать `git add .` при mixed worktree;
+- создавать общий stash при недоказанном mixed WIP;
+- продолжать commit или push после drift `origin/main` по результатам старых тестов;
+- удалять recovery-stash по текущей позиции вместо записанного object SHA;
 - удалять ветку, если commit не reachable из `origin/main` или merged PR;
-- force-push без `--force-with-lease`;
+- force-push без явного ожидаемого remote SHA в `--force-with-lease`;
 - выполнять `git reset --hard`;
 - считать `git branch -r` достаточным доказательством для удаления remote branch;
 - продолжать новую работу из старой feature branch после merge;
@@ -314,6 +365,11 @@ Script перед записью редактирует приватные пу�
 - текущая ветка соответствует этапу: clean PR branch до merge, `main` после cleanup;
 - PR создан или cleanup завершён;
 - проверки названы явно;
+- поздний гейт после тестов и короткий гейт перед push прошли на одном
+  `verified_base_sha`, а опубликованный `verified_head_sha` содержит ровно
+  проверенный `tested_tree`;
+- созданный процессом recovery-stash удалён по object SHA либо сохранён с
+  точной командой восстановления; исходные stashes не изменены;
 - merged local branches удалены;
 - remote branches удалены только если merged/closed и safe;
 - оставшиеся unmerged branches перечислены с причиной keep/delete-later;
