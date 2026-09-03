@@ -71,6 +71,7 @@ def test_skill_declares_first_failure_cause_check_contract() -> None:
         "favors_a",
         "favors_b",
         "inconclusive",
+        "models_rejected",
         "invalid_test",
         "blocked",
         "stuck-troubleshooting-reframe",
@@ -78,6 +79,54 @@ def test_skill_declares_first_failure_cause_check_contract() -> None:
         "scripts/validate_diagnostic_ledger.py",
     ):
         assert fragment in body
+
+
+def test_skill_covers_neutral_observable_behavior_without_claiming_mechanism() -> None:
+    body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    normalized_body = " ".join(body.split())
+    contract = (SKILL / "references" / "diagnostic-contract.md").read_text(encoding="utf-8")
+    verdicts = (SKILL / "references" / "evidence-and-verdicts.md").read_text(
+        encoding="utf-8"
+    )
+    registry = load_registry(SKILL)
+
+    for fragment in (
+        "нейтральном воспроизводимом поведении",
+        "по какому правилу это на самом деле работает?",
+        "при условиях X система наблюдаемо делает Y",
+        "замысел разработчиков",
+        "нормальность поведения",
+        "наличие бага",
+        "один следующий опыт и явную границу знания",
+        "явной остановки неразличающего кандидата",
+        "Остановка неразличающего кандидата завершена отдельно",
+        "verdict не присвоен",
+        "строка в `experiment-ledger.jsonl` не создана",
+        "полные множества наблюдаемых прогнозов",
+        "эти множества не пересекаются",
+        "фактическое значение, метку или относительный порядок",
+        "исход вне обоих множеств даёт `models_rejected`",
+        "последовательность действий этого не заменяет",
+        "Это не второй verdict и не заменяет единственный verdict, выбранный в шаге 9",
+        "классификация наблюдения по A/B не проводится",
+    ):
+        assert fragment in normalized_body
+
+    for trigger in (
+        "по какому правилу это на самом деле работает",
+        "интерфейс показывает одно, а система возвращает другое",
+        "предложи минимальный эксперимент, различающий версии",
+        "не гадай о причине — установи фактическое поведение",
+    ):
+        assert trigger in registry["natural_triggers"]
+
+    assert "Если нет ни outcome, ни точного вопроса о поведении" in contract
+    assert "inconclusive | models_rejected | invalid_test" in contract
+    assert "Если множества совпадают или пересекаются" in contract
+    assert "не входит ни в одно из двух заранее заданных непересекающихся" in verdicts
+    assert "не дал пригодного однозначного наблюдения" in verdicts
+    assert "Evidence содержит фактическое значение, метку или порядок" in verdicts
+    assert "не создаёт второй verdict и не заменяет единственный verdict" in verdicts
 
 
 def test_skill_separates_safe_checks_from_permissioned_changes() -> None:
@@ -104,12 +153,14 @@ def test_skill_separates_safe_checks_from_permissioned_changes() -> None:
         assert permissioned_fragment in body
 
 
-def test_examples_cover_three_domains_and_two_boundaries() -> None:
+def test_examples_cover_failure_neutral_behavior_and_stop_boundaries() -> None:
     sip = (SKILL / "examples" / "good-01-sip-timeout.md").read_text(encoding="utf-8")
     ci = (SKILL / "examples" / "good-02-ci-artifact-vs-runtime.md").read_text(encoding="utf-8")
     gui = (SKILL / "examples" / "good-03-green-ui-vs-outcome.md").read_text(encoding="utf-8")
     assertion = (SKILL / "examples" / "anti-01-exact-assertion.md").read_text(encoding="utf-8")
     compound = (SKILL / "examples" / "anti-02-compound-change.md").read_text(encoding="utf-8")
+    neutral = (SKILL / "examples" / "good-04-neutral-source-selection.md").read_text(encoding="utf-8")
+    stopped = (SKILL / "examples" / "anti-03-unsafe-or-nondiscriminating.md").read_text(encoding="utf-8")
 
     assert "нет входящего SIP-ответа" in sip
     assert "Нельзя писать «неверный пароль»" in sip
@@ -117,6 +168,20 @@ def test_examples_cover_three_domains_and_two_boundaries() -> None:
     assert "зелёный статус" in gui and "`invalid_test`" in gui
     assert "не запускает `proverka-prichin-sboya`" in assertion
     assert "одновременно меняются версия, процесс, credentials и маршрут" in compound
+    assert "явного сбоя нет" in neutral.lower()
+    assert "при условиях этого опыта" in neutral
+    assert "внутреннюю реализацию" in neutral
+    assert "`expected_if_a = {(L1, L2)}`" in neutral
+    assert "`expected_if_b = {(L1, L1)}`" in neutral
+    assert "Любая другая полностью считанная пара" in neutral
+    assert "`models_rejected`" in neutral and "`inconclusive`" in neutral
+    assert "необратим" in stopped and "одинаковый прогноз" in stopped
+    assert "`blocked`" in stopped
+    assert "не записывается в `experiment-ledger.jsonl`" in stopped
+
+    registry = load_registry(SKILL)
+    assert "examples/good-04-neutral-source-selection.md" in registry["example_files"]
+    assert "examples/anti-03-unsafe-or-nondiscriminating.md" in registry["example_files"]
 
 
 def test_stuck_skill_routes_first_ambiguous_failure_to_base_skill() -> None:
@@ -130,6 +195,19 @@ def test_stuck_skill_routes_first_ambiguous_failure_to_base_skill() -> None:
 def test_validator_accepts_complete_entry() -> None:
     validator = _load_validator()
     assert validator.validate_entries([_valid_entry()]) == []
+
+    rejected = _valid_entry()
+    rejected["observed_facts"] = [
+        {
+            "fact": "Получена фактическая метка L3",
+            "source": "санированный ответ fixture",
+            "observed_at": "2026-09-03T10:00:00Z",
+        }
+    ]
+    rejected["expected_if_a"] = "Метка L1"
+    rejected["expected_if_b"] = "Метка L2"
+    rejected["verdict"] = "models_rejected"
+    assert validator.validate_entries([rejected]) == []
 
 
 def test_validator_rejects_missing_fields_and_unknown_verdict() -> None:
