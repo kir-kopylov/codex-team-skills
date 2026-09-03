@@ -71,6 +71,7 @@ def test_skill_declares_first_failure_cause_check_contract() -> None:
         "favors_a",
         "favors_b",
         "inconclusive",
+        "models_rejected",
         "invalid_test",
         "blocked",
         "stuck-troubleshooting-reframe",
@@ -122,6 +123,7 @@ def test_skill_supports_observable_behavior_contract_without_failure() -> None:
         "фактическое различие и относительный порядок",
         "Постройте прогнозы из их реального относительного порядка",
         "пересечение пересчитанных",
+        "наблюдение не входит ни в один заранее пересчитанный прогноз",
     ):
         assert fragment in body
 
@@ -129,8 +131,10 @@ def test_skill_supports_observable_behavior_contract_without_failure() -> None:
     assert "Фактическое Правило Без Сбоя" in example
     assert "непересекающиеся" in example
     assert "created_at(M) < created_at(A) < created_at(Z)" in example
-    assert "фактический временной порядок" in example
-    assert "Любая другая последовательность даёт `inconclusive`" in example
+    assert "При другом строгом временном порядке" in example
+    assert "опыт остаётся валидным" in example
+    assert "возвращает `models_rejected`" in example
+    assert "поведенческий контракт не" in example
     assert "Не установлено: внутренняя реализация, замысел разработчика, штатность или баг" in example
 
 
@@ -164,6 +168,10 @@ def test_stuck_skill_routes_first_ambiguous_failure_to_base_skill() -> None:
 def test_validator_accepts_complete_entry() -> None:
     validator = _load_validator()
     assert validator.validate_entries([_valid_entry()]) == []
+
+    rejected = _valid_entry()
+    rejected["verdict"] = "models_rejected"
+    assert validator.validate_entries([rejected]) == []
 
 
 def test_validator_rejects_missing_fields_and_unknown_verdict() -> None:
