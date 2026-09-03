@@ -119,12 +119,16 @@ def test_skill_supports_observable_behavior_contract_without_failure() -> None:
         "два элемента не различают ключ сортировки",
         "контрбалансированный набор минимального достаточного размера",
         "могут быть достаточны три значения",
+        "система сохранила разные ключи",
+        "правило разрешения равенства делают опыт `invalid_test`",
     ):
         assert fragment in body
 
     assert "установи фактическое правило работы этой системы" in registry["natural_triggers"]
     assert "Фактическое Правило Без Сбоя" in example
     assert "непересекающиеся последовательности" in example
+    assert "сохранённых времени создания попарно различаются" in example
+    assert "Если два времени совпали или metadata недоступны" in example
     assert "Любая другая последовательность даёт `inconclusive`" in example
     assert "Не установлено: внутренняя реализация, замысел разработчика, штатность или баг" in example
 
