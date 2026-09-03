@@ -104,10 +104,33 @@ def test_skill_separates_safe_checks_from_permissioned_changes() -> None:
         assert permissioned_fragment in body
 
 
-def test_examples_cover_three_domains_and_two_boundaries() -> None:
+def test_skill_supports_observable_behavior_contract_without_failure() -> None:
+    body = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    registry = load_registry(SKILL)
+    example = (SKILL / "examples" / "good-04-observable-order-rule.md").read_text(
+        encoding="utf-8"
+    )
+
+    for fragment in (
+        "Когда технического сбоя нет",
+        "Поведенческий контракт: при условиях X система наблюдаемо делает Y.",
+        "внутренняя причина, реализация, замысел разработчика",
+        "штатность или наличие бага",
+    ):
+        assert fragment in body
+
+    assert "установи фактическое правило работы этой системы" in registry["natural_triggers"]
+    assert "Фактическое Правило Без Сбоя" in example
+    assert "Не установлено: внутренняя реализация, замысел разработчика, штатность или баг" in example
+
+
+def test_examples_cover_four_domains_and_two_boundaries() -> None:
     sip = (SKILL / "examples" / "good-01-sip-timeout.md").read_text(encoding="utf-8")
     ci = (SKILL / "examples" / "good-02-ci-artifact-vs-runtime.md").read_text(encoding="utf-8")
     gui = (SKILL / "examples" / "good-03-green-ui-vs-outcome.md").read_text(encoding="utf-8")
+    behavior = (SKILL / "examples" / "good-04-observable-order-rule.md").read_text(
+        encoding="utf-8"
+    )
     assertion = (SKILL / "examples" / "anti-01-exact-assertion.md").read_text(encoding="utf-8")
     compound = (SKILL / "examples" / "anti-02-compound-change.md").read_text(encoding="utf-8")
 
@@ -115,6 +138,7 @@ def test_examples_cover_three_domains_and_two_boundaries() -> None:
     assert "Нельзя писать «неверный пароль»" in sip
     assert "digest" in ci and "`favors_a`" in ci and "`favors_b`" in ci
     assert "зелёный статус" in gui and "`invalid_test`" in gui
+    assert "Поведенческий контракт" in behavior and "Нельзя писать" in behavior
     assert "не запускает `proverka-prichin-sboya`" in assertion
     assert "одновременно меняются версия, процесс, credentials и маршрут" in compound
 
