@@ -50,7 +50,7 @@ expected_if_b: "..."
 evidence_to_capture: "..."
 safety_gate: "Почему probe допустим либо какое разрешение требуется."
 stop_condition: "Сколько раз и при каком результате остановиться."
-verdict: "outcome_reached | favors_a | favors_b | inconclusive | invalid_test | blocked"
+verdict: "outcome_reached | favors_a | favors_b | inconclusive | models_rejected | invalid_test | blocked"
 ```
 
 `hypothesis_a` и `hypothesis_b` должны обе объяснять исходный симптом, но давать

@@ -111,6 +111,9 @@ def test_skill_supports_observable_behavior_contract_without_failure() -> None:
     example = (SKILL / "examples" / "good-04-observable-order-rule.md").read_text(
         encoding="utf-8"
     )
+    diagnostic_contract = (SKILL / "references" / "diagnostic-contract.md").read_text(
+        encoding="utf-8"
+    )
 
     for fragment in (
         "Когда технического сбоя нет",
@@ -135,7 +138,9 @@ def test_skill_supports_observable_behavior_contract_without_failure() -> None:
     assert "опыт остаётся валидным" in example
     assert "возвращает `models_rejected`" in example
     assert "поведенческий контракт не" in example
+    assert "временной порядок равен `M < A < Z`" in example
     assert "Не установлено: внутренняя реализация, замысел разработчика, штатность или баг" in example
+    assert "inconclusive | models_rejected | invalid_test" in diagnostic_contract
 
 
 def test_examples_cover_four_domains_and_two_boundaries() -> None:
