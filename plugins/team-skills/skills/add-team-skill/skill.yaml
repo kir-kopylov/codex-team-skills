@@ -12,6 +12,7 @@ use_cases:
   - "Проверить существующий skill перед публикацией и исправить нарушения правил repo или CI."
   - "Безопасно проверить тестовую среду и опубликовать PR так, чтобы невалидный текст не мог пройти к внешнему изменению."
   - "До commit независимо проверить первый ответ нового или существенно изменённого skill на дословной пользовательской фразе запуска."
+  - "Пакетно проверить первые ответы всех новых или существенно изменённых skills и не открыть commit при неполном либо устаревшем охвате."
 do_not_use_for:
   - "Разовые инструкции, которые не будут повторяться и не требуют отдельного командного skill."
   - "Секретные, клиентские или приватные workflows, которые нельзя хранить в публичном repo."
@@ -25,6 +26,7 @@ natural_triggers:
   - "доработай skill под требования repo"
   - "доведи skill до team-ready"
   - "проверь skill перед PR"
+  - "проверь первые ответы всех изменённых skills перед PR"
   - "почини skill под CI"
 example_files:
   - "examples/good-01-new-workflow.md"
@@ -37,5 +39,6 @@ example_files:
   - "examples/anti-03-unsafe-test-environment.md"
   - "examples/good-06-transparent-auto-launch.md"
   - "examples/anti-04-blocking-consent.md"
-last_reviewed: "2026-08-22"
+  - "examples/good-07-batch-first-responses.md"
+last_reviewed: "2026-08-24"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."
