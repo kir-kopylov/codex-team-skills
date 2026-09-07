@@ -22,7 +22,6 @@ QUESTION_DRIVEN_SKILLS = (
     "codex-quick-launch",
     "dopsoglasheniya-po-oplate",
     "goal-contract-shaper",
-    "goal-contract-shaper-v3",
     "krupnee-runtime",
     "kak-drugie-reshili",
     "marketplace-lot-verifier",

@@ -275,10 +275,8 @@ not already been authorized. Do not repeat an authorization already granted or
 duplicate a system approval prompt. The mandatory post-use survey remains a
 separate non-blocking exception after the result or explicit stop.
 
-`goal-contract-shaper-v3` is explicit-only even though its registry status is
-experimental; semantic matches route to `goal-contract-shaper`. Do not add a
-generic `risk` field to `skill.yaml`: risk belongs to the concrete action, not
-the skill name.
+Do not add a generic `risk` field to `skill.yaml`: risk belongs to the concrete
+action, not the skill name.
 
 Do not reconstruct the wording from memory. The canonical templates and full
 rules live in «Запуск Навыка» in `CONTRIBUTING.md` and
