@@ -26,6 +26,7 @@ QUESTION_DRIVEN_SKILLS = (
     "krupnee-runtime",
     "kak-drugie-reshili",
     "marketplace-lot-verifier",
+    "otsev-replik-do-vstrechi",
     "photo-photobomb-director",
     "raspiska-o-poluchenii-deneg",
     "razbor-bardaka",
