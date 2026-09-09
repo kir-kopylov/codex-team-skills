@@ -6,7 +6,6 @@ from conftest import ROOT, load_frontmatter, load_registry, skill_dirs
 
 
 LAUNCH_HEADING = "## Запуск Навыка"
-V3_EXPLICIT_ONLY = "goal-contract-shaper-v3"
 SCREENCAST_SPEEDUP = (
     ROOT / "plugins" / "team-skills" / "skills" / "screencast-speedup"
 )
@@ -142,14 +141,7 @@ def test_ready_and_experimental_are_immediate_but_drafts_are_explicit_only() -> 
         registry = load_registry(skill_dir)
         section = launch_section(skill_dir)
 
-        if skill_dir.name == V3_EXPLICIT_ONLY:
-            assert "только при явном вызове `goal-contract-shaper-v3`" in section
-            assert (
-                "Смысловой запрос без прямого вызова маршрутизируйте в базовый "
-                "`goal-contract-shaper`"
-            ) in section
-            assert "не запускайте v3 и не спрашивайте о его применении" in section
-        elif registry["status"] == "draft":
+        if registry["status"] == "draft":
             assert "только при явном вызове по имени или прямой команде пользователя" in section
             assert "При одном смысловом совпадении не запускайте навык" in section
             assert "не спрашивайте о его применении" in section
