@@ -110,7 +110,16 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    python scripts/new_skill.py <skill-name> --owner @github-login --summary "Коротко: что делает skill"
    ```
 
-   The name is normalized to `kebab-case` and must match the folder name. Avoid
+   The name is normalized to `kebab-case` and must match the folder name. The
+   name itself is Latin-script Russian words, not English terms: «имя латиницей
+   из русских слов, чтобы по одному названию было ясно, что делает навык и в
+   какой момент он нужен». Two to four hyphen-separated words (prepositions
+   count); the first word is an action or result, followed by the object and a
+   boundary marker (moment, channel or scenario) that separates it from the
+   nearest neighbour skill; transliterate as in accepted names (ч → ch, ш → sh,
+   й → y, ы → y, я → ya, ий → iy, ц → ts). Example: `otsev-replik-do-vstrechi`,
+   not `remote-authenticity-probe`. Full rule: `CONTRIBUTING.md` § «Имя Skill».
+   It applies to new skills; existing names are not renamed retroactively. Avoid
    generic names like `helper`, `workflow`, `assistant`. The generator scaffolds
    `SKILL.md` (including the `## Опрос После Использования` and
    `## Логирование Сбоев` sections), `skill.yaml`, an empty
@@ -308,8 +317,9 @@ text synchronized in the explicit set of question-driven skills.
 
 - **`SKILL.md` frontmatter** may only contain these keys: `name`,
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
-  `tests/test_skill_structure.py`). `name` must equal the folder name and be
-  `kebab-case`. Keep the body short and procedural (`## Запуск Навыка`
+  `tests/test_skill_structure.py`). `name` must equal the folder name, be
+  `kebab-case` and follow the naming rule above (Latin-script Russian words,
+  two to four of them). Keep the body short and procedural (`## Запуск Навыка`
   first, then overview, natural inputs, process, boundaries/safety,
   `## Опрос После Использования`, `## Логирование Сбоев`) — push long reference
   material into `references/`.
