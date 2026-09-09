@@ -29,6 +29,7 @@ QUESTION_DRIVEN_SKILLS = (
     "photo-photobomb-director",
     "raspiska-o-poluchenii-deneg",
     "razbor-bardaka",
+    "remote-authenticity-probe",
     "remont-dogovor-i-raspiski",
     "remont-smeta-builder",
     "screencast-speedup",
