@@ -120,3 +120,21 @@ def test_claude_sync_uses_team_skills_src_in_installed_layout(tmp_path: Path) ->
 
     assert "Готово: установлено скиллов" in result.stdout
     assert (destination / "demo-skill" / "SKILL.md").exists()
+
+
+def test_claude_sync_keeps_unmarked_local_folder_on_name_collision(tmp_path: Path) -> None:
+    # Личная папка без маркера .team-skill носит имя командного skill:
+    # sync не имеет права её перезаписать — пропускает с предупреждением.
+    destination = tmp_path / "claude skills with space"
+    managed_skill = skill_dirs()[0]
+    personal = destination / managed_skill.name
+    write_skill(personal, managed_skill.name, "Личная версия с тем же именем.")
+
+    result = run_sync(destination)
+
+    assert "КОЛЛИЗИЯ " + managed_skill.name in result.stdout
+    assert (personal / "SKILL.md").read_text(encoding="utf-8").endswith("Личная версия с тем же именем.\n")
+    assert not (personal / ".team-skill").exists()
+    assert "collisions=1" in (destination / ".last-sync").read_text(encoding="utf-8")
+    others = [d for d in skill_dirs() if d.name != managed_skill.name and (d / "SKILL.md").exists()]
+    assert others and all((destination / d.name / ".team-skill").exists() for d in others)
