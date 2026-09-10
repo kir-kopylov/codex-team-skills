@@ -34,6 +34,7 @@ ALLOWED_VERDICTS = {
     "favors_a",
     "favors_b",
     "inconclusive",
+    "models_rejected",
     "invalid_test",
     "blocked",
 }
