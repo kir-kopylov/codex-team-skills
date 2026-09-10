@@ -1,0 +1,30 @@
+owner: "@kir-kopylov"
+authors:
+  - "Оксана"
+status: "team-ready"
+summary: "Переводит JSON инструкций доступа, заселения и выезда для посуточных апартаментов на English, Kazakh и Chinese с сохранением схемы, кодов, HTML, плейсхолдеров, переносов строк и UTF-8 без BOM."
+use_cases:
+  - "Перевести entrance/access/check-in/check-out JSON из русского блока в en/kk/ch и сохранить готовый файл."
+  - "Исправить старые машинные переводы в JSON, не доверяя существующим target-language блокам."
+  - "Проверить сохранность HTML, плейсхолдеров, кодов доступа, этажей, подъездов, адресов и точной последовательности переносов строк CRLF/LF/CR."
+  - "Применить правила транслитерации городов и улиц: имя латиницей, тип адресного объекта на языке перевода."
+do_not_use_for:
+  - "Обычный литературный перевод без JSON-схемы и access/check-in/check-out инструкций."
+  - "Юридически заверенный, нотариальный или официальный перевод."
+  - "Live-state проверка адреса, наличия, цены, телефона, графика или актуальных реквизитов."
+  - "Публикация приватных исходных JSON, реальных адресов, кодов доступа или apartment IDs в публичный repo."
+natural_triggers:
+  - "переведи entranceMessages.json на 3 языка"
+  - "переведи access JSON для Sutki"
+  - "сделай готовый JSON с en kk ch"
+  - "исправь перевод улиц и города Алматы в китайском блоке"
+  - "проверь UTF-8 без BOM, плейсхолдеры и переносы строк в переведенном JSON"
+example_files:
+  - "examples/good-01-ready-file.md"
+  - "examples/good-02-street-city-transliteration.md"
+  - "examples/good-03-repair-machine-translation.md"
+  - "examples/good-04-line-break-preservation.md"
+  - "examples/anti-01-chat-only-literary-translation.md"
+  - "examples/anti-02-live-state-verification.md"
+last_reviewed: "2026-07-21"
+source_asset: "Методика Оксаны для переводов Sutki-style access JSON; опубликована в санированном виде без приватных файлов, реальных путей, кодов доступа, адресов и apartment IDs."
