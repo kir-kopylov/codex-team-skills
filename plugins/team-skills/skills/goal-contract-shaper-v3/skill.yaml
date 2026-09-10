@@ -3,7 +3,7 @@ author_github: "@kir-kopylov"
 authors:
   - "Кирилл Копылов"
 status: "experimental"
-base_version: "goal-contract-shaper (plugin team-skills), snapshot 2026-07-04"
+base_version: "kontrakt-tseli-do-starta (plugin team-skills), snapshot 2026-07-04"
 summary: "ЭКСПЕРИМЕНТАЛЬНАЯ v3: формирует проверяемый /goal-контракт из сырой цели; дополнительно жёстко закрывает достижимость финала, completion gate, предикат-над-прокси, BLOCKED, вооружение предпосылок, цепочку полномочий, сквозную пробу, единый источник правды, провенанс и эпистемический гейт. Для независимого A/B-тестирования против базовой версии."
 changes_from_base:
   - "1a. Достижимость финала (satisfiability): под-условия по владельцу власти; отклонять недостижимый агентом финал без BLOCKED."
@@ -31,7 +31,7 @@ use_cases:
 do_not_use_for:
   - "Непосредственное выполнение целевой задачи, поиск live-state, браузинг, контакт с внешними сервисами или запуск /goal."
   - "Разовую задачу, которую закрывает один обычный prompt без итераций, внешних систем и проверяемого финала."
-  - "Создание файлов нового team skill в repo; для этого используйте add-team-skill."
+  - "Создание файлов нового team skill в repo; для этого используйте dobavlenie-navyka-v-biblioteku."
 natural_triggers:
   - "проверь цель для /goal"
   - "подходит ли это для /goal"

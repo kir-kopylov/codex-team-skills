@@ -18,7 +18,7 @@ def test_external_practice_skill_has_executable_handoff() -> None:
     for fragment in (
         "CandidatePacket v1",
         "local_status` всегда равен `NOT_TESTED",
-        "stuck-troubleshooting-reframe",
+        "peresmotr-predposylok-posle-povtora",
         "scripts/validate_candidate_packet.py",
         "поисковый фрагмент считайте наводкой",
     ):

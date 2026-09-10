@@ -8,7 +8,7 @@
 
 ## После Повторного Провала
 
-Если есть current state и не менее двух одинаковых `failed` или `partial` на одном слое, задачу принимает `stuck-troubleshooting-reframe`.
+Если есть current state и не менее двух одинаковых `failed` или `partial` на одном слое, задачу принимает `peresmotr-predposylok-posle-povtora`.
 
 Если новые гипотезы по контракту обязаны иметь внешнее происхождение:
 

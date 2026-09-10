@@ -10,6 +10,9 @@
 #    просто работает на текущем состоянии и пишет предупреждение;
 #  - prune ТОЛЬКО по маркеру .team-skill: личные скиллы коллег, которых нет
 #    в репозитории, никогда не удаляются;
+#  - коллизия имени: папка назначения БЕЗ маркера .team-skill (личный скилл
+#    с тем же именем, что у командного) не перезаписывается — скилл
+#    пропускается с предупреждением КОЛЛИЗИЯ и счётчиком collisions в .last-sync;
 #  - битый frontmatter в SKILL.md → скилл пропускается (fail-closed), а не
 #    копируется и не валит весь синк (паритет с tests/test_skill_structure.py).
 #
@@ -96,7 +99,7 @@ log "Источник:   $SRC"
 log "Назначение: $DEST"
 
 # 3. Копирование с маркером + fail-closed гейтом.
-count=0; skipped=0
+count=0; skipped=0; collisions=0
 for skill_dir in "$SRC"/*/; do
   [[ -f "${skill_dir}SKILL.md" ]] || continue
   name="$(basename "$skill_dir")"
@@ -104,6 +107,11 @@ for skill_dir in "$SRC"/*/; do
   if ! valid_frontmatter "${skill_dir}SKILL.md" "$name"; then
     log "  ⤫ ПРОПУСК $name — невалидный frontmatter (keys/name); не копирую (fail-closed)"
     skipped=$((skipped + 1))
+    continue
+  fi
+  if [[ -d "$DEST/$name" && ! -f "$DEST/$name/$MARKER" ]]; then
+    log "  ⤫ КОЛЛИЗИЯ $name — в назначении есть папка без маркера $MARKER (личный скилл с тем же именем); не перезаписываю. Переименуйте или удалите её и повторите sync"
+    collisions=$((collisions + 1))
     continue
   fi
   rm -rf "${DEST:?}/${name}"
@@ -129,16 +137,16 @@ for dest_dir in "$DEST"/*/; do
 done
 
 # 5. Локальный маркер последней синхронизации Claude skills.
-printf '%s head=%s installed=%s skipped=%s pruned=%s\n' \
+printf '%s head=%s installed=%s skipped=%s pruned=%s collisions=%s\n' \
   "$(ts)" "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')" \
-  "$count" "$skipped" "$pruned" > "$DEST/.last-sync" 2>/dev/null || true
+  "$count" "$skipped" "$pruned" "$collisions" > "$DEST/.last-sync" 2>/dev/null || true
 
 if [[ "$count" -eq 0 ]]; then
   err "Скиллов с SKILL.md не найдено — ничего не установлено."
   exit 1
 fi
 
-log "Готово: установлено скиллов — $count (пропущено $skipped, удалено $pruned)."
+log "Готово: установлено скиллов — $count (пропущено $skipped, удалено $pruned, коллизий $collisions)."
 log "Если скилл не появился сразу — перезапустите Claude (приложение или сессию CLI)."
 log "=== pull-skills end ==="
 exit 0
