@@ -28,12 +28,8 @@ SOURCE_ROLES = {"anchor", "supporting"}
 REMOTE_URI_PREFIX = re.compile(r"(?i)\bhttps?://")
 LOCAL_PATH_PATTERNS = (
     (
-        "абсолютный путь Unix",
-        re.compile(r"(?<![\w/])/(?!/)[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
-    ),
-    (
-        "сетевой путь Unix",
-        re.compile(r"(?<![\w/])//(?!/)[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
+        "абсолютный или сетевой путь Unix",
+        re.compile(r"(?<![\w/])/+[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
     ),
     (
         "локальный путь Unix",
