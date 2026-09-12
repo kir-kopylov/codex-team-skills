@@ -349,6 +349,7 @@ def test_colliding_variant_and_shot_stems_are_rejected(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
+        ("prompt", "Используй /room.png как исходник."),
         ("prompt", "Используй /Users/test-user/work/room.png как исходник."),
         ("notes", r"Рабочий файл C:\Users\test-user\room.png"),
         ("title", "Материал из file:///home/test-user/room.png"),

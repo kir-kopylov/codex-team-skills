@@ -28,7 +28,7 @@ SOURCE_ROLES = {"anchor", "supporting"}
 LOCAL_PATH_PATTERNS = (
     (
         "абсолютный путь Unix",
-        re.compile(r"(?<![A-Za-z0-9:/])/(?!/)(?:[^/\s`\"'<>|]+/)+[^/\s`\"'<>|]+"),
+        re.compile(r"(?<![\w:/<])/(?!/)[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
     ),
     (
         "локальный путь Unix",
