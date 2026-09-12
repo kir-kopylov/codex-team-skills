@@ -350,7 +350,11 @@ def test_colliding_variant_and_shot_stems_are_rejected(tmp_path: Path) -> None:
     ("field", "value"),
     [
         ("prompt", "Используй /room.png как исходник."),
+        ("prompt", "Исходник:/room.png"),
+        ("prompt", "Исходник: </room.png>"),
+        ("notes", "Сетевой файл //server/share/room.png"),
         ("prompt", "Используй /Users/test-user/work/room.png как исходник."),
+        ("notes", r"Корневой файл \room.png"),
         ("notes", r"Рабочий файл C:\Users\test-user\room.png"),
         ("title", "Материал из file:///home/test-user/room.png"),
         ("description", "Эталон лежит в ~/projects/room.png"),
@@ -369,6 +373,16 @@ def test_local_paths_cannot_enter_portable_output(
     write_brief(brief, data)
 
     assert_rejected(brief, tmp_path / "выдача")
+
+
+def test_remote_url_is_not_treated_as_local_path(tmp_path: Path) -> None:
+    brief, data = make_brief(tmp_path)
+    data["images"][0]["notes"] = "Карточка: https://example.com/room.png"
+    write_brief(brief, data)
+
+    result = run_package(brief, tmp_path / "выдача")
+
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("field", REVIEW_FIELDS)
