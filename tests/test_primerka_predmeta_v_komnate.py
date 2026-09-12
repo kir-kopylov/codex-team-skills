@@ -378,14 +378,32 @@ def test_local_paths_cannot_enter_portable_output(
     assert_rejected(brief, tmp_path / "выдача")
 
 
-def test_remote_url_is_not_treated_as_local_path(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/room.png",
+        "http://example.com/room.png",
+        "https://[2001:db8::1]/room.png",
+        "https://example.com./room.png",
+        "https://example.com/#/room.png",
+    ],
+)
+def test_remote_url_is_not_treated_as_local_path(tmp_path: Path, url: str) -> None:
     brief, data = make_brief(tmp_path)
-    data["images"][0]["notes"] = "Карточка: https://example.com/room.png"
+    data["images"][0]["notes"] = f"Карточка: {url}"
     write_brief(brief, data)
 
     result = run_package(brief, tmp_path / "выдача")
 
     assert result.returncode == 0, result.stderr
+
+
+def test_malformed_remote_url_does_not_hide_a_local_path(tmp_path: Path) -> None:
+    brief, data = make_brief(tmp_path)
+    data["images"][0]["notes"] = "Карточка: https:///home/test-user/room.png"
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
 
 
 @pytest.mark.parametrize("field", REVIEW_FIELDS)

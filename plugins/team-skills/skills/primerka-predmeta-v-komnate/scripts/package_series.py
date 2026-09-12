@@ -15,6 +15,7 @@ import re
 import shutil
 import sys
 import tempfile
+from urllib.parse import urlsplit
 import zipfile
 
 
@@ -25,7 +26,7 @@ EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 VARIATION_MODES = {"auto_concepts", "provided_concepts", "product_references"}
 GENERATOR_POLICIES = {"auto", "preferred", "strict"}
 SOURCE_ROLES = {"anchor", "supporting"}
-REMOTE_URI_PREFIX = re.compile(r"(?i)\bhttps?://")
+REMOTE_HTTP_URL = re.compile(r"(?i)\bhttps?://[^\s`\"'<>|]+")
 LOCAL_PATH_PATTERNS = (
     (
         "абсолютный или сетевой путь Unix",
@@ -116,9 +117,19 @@ def reject_local_paths(value: object, name: str) -> None:
         for index, child in enumerate(value):
             reject_local_paths(child, f"{name}[{index}]")
     elif isinstance(value, str):
-        scan_value = REMOTE_URI_PREFIX.sub(
-            lambda match: match.group(0).replace("/", " "), value
-        )
+        def mask_valid_remote_url(match: re.Match[str]) -> str:
+            candidate = match.group(0)
+            try:
+                parsed = urlsplit(candidate)
+                hostname = parsed.hostname
+                _ = parsed.port
+            except ValueError:
+                return candidate
+            if parsed.scheme.lower() in {"http", "https"} and parsed.netloc and hostname:
+                return " " * len(candidate)
+            return candidate
+
+        scan_value = REMOTE_HTTP_URL.sub(mask_valid_remote_url, value)
         for label, pattern in LOCAL_PATH_PATTERNS:
             if pattern.search(scan_value):
                 raise SeriesError(f"{name} содержит {label}; удалите его до упаковки.")
