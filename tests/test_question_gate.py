@@ -28,6 +28,7 @@ QUESTION_DRIVEN_SKILLS = (
     "marketplace-lot-verifier",
     "otsev-replik-do-vstrechi",
     "photo-photobomb-director",
+    "primerka-predmeta-v-komnate",
     "raspiska-o-poluchenii-deneg",
     "razbor-bardaka",
     "remont-dogovor-i-raspiski",
