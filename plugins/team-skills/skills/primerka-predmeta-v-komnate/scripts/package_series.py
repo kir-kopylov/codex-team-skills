@@ -25,7 +25,7 @@ EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 VARIATION_MODES = {"auto_concepts", "provided_concepts", "product_references"}
 GENERATOR_POLICIES = {"auto", "preferred", "strict"}
 SOURCE_ROLES = {"anchor", "supporting"}
-HTML_CLOSING_TAG = re.compile(r"</[A-Za-z][A-Za-z0-9:-]*\s*>")
+REMOTE_URI_PREFIX = re.compile(r"(?i)\bhttps?://")
 LOCAL_PATH_PATTERNS = (
     (
         "абсолютный путь Unix",
@@ -33,7 +33,7 @@ LOCAL_PATH_PATTERNS = (
     ),
     (
         "сетевой путь Unix",
-        re.compile(r"(?<![\w:/])//(?!/)[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
+        re.compile(r"(?<![\w/])//(?!/)[^/\s`\"'<>|]+(?:/[^/\s`\"'<>|]+)*"),
     ),
     (
         "локальный путь Unix",
@@ -120,7 +120,9 @@ def reject_local_paths(value: object, name: str) -> None:
         for index, child in enumerate(value):
             reject_local_paths(child, f"{name}[{index}]")
     elif isinstance(value, str):
-        scan_value = HTML_CLOSING_TAG.sub("", value)
+        scan_value = REMOTE_URI_PREFIX.sub(
+            lambda match: match.group(0).replace("/", " "), value
+        )
         for label, pattern in LOCAL_PATH_PATTERNS:
             if pattern.search(scan_value):
                 raise SeriesError(f"{name} содержит {label}; удалите его до упаковки.")

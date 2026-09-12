@@ -272,7 +272,7 @@ def test_two_real_source_views_build_six_cell_matrix(tmp_path: Path) -> None:
 
 def test_metadata_is_escaped_in_gallery(tmp_path: Path) -> None:
     brief, data = make_brief(tmp_path, variants=1, source_views=1)
-    payload = '<script>alert("пример")</script><img src=x onerror="alert(1)">'
+    payload = '<script>alert("пример")<img src=x onerror="alert(1)">'
     data["title"] = payload
     data["variants"][0]["name"] = payload
     data["variants"][0]["description"] = payload
@@ -351,8 +351,10 @@ def test_colliding_variant_and_shot_stems_are_rejected(tmp_path: Path) -> None:
     [
         ("prompt", "Используй /room.png как исходник."),
         ("prompt", "Исходник:/room.png"),
+        ("prompt", "Исходник: </home>"),
         ("prompt", "Исходник: </room.png>"),
         ("notes", "Сетевой файл //server/share/room.png"),
+        ("notes", "Исходник://server/share/room.png"),
         ("prompt", "Используй /Users/test-user/work/room.png как исходник."),
         ("notes", r"Корневой файл \room.png"),
         ("notes", r"Рабочий файл C:\Users\test-user\room.png"),
