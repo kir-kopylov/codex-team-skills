@@ -119,6 +119,8 @@ def reject_local_paths(value: object, name: str) -> None:
     elif isinstance(value, str):
         def mask_valid_remote_url(match: re.Match[str]) -> str:
             candidate = match.group(0)
+            if "\\" in candidate:
+                return candidate
             try:
                 parsed = urlsplit(candidate)
                 hostname = parsed.hostname
