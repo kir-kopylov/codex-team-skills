@@ -322,6 +322,54 @@ def test_identical_bytes_are_rejected(tmp_path: Path) -> None:
     assert_rejected(brief, tmp_path / "выдача")
 
 
+def test_colliding_variant_and_shot_stems_are_rejected(tmp_path: Path) -> None:
+    brief, data = make_brief(
+        tmp_path, variants=2, source_views=2, images_per_variation=2
+    )
+    variant_ids = {"01": "a-b", "02": "a"}
+    shot_ids = {
+        "v01-t01": {"id": "c-t01", "source_view": "c", "take": 1},
+        "v02-t01": {"id": "b-c-t01", "source_view": "b-c", "take": 1},
+    }
+    data["source_views"][0]["id"] = "c"
+    data["source_views"][1]["id"] = "b-c"
+    for variant in data["variants"]:
+        variant["id"] = variant_ids[variant["id"]]
+    for shot in data["shots"]:
+        replacement = shot_ids[shot["id"]]
+        shot.update(replacement)
+    for item in data["images"]:
+        item["variant"] = variant_ids[item["variant"]]
+        item["shot"] = shot_ids[item["shot"]]["id"]
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("prompt", "Используй /Users/test-user/work/room.png как исходник."),
+        ("notes", r"Рабочий файл C:\Users\test-user\room.png"),
+        ("title", "Материал из file:///home/test-user/room.png"),
+        ("description", "Эталон лежит в ~/projects/room.png"),
+    ],
+)
+def test_local_paths_cannot_enter_portable_output(
+    tmp_path: Path, field: str, value: str
+) -> None:
+    brief, data = make_brief(tmp_path)
+    if field in {"prompt", "notes"}:
+        data["images"][0][field] = value
+    elif field == "description":
+        data["variants"][0][field] = value
+    else:
+        data[field] = value
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
 @pytest.mark.parametrize("field", REVIEW_FIELDS)
 @pytest.mark.parametrize("value", ["fail", "pending", True, None])
 def test_each_review_field_requires_explicit_pass(
@@ -362,9 +410,11 @@ def test_unreadable_images_are_rejected(tmp_path: Path, failure: str) -> None:
         "variant-count",
         "shot-count",
         "bad-shot-id",
+        "repeat-before-cycle",
         "supporting-camera",
         "auto-requested",
         "strict-unconfirmed",
+        "missing-actual-name",
         "auto-without-goal",
     ],
 )
@@ -383,6 +433,14 @@ def test_invalid_order_contract_is_rejected(tmp_path: Path, failure: str) -> Non
     elif failure == "bad-shot-id":
         data["shots"][0]["id"] = "invented-view"
         data["images"][0]["shot"] = "invented-view"
+    elif failure == "repeat-before-cycle":
+        old_shot = data["shots"][1]["id"]
+        data["shots"][1].update(
+            {"id": "v01-t02", "source_view": "v01", "take": 2}
+        )
+        for item in data["images"]:
+            if item["shot"] == old_shot:
+                item["shot"] = "v01-t02"
     elif failure == "supporting-camera":
         data["source_views"][0]["role"] = "supporting"
     elif failure == "auto-requested":
@@ -395,6 +453,8 @@ def test_invalid_order_contract_is_rejected(tmp_path: Path, failure: str) -> Non
             "actual_version": None,
             "version_fulfilled": False,
         }
+    elif failure == "missing-actual-name":
+        data["generator"]["actual_name"] = None
     else:
         data["design_goal"] = None
     write_brief(brief, data)

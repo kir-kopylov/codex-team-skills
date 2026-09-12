@@ -25,6 +25,26 @@ EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 VARIATION_MODES = {"auto_concepts", "provided_concepts", "product_references"}
 GENERATOR_POLICIES = {"auto", "preferred", "strict"}
 SOURCE_ROLES = {"anchor", "supporting"}
+LOCAL_PATH_PATTERNS = (
+    (
+        "абсолютный путь Unix",
+        re.compile(r"(?<![A-Za-z0-9:/])/(?!/)(?:[^/\s`\"'<>|]+/)+[^/\s`\"'<>|]+"),
+    ),
+    (
+        "локальный путь Unix",
+        re.compile(
+            r"(?<![A-Za-z0-9:/])/(?:Users|home|root|private|tmp|var|Volumes|mnt|opt|etc)"
+            r"(?:/[^\s`\"'<>|]+)*"
+        ),
+    ),
+    (
+        "локальный путь Windows",
+        re.compile(r"(?i)(?<![A-Za-z0-9])[A-Z]:[\\/][^\s`\"'<>|]+"),
+    ),
+    ("сетевой путь Windows", re.compile(r"\\\\[^\\\s]+\\[^\\\s]+")),
+    ("домашний путь", re.compile(r"(?<![\w])~[\\/][^\s`\"'<>|]+")),
+    ("локальный file URI", re.compile(r"(?i)\bfile://[^\s`\"'<>|]+")),
+)
 TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "gallery-template.html"
 REVIEW_NOTICE = (
     "Статусы визуальной проверки переданы исполнителем. Сборщик проверяет "
@@ -80,6 +100,20 @@ def safe_id(value: object, name: str) -> str:
     if not isinstance(value, str) or not ID.fullmatch(value):
         raise SeriesError(f"{name} содержит недопустимый id: {value!r}.")
     return value
+
+
+def reject_local_paths(value: object, name: str) -> None:
+    """Не дать приватным рабочим путям попасть в переносимый пакет."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            reject_local_paths(child, f"{name}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            reject_local_paths(child, f"{name}[{index}]")
+    elif isinstance(value, str):
+        for label, pattern in LOCAL_PATH_PATTERNS:
+            if pattern.search(value):
+                raise SeriesError(f"{name} содержит {label}; удалите его до упаковки.")
 
 
 def read_brief(path: Path) -> dict:
@@ -197,6 +231,7 @@ def read_brief(path: Path) -> dict:
         raise SeriesError("shots должен быть непустым массивом.")
     shot_ids: set[str] = set()
     shot_pairs: set[tuple[str, int]] = set()
+    shot_sequence: list[tuple[str, int]] = []
     for entry in shots:
         entry = require_fields(
             entry,
@@ -220,9 +255,32 @@ def read_brief(path: Path) -> dict:
             raise SeriesError(f"Повторный кадр: {key}.")
         shot_ids.add(key)
         shot_pairs.add((source_view, take))
+        shot_sequence.append((source_view, take))
         nonempty_string(entry["label"], f"shots/{key}/label")
     if len(shots) != counts["images_per_variation"]:
         raise SeriesError("Число shots не совпадает с counts.images_per_variation.")
+    anchor_ids = [entry["id"] for entry in source_views if entry["role"] == "anchor"]
+    expected_sequence = [
+        (anchor_ids[index % len(anchor_ids)], index // len(anchor_ids) + 1)
+        for index in range(counts["images_per_variation"])
+    ]
+    if shot_sequence != expected_sequence:
+        raise SeriesError(
+            "shots должны использовать все anchor-виды по порядку до нового дубля."
+        )
+
+    output_stems: dict[str, tuple[str, str]] = {}
+    for variant in variants:
+        for shot in shots:
+            slot = (variant["id"], shot["id"])
+            stem = f"{slot[0]}-{slot[1]}"
+            if stem in output_stems:
+                previous = output_stems[stem]
+                raise SeriesError(
+                    f"Ячейки {previous[0]}/{previous[1]} и {slot[0]}/{slot[1]} "
+                    "дают одинаковое имя выходного файла; измените id."
+                )
+            output_stems[stem] = slot
 
     generator = require_fields(
         data["generator"],
@@ -235,11 +293,12 @@ def read_brief(path: Path) -> dict:
             "version_fulfilled",
         },
     )
-    for field in ("requested", "actual_name", "actual_version"):
+    for field in ("requested", "actual_version"):
         if generator[field] is not None and (
             not isinstance(generator[field], str) or not generator[field].strip()
         ):
             raise SeriesError(f"generator.{field} должен быть непустой строкой или null.")
+    nonempty_string(generator["actual_name"], "generator.actual_name")
     if generator["policy"] not in GENERATOR_POLICIES:
         raise SeriesError("generator.policy содержит неизвестное значение.")
     if generator["policy"] == "auto" and generator["requested"] is not None:
@@ -465,6 +524,10 @@ def package(brief_path: Path, out: Path) -> int:
         raise SeriesError(f"Папка результата уже существует; выберите новую: {out}")
     data = read_brief(brief_path)
     accepted = validate_images(data, brief_path.parent)
+    portable_input = copy.deepcopy(data)
+    for item in portable_input["images"]:
+        item.pop("path", None)
+    reject_local_paths(portable_input, "переносимые данные")
     if not out.parent.is_dir():
         raise SeriesError(f"Родительская папка результата не существует: {out.parent}")
 
