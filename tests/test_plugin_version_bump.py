@@ -14,7 +14,7 @@ spec.loader.exec_module(check)
 
 def test_regular_skill_change_requires_higher_version() -> None:
     errors = check.validate_version_bump(
-        ["plugins/team-skills/skills/verify/SKILL.md"],
+        ["plugins/team-skills/skills/proverka-aktualnosti-v-momente/SKILL.md"],
         base_version="1.2.3",
         head_version="1.2.3",
     )
@@ -22,7 +22,7 @@ def test_regular_skill_change_requires_higher_version() -> None:
 
 
 def test_patch_minor_and_major_bumps_are_accepted() -> None:
-    path = ["plugins/team-skills/skills/verify/SKILL.md"]
+    path = ["plugins/team-skills/skills/proverka-aktualnosti-v-momente/SKILL.md"]
     for head in ("1.2.4", "1.3.0", "2.0.0"):
         assert check.validate_version_bump(path, base_version="1.2.3", head_version=head) == []
 

@@ -10,7 +10,7 @@ from conftest import ROOT, load_registry
 
 
 SKILL = ROOT / "plugins" / "team-skills" / "skills" / "proverka-prichin-sboya"
-STUCK = ROOT / "plugins" / "team-skills" / "skills" / "stuck-troubleshooting-reframe"
+STUCK = ROOT / "plugins" / "team-skills" / "skills" / "peresmotr-predposylok-posle-povtora"
 VALIDATOR = SKILL / "scripts" / "validate_diagnostic_ledger.py"
 
 
@@ -73,7 +73,7 @@ def test_skill_declares_first_failure_cause_check_contract() -> None:
         "inconclusive",
         "invalid_test",
         "blocked",
-        "stuck-troubleshooting-reframe",
+        "peresmotr-predposylok-posle-povtora",
         "Не создавайте эти файлы без согласия",
         "scripts/validate_diagnostic_ledger.py",
     ):

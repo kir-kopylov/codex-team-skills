@@ -108,5 +108,5 @@ jobs:
           mkdir -p "$dest/local-only"
           printf '%s\n' '---' 'name: local-only' 'description: local only' '---' '# Local Only' > "$dest/local-only/SKILL.md"
           CLAUDE_SKILLS_DIR="$dest" ./scripts/pull-skills.sh
-          test -f "$dest/add-team-skill/SKILL.md"
+          test -f "$dest/dobavlenie-navyka-v-biblioteku/SKILL.md"
           test -f "$dest/local-only/SKILL.md"

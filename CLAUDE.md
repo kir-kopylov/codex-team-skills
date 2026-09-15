@@ -88,7 +88,7 @@ pyproject.toml                     # Python project (requires-python >=3.11)
 The authoritative list of skills and their statuses lives in `catalog.md`
 (team-ready skills) and in each skill's `skill.yaml` (`status` field) — treat
 those as the single source of truth rather than hardcoding a list here. The
-`photo-photobomb-director` skill is the seed/example that demonstrates the
+`podsadka-nezvanyh-v-snimok` skill is the seed/example that demonstrates the
 quality bar; `docs/seed-skill-example.md` walks through it.
 
 ## Development Workflow
@@ -99,7 +99,7 @@ quality bar; `docs/seed-skill-example.md` walks through it.
 python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python >= 3.11)
 ```
 
-`openpyxl` is needed because some skills (e.g. `remont-smeta-builder`) ship
+`openpyxl` is needed because some skills (e.g. `smeta-remonta-do-dogovora`) ship
 `scripts/` that build `.xlsx` output and have tests that exercise them.
 
 ### Adding or editing a skill
@@ -119,7 +119,9 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    nearest neighbour skill; transliterate as in accepted names (ч → ch, ш → sh,
    й → y, ы → y, я → ya, ий → iy, ц → ts). Example: `otsev-replik-do-vstrechi`,
    not `remote-authenticity-probe`. Full rule: `CONTRIBUTING.md` § «Имя Skill».
-   It applies to new skills; existing names are not renamed retroactively. Avoid
+   It applies to all skills: the one-off September 2026 rename of the legacy
+   English names is recorded in `docs/skill-renames-2026-09.md`; do not rename
+   again without an owner decision. Avoid
    generic names like `helper`, `workflow`, `assistant`. The generator scaffolds
    `SKILL.md` (including the `## Опрос После Использования` and
    `## Логирование Сбоев` sections), `skill.yaml`, an empty
@@ -227,17 +229,17 @@ survey (`usage-feedback.jsonl`).
   a `SKILL.md` edit, a `references/domain-playbook.md` patch, a synthetic
   good/anti example, or a regression test. Never commit raw logs, PII, private
   paths, tokens, client transcripts, or screenshots.
-- Two skills operate this loop: `skill-exception-reviewer` (turns sanitized
+- Two skills operate this loop: `pravilo-iz-zhurnala-sboev` (turns sanitized
   failure cards AND usage-feedback cards into a patch *proposal* without
-  applying it) and `skill-methodologist` (designs the skill contract up front).
+  applying it) and `kontrakt-navyka-do-sborki` (designs the skill contract up front).
   Survey wishes become `SKILL.md`/example edits in the proposal;
   `known-exceptions.yaml` entries are reserved for failures.
 
 ## references/ and domain playbooks
 
 `references/` holds heavier per-skill docs that don't belong in the short
-`SKILL.md` body — e.g. `add-team-skill/references/discovery-gate.md`,
-`skill-methodologist/references/skill-methodology.md`,
+`SKILL.md` body — e.g. `dobavlenie-navyka-v-biblioteku/references/discovery-gate.md`,
+`kontrakt-navyka-do-sborki/references/skill-methodology.md`,
 `dopsoglasheniya-po-oplate/references/bloki-DS.md`.
 
 For domain/interface-heavy skills, `references/domain-playbook.md` is the
@@ -285,7 +287,7 @@ duplicate a system approval prompt. The mandatory post-use survey remains a
 separate non-blocking exception after the result or explicit stop.
 
 `goal-contract-shaper-v3` is explicit-only even though its registry status is
-experimental; semantic matches route to `goal-contract-shaper`. Do not add a
+experimental; semantic matches route to `kontrakt-tseli-do-starta`. Do not add a
 generic `risk` field to `skill.yaml`: risk belongs to the concrete action, not
 the skill name.
 
@@ -346,9 +348,9 @@ text synchronized in the explicit set of question-driven skills.
   Caveat: the privacy test is regex-only — it does NOT catch real personal
   names (no NER detector) or relative `~/` paths, so a green `pytest` is not a
   privacy clearance; a human must still review before publishing.
-- **`mac-app-uninstaller` scanner is scan-only**: its script must never contain
+- **`udalenie-prilozheniya-s-mac` scanner is scan-only**: its script must never contain
   deletion primitives (`rm -`, `.unlink(`, `rmtree`, `send2trash`, etc.) —
-  enforced by `tests/test_mac_app_uninstaller.py`.
+  enforced by `tests/test_udalenie_prilozheniya_s_mac.py`.
 - **Plugin manifest**: two manifests, two rules. The Codex manifest
   (`.codex-plugin/plugin.json`, checked by `tests/test_plugin_manifest.py`) has
   `name` = `team-skills`, a semver `version`, `skills` = `./skills/`, and an
@@ -398,9 +400,9 @@ changes here must keep the tests and the Russian user-facing messages intact.
     `test_usage_feedback.py`, `test_domain_playbook.py`,
     `test_plugin_manifest.py`
   - safety & policy: `test_privacy.py`, `test_language_policy.py`,
-    `test_mac_app_uninstaller.py`
+    `test_udalenie_prilozheniya_s_mac.py`
   - per-skill behavior: `test_dopsoglasheniya_po_oplate.py`,
-    `test_remont_smeta_builder.py`, `test_translate_daily_briefs.py`
+    `test_smeta_remonta_do_dogovora.py`, `test_perevod_smennyh_svodok.py`
   - delivery: `test_native_codex_delivery.py`,
     `test_plugin_version_bump.py`, `test_claude_sync.py`
 

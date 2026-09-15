@@ -15,25 +15,25 @@ CANONICAL_GATE = """Перед любым вопросом проведи кон
 
 SKILLS_DIR = ROOT / "plugins" / "team-skills" / "skills"
 QUESTION_DRIVEN_SKILLS = (
-    "add-team-skill",
-    "browser-preflight",
-    "cheap-route-splitter",
-    "chat-to-skill-miner",
-    "codex-quick-launch",
+    "dobavlenie-navyka-v-biblioteku",
+    "dopusk-saytov-do-tsikla",
+    "razbivka-marshruta-pod-limit",
+    "otbor-navykov-iz-chata",
+    "navyk-iz-chastogo-zaprosa",
     "dopsoglasheniya-po-oplate",
-    "goal-contract-shaper",
+    "kontrakt-tseli-do-starta",
     "goal-contract-shaper-v3",
-    "krupnee-runtime",
+    "podskazka-krupnee-posle-povtorov",
     "kak-drugie-reshili",
-    "marketplace-lot-verifier",
+    "proverka-lotov-perepiskoy",
     "otsev-replik-do-vstrechi",
-    "photo-photobomb-director",
+    "podsadka-nezvanyh-v-snimok",
     "raspiska-o-poluchenii-deneg",
     "razbor-bardaka",
     "remont-dogovor-i-raspiski",
-    "remont-smeta-builder",
-    "screencast-speedup",
-    "str-direct-semantika",
+    "smeta-remonta-do-dogovora",
+    "uskorenie-zapisi-ekrana",
+    "semantika-direkta-po-adresam",
     "vtoroy-mozg",
 )
 
@@ -66,9 +66,9 @@ def test_author_contracts_keep_canonical_gate() -> None:
 def test_question_gate_removes_precomputed_question_batches() -> None:
     razbor = _read(SKILLS_DIR / "razbor-bardaka" / "SKILL.md")
     razbor_example = _read(SKILLS_DIR / "razbor-bardaka" / "examples" / "good-01.md")
-    add_skill = _read(SKILLS_DIR / "add-team-skill" / "SKILL.md")
+    add_skill = _read(SKILLS_DIR / "dobavlenie-navyka-v-biblioteku" / "SKILL.md")
     discovery = _read(
-        SKILLS_DIR / "add-team-skill" / "references" / "discovery-gate.md"
+        SKILLS_DIR / "dobavlenie-navyka-v-biblioteku" / "references" / "discovery-gate.md"
     )
 
     for forbidden in ("раунды по 3–4", "показывать пачкой", "следующий раунд вопросов"):
@@ -84,7 +84,7 @@ def test_question_gate_removes_precomputed_question_batches() -> None:
 
 
 def test_goal_contract_shaper_keeps_domain_specific_question_gate() -> None:
-    content = _read(SKILLS_DIR / "goal-contract-shaper" / "SKILL.md")
+    content = _read(SKILLS_DIR / "kontrakt-tseli-do-starta" / "SKILL.md")
 
     for fragment in (
         "### Настоящий Вопрос",
