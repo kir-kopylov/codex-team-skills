@@ -433,6 +433,9 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "оба списка должны содержать ровно один и тот же URL",
         "к этой URL не должна применяться ни одна `url.*.insteadOf` или `url.*.pushInsteadOf`",
         "имя `origin` или уже раскрытая URL не исключают повторную подстановку адреса",
+        "полные строки `<base-full-ref>` и `<target-full-ref>` должны различаться",
+        "Их равенство запрещает одобрение, `commit`, `push` и работу с PR",
+        "не доказывает, что target не является самой base-веткой",
         "destination должен быть без встроенного пароля или token",
         "настройте credential-free destination",
         "staged tree из `git write-tree`",
@@ -507,6 +510,7 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
     for preapproval_gate in (
         "выбранный до одобрения режим границы",
         "git remote get-url --push --all \"<remote>\"",
+        "полные строки `<base-full-ref>` и `<target-full-ref>` должны различаться",
         "git ls-remote --heads \"<destination>\" \"<base-full-ref>\" \"<target-full-ref>\"",
         "при существующем target OID HEAD должен точно совпадать с OID target",
         "если существует `MERGE_HEAD`, он должен содержать ровно один OID",
