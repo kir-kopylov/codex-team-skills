@@ -74,9 +74,9 @@ Read-only способом получите текущий SHA ветки `main`
 
 ### 3. Проверить Marketplace-Источник
 
-Выполните `codex --version`, `codex plugin --help` и `codex plugin list --json`. Из ответа текущего запуска берите только реально возвращённые поля: marketplace/source/ref или их отсутствие. Не вычисляйте snapshot marketplace по имени cache-каталога.
+Выберите работающую официальную CLI по [общей предварительной проверке](../obnovlenie-biblioteki-navykov/references/codex-cli-preflight.md) и выполните только её read-only часть: `--version`, `plugin --help` и `plugin list --json`. Ошибка команды `codex` из `PATH` доказывает сбой этого запуска, но не недоступность всей CLI: проверьте уже установленный официальный binary приложения с тем же Codex home/profile. Если совпадение home/profile не доказано, не переносите результат другого окружения на проверяемую установку. Не устанавливайте CLI и не меняйте `PATH` ради диагностики.
 
-Если CLI не запускается или JSON не разбирается, этот слой получает `UNKNOWN_COMMAND_FAILED`. Если CLI не отдаёт commit/ref marketplace, укажите `UNKNOWN_NOT_EXPOSED`; не приравнивайте source URL к конкретному SHA.
+Из ответа текущего успешного запуска берите только реально возвращённые поля: marketplace/source/ref или их отсутствие. Не вычисляйте snapshot marketplace по имени cache-каталога. Если ни один безопасно обнаруженный официальный кандидат для того же home/profile не запускает нужную команду или не возвращает разбираемый JSON, этот слой получает `UNKNOWN_COMMAND_FAILED`. Укажите проверенные способы запуска и точную границу недоступного наблюдения; это не `NOT_INSTALLED`. Остальные слои проверяйте независимо. Если CLI не отдаёт commit/ref marketplace, укажите `UNKNOWN_NOT_EXPOSED`; не приравнивайте source URL к конкретному SHA.
 
 ### 4. Проверить Установленный Plugin
 
@@ -149,6 +149,8 @@ Marketplace: [source/ref или unknown, status, evidence]
 ## Границы
 
 - Не выполнять `marketplace add/upgrade/remove`, `plugin add/remove`, `git pull`, перемещение, карантин, удаление, правку config или перезапуск.
+- Не добавлять или удалять plugin ради получения его пути; отсутствие `installedPath` в read-only ответе оставлять `UNKNOWN_NOT_EXPOSED`.
+- Не считать один сломанный запуск из `PATH` доказательством недоступности официальной CLI приложения и не подменять целевой Codex home/profile при её проверке.
 - Не выдавать remote `main`, marketplace, cache, установленный plugin и текущую сессию за одно состояние.
 - Не считать каталог в cache доказательством активной версии.
 - Не считать точную личную копию фактическим перекрытием без наблюдаемого источника загруженного skill.

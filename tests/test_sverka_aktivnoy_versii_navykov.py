@@ -88,7 +88,7 @@ def test_reality_check_package_is_complete_and_experimental():
     )
 
     assert metadata["status"] == "experimental"
-    assert len(metadata["example_files"]) == 5
+    assert len(metadata["example_files"]) == 6
     assert len(exceptions["exceptions"]) >= 5
     for relative_path in metadata["example_files"]:
         assert (SKILL_DIR / relative_path).is_file()

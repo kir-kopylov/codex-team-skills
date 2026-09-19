@@ -128,3 +128,74 @@ def test_known_exceptions_cover_delivery_duplicates_and_restart() -> None:
         "START_HERE_CONNECT_CODEX_SKILLS.md",
     ):
         assert required in combined
+
+
+def test_reconnect_preserves_the_package_before_native_removal() -> None:
+    guide = (SKILL_DIR / "references/reconnect.md").read_text(encoding="utf-8")
+    backup = guide.index("## 3. Сохранение До Любой Замены")
+    remove = guide.index("codex plugin remove team-skills@codex-team-skills --json")
+    assert guide.index("## 2. Проверка Владения Перед Очисткой") < backup < remove
+    preservation = guide[backup:remove]
+    for prerequisite in ("весь установленный пакет", "SHA-256", "свежесть", "main"):
+        assert prerequisite in preservation
+    assert "preserve-before-reconnect.md" in preservation
+
+
+def test_source_routing_covers_installed_local_and_nested_plugin_sources() -> None:
+    content = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    router = content.split("### 4.", 1)[1].split("### 5.", 1)[0]
+    for distinction in (
+        "Независимо от наличия установленного plugin",
+        "marketplaceSource.sourceType",
+        'source.source = "local"',
+        "даже если plugin уже установлен",
+        "Уже разрешённое переподключение",
+        "Чужой или неизвестный source/ref",
+    ):
+        assert distinction in router
+    assert router.index("до любой команды `marketplace add` или `plugin add`") < router.index("- Подтверждены Git-репозиторий")
+
+
+def test_both_skills_use_one_official_cli_preflight_contract() -> None:
+    relative_reference = "references/codex-cli-preflight.md"
+    reference = (SKILL_DIR / relative_reference).read_text(encoding="utf-8")
+    diagnostic = SKILL_DIR.parent / "sverka-aktivnoy-versii-navykov"
+    for skill in (SKILL_DIR, diagnostic):
+        assert relative_reference in (skill / "SKILL.md").read_text(encoding="utf-8")
+    for guard in (
+        "уже установленного официального приложения",
+        "с тем же Codex home",
+        "plugin list --json",
+        "все доступные подтверждённые кандидаты",
+        "Не скачивайте обходной установщик",
+    ):
+        assert guard in reference
+
+
+def test_preservation_is_conditional_and_does_not_discard_development_work() -> None:
+    content = (SKILL_DIR / "references/preserve-before-reconnect.md").read_text(
+        encoding="utf-8"
+    )
+    for guard in (
+        "Обычное\nобновление подтверждённого канонического Git marketplace",
+        "из этого же SHA",
+        "Номер версии не доказывает включение расширения",
+        "Не меняйте эти файлы, ветку,\n   index или stash",
+        "после установки нужное поведение исчезнет",
+        "повторно проверьте удалённый `main`",
+        "Резервную\nкопию и сведения о восстановлении не удаляйте",
+    ):
+        assert guard in content
+
+
+def test_reconnect_instructions_ship_with_the_plugin() -> None:
+    entry = (ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md").read_text(encoding="utf-8")
+    bundled = "plugins/team-skills/skills/obnovlenie-biblioteki-navykov/references/reconnect.md"
+    assert f"({bundled})" in entry
+    assert (ROOT / bundled).is_file()
+    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    assert "(references/reconnect.md)" in skill
+    guide = (ROOT / bundled).read_text(encoding="utf-8")
+    for reference in ("codex-cli-preflight.md", "preserve-before-reconnect.md"):
+        assert f"({reference})" in guide
+        assert (SKILL_DIR / "references" / reference).is_file()

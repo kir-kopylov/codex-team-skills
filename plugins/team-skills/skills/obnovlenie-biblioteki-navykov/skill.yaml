@@ -9,6 +9,7 @@ use_cases:
   - "Обновить Team Skills из канонического Git marketplace и повторно установить свежий plugin одной командой пользователя."
   - "Убрать конфликтующие одноимённые личные копии навыков в восстанавливаемый карантин, сохранив уникальные навыки."
   - "Отделить установку на диске от фактической видимости навыков и завершить работу проверкой новой сессии."
+  - "Переподключить доказанный локальный marketplace, в том числе с установленным plugin, сохранив нужные доработки и незакоммиченные файлы исходного repo."
   - "Перед первой установкой обнаружить точные следы прежней схемы и направить их в безопасную процедуру переподключения."
 do_not_use_for:
   - "Создание или правка содержания навыков; для этого используйте dobavlenie-navyka-v-biblioteku."
@@ -28,4 +29,8 @@ example_files:
   - "examples/anti-01.md"
   - "examples/anti-02.md"
   - "examples/anti-03-legacy-before-clean-install.md"
-last_reviewed: "2026-08-05"
+  - "examples/good-04-cli-fallback.md"
+  - "examples/good-05-local-reconnect.md"
+  - "examples/good-06-preserve-content.md"
+  - "examples/anti-04-stale-or-missing-extension.md"
+last_reviewed: "2026-09-17"

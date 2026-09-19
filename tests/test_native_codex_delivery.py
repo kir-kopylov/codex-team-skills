@@ -91,7 +91,7 @@ def test_clean_install_update_and_remove_commands_are_documented() -> None:
 
 
 def test_legacy_transition_is_evidence_gated() -> None:
-    guide = (ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md").read_text(encoding="utf-8")
+    guide = (ROOT / "plugins/team-skills/skills/obnovlenie-biblioteki-navykov/references/reconnect.md").read_text(encoding="utf-8")
     required_markers = (
         "# BEGIN codex-team-skills managed block",
         "~/.codex/config.toml",
