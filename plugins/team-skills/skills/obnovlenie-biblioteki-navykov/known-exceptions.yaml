@@ -43,3 +43,7 @@ exceptions:
     root_cause: "Причина изменения неизвестна; старый снимок больше не подтверждает текущее состояние."
     do_next_time: "До удаления перечитать состояние, создать новый снимок, повторить затронутое сравнение содержимого и не объяснять расхождение неподтверждённой причиной."
     source_example: "examples/anti-04-stale-or-missing-extension.md"
+  - symptom: "Успешный plugin list не раскрывает installedPath, а обновление блокируется до резервного копирования."
+    root_cause: "Поле ответа установки было ошибочно принято за обязательное поле read-only списка."
+    do_next_time: "Не вызывать plugin add для поиска пути. Сохранить полный проверенный preservation_set по references/preserve-before-reconnect.md, включая все принадлежащие plugin cache-пакеты; неизвестность активного пути не мешает проверке полноты резервной копии. После разрешённой установки сохранить installedPath из её ответа."
+    source_example: "examples/good-06-preserve-content.md"

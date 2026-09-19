@@ -199,3 +199,27 @@ def test_reconnect_instructions_ship_with_the_plugin() -> None:
     for reference in ("codex-cli-preflight.md", "preserve-before-reconnect.md"):
         assert f"({reference})" in guide
         assert (SKILL_DIR / "references" / reference).is_file()
+
+
+def test_missing_installed_path_has_a_read_only_preservation_route() -> None:
+    content = (SKILL_DIR / "references/preserve-before-reconnect.md").read_text(
+        encoding="utf-8"
+    )
+    fallback = content.split("## Если CLI Не Раскрывает Установленный Путь", 1)[1].split(
+        "## Когда Нужна Сверка Содержимого", 1
+    )[0]
+    for guard in (
+        "installedPath = UNKNOWN_NOT_EXPOSED",
+        "preservation_set",
+        "Перечислите **все** версии",
+        "Сохраните всё поддерево целиком",
+        "Ссылки в любом компоненте пути",
+        "прочитайте копии обратно",
+        "**каждый пакет**",
+        "Если plugin установлен, но ни точный путь, ни полный набор сохранения",
+        "не доказывает путь старой установки",
+    ):
+        assert guard in fallback
+    guide = (SKILL_DIR / "references/reconnect.md").read_text(encoding="utf-8")
+    assert "полный проверенный `preservation_set`" in guide
+    assert "неизвестный путь установленного пакета дают" not in guide
