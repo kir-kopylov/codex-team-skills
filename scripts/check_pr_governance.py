@@ -39,6 +39,16 @@ RAW_LOG_PATTERNS = {
     "raw exception log file": re.compile(r"\bexception-log\.jsonl\b"),
 }
 
+# Every field label of .github/pull_request_template.md ends the previous field:
+# otherwise an empty «Когда не использовать:» borrows the text of its neighbour.
+NEXT_FIELD_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:"
+    r"(?:Какую\s+боль|Для\s+кого|Какие\s+примеры)[^:]*"
+    r"|Было|Стало|Что\s+не\s+меняется|Проверки|Инвариант\s+тестов"
+    r")\s*:",
+    flags=re.I,
+)
+
 
 def strip_markdown_noise(value: str) -> str:
     value = re.sub(r"```.*?```", " ", value, flags=re.DOTALL)
@@ -80,7 +90,7 @@ def extract_when_not_to_use(body: str) -> str:
                 if any(collected):
                     break
                 continue
-            if re.match(r"^\s*(?:[-*]\s*)?(?:Какую\s+боль|Для\s+кого|Какие\s+примеры)[^:]*:", stripped, flags=re.I):
+            if NEXT_FIELD_RE.match(stripped):
                 break
             if re.match(r"^\s*#{1,6}\s+", next_line):
                 break
