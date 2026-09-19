@@ -148,8 +148,10 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    python -m pytest
    ```
 
-5. **Open a Pull Request** that answers the four mandatory questions (see
-   `CONTRIBUTING.md` and `.github/pull_request_template.md`):
+5. **Open a Pull Request** that answers the four mandatory questions inside the
+   shared PR description format (see "PR description format" under
+   `Git & PR Etiquette`, `CONTRIBUTING.md` § «Описание PR» and
+   `.github/pull_request_template.md`):
    - What repeatable pain does this skill solve?
    - Who needs it?
    - When must it NOT be used?
@@ -439,3 +441,31 @@ changes here must keep the tests and the Russian user-facing messages intact.
   Russian-language PR-comment gate (`pr-language.yml`, sender-type check), but
   your replies are not: write them in Russian like any other human-facing PR
   comment, per `language-policy.md`.
+
+### PR description format
+
+One format applies to every PR — skill or not — and to every author, human or
+AI assistant in any harness. It is a shared rule, not a runtime contract: do
+not fork it per runtime. A colleague must be able to name, without opening the
+diff, the problem, the changed observable behavior, the boundaries of the
+solution, and the evidence.
+
+- Build the description in this order, keeping the Russian headings and field
+  labels verbatim (they are technical contract terms): `## Проблема`
+  (`Какую боль решает:`, `Для кого:`) → `## Что изменилось` (`Было:`,
+  `Стало:`) → `## Границы` (`Когда не использовать:`, `Что не меняется:`) →
+  `## Доказательства` (`Какие примеры доказывают полезность:`, `Проверки:`,
+  and `Инвариант тестов:` only when tests changed). In the description each
+  label is a plain list item as in the template (`- Когда не использовать: …`),
+  without backticks or bold. The technical checklist comes after these sections
+  and never replaces them.
+- The four mandatory questions are the fields `Какую боль решает:`,
+  `Для кого:`, `Когда не использовать:` and
+  `Какие примеры доказывают полезность:`. `Когда не использовать:` stays
+  mandatory for a non-skill PR too, and its exact label is parsed by
+  `scripts/check_pr_governance.py` (CI job `pr-governance`), which fails a PR
+  whose field is empty.
+- Do not reconstruct the field-level rules from memory. The canonical Russian
+  wording lives once in `CONTRIBUTING.md` § «Описание PR»;
+  `.github/pull_request_template.md` is its fill-in form, kept in sync by
+  `tests/test_pr_governance.py`.
