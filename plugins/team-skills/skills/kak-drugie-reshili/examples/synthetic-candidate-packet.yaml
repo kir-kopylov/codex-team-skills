@@ -1,0 +1,101 @@
+# Синтетический fixture с зарезервированным example.org.
+# PASS валидатора не превращает его в реальное свидетельство.
+schema_version: 1
+run_id: run-001
+candidate_id: cph-v1-b35a527d5f3caa65a3309b3a4b4be6042fd618d49a5c48e5db3990590d21b67e
+input_fingerprint: ifp-v1-4e6edbf12158115aefb3f32f05413d34ef9327a9da873cae7b00f23b1967d9f1
+status: DRAFT_EXTERNAL_PRACTICE_CANDIDATE
+candidate_type: atomic_mechanism
+reported_problem: Операторская связь недоступна из другой страны
+reported_intervention:
+  components:
+    - Домашний VPN
+  attribution_note: Источник описывает этот набор изменений.
+reported_result: Автор сообщил о работающей связи
+local_status: NOT_TESTED
+evidence_records:
+  - origin_url: https://example.org/case-one
+    canonical_origin_url: https://example.org/case-one
+    canonical_origin_id: origin-v1-a125539663889f9297c7f861cd979a1a2445d7bd1e002e28838c841a23750a94
+    relation: original
+    accessed_at: "2026-07-26T10:05:00+05:00"
+    published_at: "2025-05-03"
+    language: ru
+    accessibility: full_text
+    locator: абзац 4
+    short_excerpt: Автор включил домашний VPN и после этого сообщил о работающей связи.
+    extract_sha256: dc87c9f0695ef35ba3d7322265bfcb49ccd9649141e3c47e6a60aa581bb8c316
+    translation: null
+    reported_context: Доступ к оператору из другой страны
+    reported_change: Домашний VPN
+    reported_result: Автор сообщил о работающей связи
+evidence_basis:
+  independent_origin_count: 1
+  corroboration: none
+  causal_support: single_change_reported
+applicability:
+  matches:
+    - Трансграничный доступ
+  differences:
+    - Другой оператор
+  unknowns:
+    - Текущая доступность
+  acceptance_evidence_not_addressed:
+    - Локальный эксперимент
+    - Подтверждение оператора
+review:
+  researcher_id: researcher-1
+  reviewer_class: none
+  reviewer_id: null
+  reviewed_at: null
+  original_opened: false
+  disagreements: []
+  resolution: not_reviewed
+run_metrics:
+  queries: 2
+  sources_discovered: 1
+  sources_opened: 1
+  sources_readable: 1
+  sources_rejected: 0
+  duplicate_origins: 0
+  retries: 0
+  active_seconds: 600
+  human_review_minutes: 0
+  observable_cost:
+    amount: unknown
+    currency: null
+  failure_codes: []
+  discovery_records:
+    - url: https://example.org/case-one
+      method: search_result
+      reference: q-001
+  query_records:
+    - query_id: q-001
+      query: operator access abroad vpn
+      language: en
+      rationale: Поиск архитектуры от результата.
+      executed_at: "2026-07-26T10:01:00+05:00"
+      result_urls:
+        - https://example.org/case-one
+    - query_id: q-002
+      query: операторская связь за границей vpn
+      language: ru
+      rationale: Проверка другого языкового пространства.
+      executed_at: "2026-07-26T10:02:00+05:00"
+      result_urls: []
+  source_attempts:
+    - url: https://example.org/case-one
+      attempts: 1
+      final_accessibility: full_text
+      disposition: evidence
+      failure_code: null
+resume:
+  queued_leads: []
+  exhausted_queries:
+    - operator access abroad vpn
+    - операторская связь за границей vpn
+  remaining_budget:
+    active_minutes: 20
+    queries: 6
+    opened_sources: 5
+  next_action: Передать пакет независимому reviewer.

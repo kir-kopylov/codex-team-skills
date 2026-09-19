@@ -9,11 +9,11 @@
 ```yaml
 decision:
   run_verifier: false
-  route_to: production-forensic-auditor
+  route_to: razgrom-plana-na-naivnost
   mutation_allowed: false
 ```
 
-Не запускать `pr-semantic-verifier`. Передать исходный текст и заявленную цель в `production-forensic-auditor` либо выполнить обычный code review, если запрос относится к коду.
+Не запускать `pr-semantic-verifier`. Передать исходный текст и заявленную цель в `razgrom-plana-na-naivnost` либо выполнить обычный code review, если запрос относится к коду.
 
 ## Нельзя
 

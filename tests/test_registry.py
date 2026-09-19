@@ -24,6 +24,10 @@ def test_skill_yaml_schema() -> None:
     for skill_dir in skill_dirs():
         registry = load_registry(skill_dir)
         assert required <= set(registry), f"{skill_dir.name} missing registry keys"
+        assert "risk" not in registry, (
+            f"{skill_dir.name}: общий risk в skill.yaml запрещён; "
+            "риск определяется конкретным действием"
+        )
         assert isinstance(registry["owner"], str) and registry["owner"].startswith("@")
         assert registry["status"] in ALLOWED_STATUSES
         assert isinstance(registry["summary"], str) and registry["summary"].strip()

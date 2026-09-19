@@ -1,0 +1,13 @@
+exceptions:
+  - symptom: "Поисковый фрагмент или недоступная страница выданы за прочитанный первоисточник."
+    root_cause: "Наводка была подменена доказательством."
+    do_next_time: "Без открытого оригинала и точного места в тексте оставить NEEDS_MORE_EVIDENCE."
+    source_example: "examples/anti-02.md"
+  - symptom: "Один набор одновременных изменений разобран на несколько якобы независимых причин."
+    root_cause: "Из источника извлечена причинность, которой автор не доказывал."
+    do_next_time: "Сохранить весь набор как reported_intervention_bundle с causal_support bundle_only."
+    source_example: "examples/good-02.md"
+  - symptom: "Переводы и перепечатки одного поста сосчитаны как независимые подтверждения."
+    root_cause: "Дедупликация сделана по URL, а не по происхождению."
+    do_next_time: "Группировать копии по canonical_origin_id и считать независимыми только разные оригиналы."
+    source_example: "examples/good-03.md"

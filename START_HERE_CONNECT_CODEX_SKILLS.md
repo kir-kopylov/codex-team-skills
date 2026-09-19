@@ -34,7 +34,7 @@ codex plugin add team-skills@codex-team-skills --json
 
 ## Проверка После Перезапуска
 
-В новой задаче проверь только список доступных skills: есть ли `team-skills:production-forensic-auditor`. Не подменяй эту проверку наличием файлов на диске.
+В новой задаче проверь только список доступных skills: есть ли `team-skills:razgrom-plana-na-naivnost`. Не подменяй эту проверку наличием файлов на диске.
 
 ## Обновление
 

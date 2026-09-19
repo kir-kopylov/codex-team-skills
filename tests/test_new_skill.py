@@ -5,7 +5,7 @@
 порождает скилы, проваливающие остальные контракты. Здесь мы реально
 запускаем генератор в tmp-каталог и проверяем как нормализацию имени и
 отказ от перезаписи, так и то, что сгенерированный каркас удовлетворяет
-тем же инвариантам формы, что и весь остальной набор (consent gate первой
+тем же инвариантам формы, что и весь остальной набор (запуск первой
 секцией, логирование сбоев, known-exceptions, секции примеров,
 допустимые ключи frontmatter)."""
 
@@ -108,7 +108,14 @@ def test_generator_creates_expected_files(monkeypatch, tmp_path) -> None:
 
 def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     mod = _load_module()
-    skill_dir = _generate(mod, monkeypatch, tmp_path, "shape-check")
+    skill_dir = _generate(
+        mod,
+        monkeypatch,
+        tmp_path,
+        "shape-check",
+        owner="@launch-owner",
+        author_github="@method-author",
+    )
     frontmatter, body = _frontmatter(skill_dir / "SKILL.md")
 
     # frontmatter: только разрешённые ключи, name совпадает с папкой и kebab-case
@@ -116,40 +123,45 @@ def test_generated_skill_md_has_valid_shape(monkeypatch, tmp_path) -> None:
     assert frontmatter["name"] == "shape-check"
     assert NAME_RE.match(frontmatter["name"])
 
-    # consent gate обязан быть первой секцией body (как требует test_consent_gate)
+    # Политика запуска обязана быть первой секцией body.
     headings = [line for line in body.splitlines() if line.startswith("## ")]
-    assert headings[0] == "## Согласие На Запуск"
-    gate = body.split("## Согласие На Запуск", 1)[1].split("\n## ", 1)[0]
+    assert headings[0] == "## Запуск Навыка"
+    launch = body.split("## Запуск Навыка", 1)[1].split("\n## ", 1)[0]
     for phrase in (
-        "без вопроса",
-        "Применить **«TODO: понятное русское название навыка»** (@author) для",
-        "действие пользователя",
-        "конкретный объект",
+        "только при явном вызове по имени или прямой команде пользователя",
+        "При одном смысловом совпадении не запускайте навык",
+        "не спрашивайте о его применении",
+        "ровно одну короткую контекстную строку (не более 30 слов)",
+        "продолжайте работу в том же ответе, не ожидая реакции",
+        "минимальный набор",
+        "одну общую строку",
+        "несовместимым результатам",
+        "желаемом результате",
+        "Запуск навыка не расширяет полномочия",
+        "только непосредственно перед ещё не разрешённым внешним или изменяющим действием",
+    ):
+        assert phrase in launch
+
+    notice = re.search(
+        r"(?m)^Применяю черновой навык "
+        r"\*\*«TODO: понятное русское название навыка»\*\* "
+        r"\(обратная связь — @launch-owner\): "
+        r"(?P<context><[^>\n]+>); продолжаю без ожидания\.$",
+        launch,
+    )
+    assert notice
+    assert "текущего запроса" in notice.group("context")
+    assert len(re.findall(r"(?u)\b[\w@][\w@-]*\b", notice.group(0))) <= 30
+    assert "@method-author" not in notice.group(0)
+    assert "?" not in notice.group(0)
+    for old_marker in (
+        "Применить **«",
         "**С навыком:**",
         "**Без навыка:**",
-        "ровно три содержательные строки",
-        "не более 45 слов",
-        "по одной строке и одному предложению",
-        "не повторяют запрос",
-        "неизвестное не придумывайте",
-        "`Annotation N`",
+        "ждите ответ",
         "выйдите из skill молча",
     ):
-        assert phrase in gate
-    assert "| С навыком |" not in gate
-    assert "Автор навыка —" not in gate
-    assert "**Применить навык?**" not in gate
-
-    question = re.search(r"(?m)^Применить \*\*«.*»\*\* \(@author\) для .*\?$", gate)
-    with_skill = re.search(r"(?m)^\*\*С навыком:\*\* [^\n]+\.$", gate)
-    without_skill = re.search(r"(?m)^\*\*Без навыка:\*\* [^\n]+\.$", gate)
-    assert question and with_skill and without_skill
-    card = (
-        f"{question.group(0)}\n\n{with_skill.group(0)}\n\n"
-        f"{without_skill.group(0)}"
-    )
-    assert card in gate
-    assert len([line for line in card.splitlines() if line]) == 3
+        assert old_marker not in launch
 
     # контракт логирования сбоев
     assert "## Логирование Сбоев" in body

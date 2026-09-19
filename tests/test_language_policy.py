@@ -162,7 +162,7 @@ def test_pr_language_checker_accepts_russian_text() -> None:
             "--kind",
             "PR title/body",
             "--title",
-            "[codex] Усилить goal-contract-shaper",
+            "[codex] Усилить kontrakt-tseli-do-starta",
             "--body",
             (
                 "Что изменилось\n\n"

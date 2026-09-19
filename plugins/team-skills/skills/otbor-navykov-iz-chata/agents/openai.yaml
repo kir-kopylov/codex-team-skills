@@ -1,0 +1,7 @@
+interface:
+  display_name: "Поиск навыков в чате"
+  short_description: "Ищет skills и отделяет уже реализованное от предложенного"
+  default_prompt: "Изучи этот чат и предложи навыки: отдели уже реализованное от предложенного и рекомендуй не более трёх."
+
+policy:
+  allow_implicit_invocation: true

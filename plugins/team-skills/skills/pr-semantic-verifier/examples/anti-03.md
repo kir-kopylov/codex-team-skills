@@ -9,12 +9,12 @@
 ```yaml
 decision:
   run_verifier: false
-  route_to: git-pr-lifecycle-safeguard
-  secondary_route: add-team-skill
+  route_to: provedenie-vetki-do-uborki
+  secondary_route: dobavlenie-navyka-v-biblioteku
   mutation_allowed: false
 ```
 
-Не запускать `pr-semantic-verifier` как управляющий workflow. Передать проверенный scope в `git-pr-lifecycle-safeguard`; для создания или изменения team skill использовать `add-team-skill`.
+Не запускать `pr-semantic-verifier` как управляющий workflow. Передать проверенный scope в `provedenie-vetki-do-uborki`; для создания или изменения team skill использовать `dobavlenie-navyka-v-biblioteku`.
 
 ## Нельзя
 

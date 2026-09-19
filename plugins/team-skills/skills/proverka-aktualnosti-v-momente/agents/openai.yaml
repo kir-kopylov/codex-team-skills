@@ -1,0 +1,7 @@
+interface:
+  display_name: "Проверка актуальности"
+  short_description: "Разделяет найденное, публичные сведения, заказ и ответ человека"
+  default_prompt: "Перед покупкой проверь прямо сейчас предложения по уровням доказательств и сохрани unknown."
+
+policy:
+  allow_implicit_invocation: true

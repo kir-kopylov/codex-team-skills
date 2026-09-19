@@ -59,4 +59,4 @@ codex plugin marketplace add kir-kopylov/codex-team-skills --ref main --json
 codex plugin add team-skills@codex-team-skills --json
 ```
 
-Проверь `codex plugin list --json`, полностью перезапусти Codex и в новой задаче проверь наличие `team-skills:production-forensic-auditor`.
+Проверь `codex plugin list --json`, полностью перезапусти Codex и в новой задаче проверь наличие `team-skills:razgrom-plana-na-naivnost`.

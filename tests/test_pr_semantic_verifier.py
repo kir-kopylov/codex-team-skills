@@ -330,10 +330,10 @@ def test_registry_and_package_keep_experimental_read_only_boundary() -> None:
     for target in {
         "gh-fix-ci",
         "gh-address-comments",
-        "git-pr-lifecycle-safeguard",
-        "add-team-skill",
-        "production-forensic-auditor",
-        "stuck-troubleshooting-reframe",
+        "provedenie-vetki-do-uborki",
+        "dobavlenie-navyka-v-biblioteku",
+        "razgrom-plana-na-naivnost",
+        "peresmotr-predposylok-posle-povtora",
     }:
         assert f"`{target}`" in skill
 
@@ -443,13 +443,13 @@ def test_examples_cover_false_confidence_and_routing_boundaries() -> None:
         },
         "examples/anti-02.md": {
             "run_verifier": False,
-            "route_to": "production-forensic-auditor",
+            "route_to": "razgrom-plana-na-naivnost",
             "mutation_allowed": False,
         },
         "examples/anti-03.md": {
             "run_verifier": False,
-            "route_to": "git-pr-lifecycle-safeguard",
-            "secondary_route": "add-team-skill",
+            "route_to": "provedenie-vetki-do-uborki",
+            "secondary_route": "dobavlenie-navyka-v-biblioteku",
             "mutation_allowed": False,
         },
     }

@@ -1,6 +1,6 @@
 # Seed-Skill: Почему Здесь Есть Фотобомбинг
 
-`photo-photobomb-director` — это первый `team-ready` skill в registry. Он нужен не потому, что хранилище “про фотки”, а потому что на нём удобно показать стандарт качества.
+`podsadka-nezvanyh-v-snimok` — это первый `team-ready` skill в registry. Он нужен не потому, что хранилище “про фотки”, а потому что на нём удобно показать стандарт качества.
 
 ## Что Он Демонстрирует
 
@@ -30,7 +30,7 @@ Registry рассчитан на любые командные skills: доку�
 
 - `codex-team-skills` — это платформа и общее хранилище.
 - `team-skills` — это plugin package, который ставится в Codex.
-- `photo-photobomb-director` — это один skill внутри plugin.
+- `podsadka-nezvanyh-v-snimok` — это один skill внутри plugin.
 
 Если завтра появятся skills для документов, таблиц или due diligence, они должны жить рядом с фотобомбингом как равноправные entries в `catalog.md`.
 

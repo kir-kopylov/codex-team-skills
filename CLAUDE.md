@@ -88,7 +88,7 @@ pyproject.toml                     # Python project (requires-python >=3.11)
 The authoritative list of skills and their statuses lives in `catalog.md`
 (team-ready skills) and in each skill's `skill.yaml` (`status` field) — treat
 those as the single source of truth rather than hardcoding a list here. The
-`photo-photobomb-director` skill is the seed/example that demonstrates the
+`podsadka-nezvanyh-v-snimok` skill is the seed/example that demonstrates the
 quality bar; `docs/seed-skill-example.md` walks through it.
 
 ## Development Workflow
@@ -99,7 +99,7 @@ quality bar; `docs/seed-skill-example.md` walks through it.
 python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python >= 3.11)
 ```
 
-`openpyxl` is needed because some skills (e.g. `remont-smeta-builder`) ship
+`openpyxl` is needed because some skills (e.g. `smeta-remonta-do-dogovora`) ship
 `scripts/` that build `.xlsx` output and have tests that exercise them.
 
 ### Adding or editing a skill
@@ -110,7 +110,18 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    python scripts/new_skill.py <skill-name> --owner @github-login --summary "Коротко: что делает skill"
    ```
 
-   The name is normalized to `kebab-case` and must match the folder name. Avoid
+   The name is normalized to `kebab-case` and must match the folder name. The
+   name itself is Latin-script Russian words, not English terms: «имя латиницей
+   из русских слов, чтобы по одному названию было ясно, что делает навык и в
+   какой момент он нужен». Two to four hyphen-separated words (prepositions
+   count); the first word is an action or result, followed by the object and a
+   boundary marker (moment, channel or scenario) that separates it from the
+   nearest neighbour skill; transliterate as in accepted names (ч → ch, ш → sh,
+   й → y, ы → y, я → ya, ий → iy, ц → ts). Example: `otsev-replik-do-vstrechi`,
+   not `remote-authenticity-probe`. Full rule: `CONTRIBUTING.md` § «Имя Skill».
+   It applies to all skills: the one-off September 2026 rename of the legacy
+   English names is recorded in `docs/skill-renames-2026-09.md`; do not rename
+   again without an owner decision. Avoid
    generic names like `helper`, `workflow`, `assistant`. The generator scaffolds
    `SKILL.md` (including the `## Опрос После Использования` and
    `## Логирование Сбоев` sections), `skill.yaml`, an empty
@@ -124,9 +135,12 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
    trigger phrases so users don't need to remember the internal skill name
    (max 1024 chars, no `TODO`).
 
-3. **Update `catalog.md`** with a row — required for any `team-ready` skill. The
-   row must carry a real, non-empty "Первая фраза для Codex" cell (the phrase a
-   colleague pastes to route to the skill) and link to the skill's `SKILL.md`.
+3. **Update `catalog.md`** with a row — required for any `team-ready` *and* any
+   `experimental` skill (`tests/test_catalog.py` enforces both; an
+   `experimental` skill is already shipped to the team, so it must be findable).
+   The row must carry a real, non-empty "Первая фраза для Codex" cell (the
+   phrase a colleague pastes to route to the skill) and link to the skill's
+   `SKILL.md`.
 
 4. **Run the checks** and fix the *cause* of any failure (never bypass a check):
 
@@ -143,11 +157,27 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 
 ### Skill statuses
 
-- `draft` — early; structure exists, team should not rely on it yet.
+The ladder into the team is `draft` → `experimental` → `team-ready`; a working
+recipe does not have to reach `team-ready` before it is shared.
+
+- `draft` — early; structure exists, team should not rely on it yet. It is
+  explicit-only: a semantic match must not invoke it automatically, while a
+  direct call runs immediately with the draft label and feedback `owner`.
+- `experimental` — a working recipe without guarantees: shipped to the team, so
+  it already needs a `catalog.md` row and no template placeholders / `TODO`
+  (`tests/test_catalog.py`, `tests/test_skill_structure.py`). An unambiguous
+  semantic match invokes it automatically; the notice must identify it as
+  experimental and name the feedback `owner`.
 - `team-ready` — has an owner, a `catalog.md` row, ≥3 `good-*` examples, ≥2
   `anti-*` examples, no template placeholders / `TODO`, and green tests.
+  Promotion from `experimental` comes after colleague feedback or review. An
+  unambiguous semantic match invokes it automatically with a short contextual
+  notice that omits the author and `owner`.
 - `internal-only` — useful but needs internal context or special limits.
 - `deprecated` — must carry a `replacement` or `deprecation_reason` key.
+
+The full ladder rationale lives in the «Лестница Статусов» section of
+`CONTRIBUTING.md`; the allowed values are enforced by `tests/test_registry.py`.
 
 ### Native Codex plugin install
 
@@ -199,17 +229,17 @@ survey (`usage-feedback.jsonl`).
   a `SKILL.md` edit, a `references/domain-playbook.md` patch, a synthetic
   good/anti example, or a regression test. Never commit raw logs, PII, private
   paths, tokens, client transcripts, or screenshots.
-- Two skills operate this loop: `skill-exception-reviewer` (turns sanitized
+- Two skills operate this loop: `pravilo-iz-zhurnala-sboev` (turns sanitized
   failure cards AND usage-feedback cards into a patch *proposal* without
-  applying it) and `skill-methodologist` (designs the skill contract up front).
+  applying it) and `kontrakt-navyka-do-sborki` (designs the skill contract up front).
   Survey wishes become `SKILL.md`/example edits in the proposal;
   `known-exceptions.yaml` entries are reserved for failures.
 
 ## references/ and domain playbooks
 
 `references/` holds heavier per-skill docs that don't belong in the short
-`SKILL.md` body — e.g. `add-team-skill/references/discovery-gate.md`,
-`skill-methodologist/references/skill-methodology.md`,
+`SKILL.md` body — e.g. `dobavlenie-navyka-v-biblioteku/references/discovery-gate.md`,
+`kontrakt-navyka-do-sborki/references/skill-methodology.md`,
 `dopsoglasheniya-po-oplate/references/bloki-DS.md`.
 
 For domain/interface-heavy skills, `references/domain-playbook.md` is the
@@ -221,6 +251,49 @@ interface mechanics (URL patterns, selectors, paid/no-payment paths, local
 language keys); a generic, interface-independent failure does not need one.
 
 ## Key Conventions & Hard Rules
+
+### Transparent skill launch
+
+**Every `SKILL.md` body must open with `## Запуск Навыка`, and it must be the
+FIRST H2** — before the overview and before any working instruction (enforced
+by `tests/test_skill_launch_policy.py`, which reads the section from that
+heading to the next H2).
+
+For `team-ready` and `experimental`, either an explicit call or an unambiguous
+semantic match invokes the skill immediately. Before the first working step,
+show one contextual notice of at most 30 words and continue in the same
+response without waiting for user reaction. The notice names the additional
+procedure or verifiable result for the current request without restating the
+request, exposing the folder name, asking whether to use the skill, or
+comparing two modes.
+
+The canonical `team-ready` notice is:
+
+`Применяю **«<понятное название>»**: <дополнительная процедура или проверяемый результат>; продолжаю без ожидания.`
+
+It must not show `author_github`, `authors`, or `owner`. Preserve those fields
+as authorship and maintenance metadata. `status: experimental` adds the
+experimental label and feedback `owner`; a directly invoked `status: draft`
+adds the draft label and feedback `owner`. Drafts are explicit-only.
+
+Multiple compatible skills are reduced to the smallest useful set and one
+notice. If approaches would produce incompatible results and the request does
+not choose one, ask about the desired result rather than about skill use.
+
+Skill launch does not expand authority. Complete the authorized safe work,
+then ask only immediately before an external or state-changing action that has
+not already been authorized. Do not repeat an authorization already granted or
+duplicate a system approval prompt. The mandatory post-use survey remains a
+separate non-blocking exception after the result or explicit stop.
+
+`goal-contract-shaper-v3` is explicit-only even though its registry status is
+experimental; semantic matches route to `kontrakt-tseli-do-starta`. Do not add a
+generic `risk` field to `skill.yaml`: risk belongs to the concrete action, not
+the skill name.
+
+Do not reconstruct the wording from memory. The canonical templates and full
+rules live in «Запуск Навыка» in `CONTRIBUTING.md` and
+`docs/transparent-skill-launch.md`.
 
 ### Counterfactual question gate
 
@@ -240,16 +313,18 @@ decision map to the user.
 ```
 
 After every answer, recompute whether another question still changes the work.
-This rule does not replace the consent gate, authority confirmation, or the
+This rule does not replace the launch notice, authority confirmation, or the
 mandatory post-use survey. `tests/test_question_gate.py` keeps the canonical
 text synchronized in the explicit set of question-driven skills.
 
 - **`SKILL.md` frontmatter** may only contain these keys: `name`,
   `description`, `license`, `allowed-tools`, `metadata` (enforced by
-  `tests/test_skill_structure.py`). `name` must equal the folder name and be
-  `kebab-case`. Keep the body short and procedural (overview, natural inputs,
-  process, boundaries/safety, `## Опрос После Использования`,
-  `## Логирование Сбоев`) — push long reference material into `references/`.
+  `tests/test_skill_structure.py`). `name` must equal the folder name, be
+  `kebab-case` and follow the naming rule above (Latin-script Russian words,
+  two to four of them). Keep the body short and procedural (`## Запуск Навыка`
+  first, then overview, natural inputs, process, boundaries/safety,
+  `## Опрос После Использования`, `## Логирование Сбоев`) — push long reference
+  material into `references/`.
 - **`skill.yaml` schema** requires: `owner` (starts with `@`, not a placeholder
   like `@owner`/`@github-login`), `status` (one of the allowed values),
   `summary`, `use_cases`, `do_not_use_for`, `natural_triggers`, `example_files`,
@@ -257,10 +332,11 @@ text synchronized in the explicit set of question-driven skills.
   must exist. Optional `authors` (human authorship, must NOT be `@`-handles) and
   `source_asset` go together — if you set `authors`, set `source_asset` too.
   Optional `author_github` is a separately confirmed GitHub account for the
-  method author and is the only author value shown in a user-facing consent
-  card. It may equal `owner` only when the same person is both author and
-  maintainer. Don't infer `author_github` from `owner`, and don't invent either
-  handle; keep human attribution in `authors`/`source_asset`.
+  method author. Keep it as authorship metadata, but do not show it in the
+  ordinary `team-ready` launch notice. It may equal `owner` only when the same
+  person is both author and maintainer. Don't infer `author_github` from
+  `owner`, and don't invent either handle; keep human attribution in
+  `authors`/`source_asset`.
 - **Examples** (`examples/*.md`) must each contain the sections `## Вход`,
   `## Ожидаемое Поведение`, `## Нельзя` (enforced by
   `tests/test_examples.py`). Good examples prove applicability; anti-examples
@@ -272,9 +348,9 @@ text synchronized in the explicit set of question-driven skills.
   Caveat: the privacy test is regex-only — it does NOT catch real personal
   names (no NER detector) or relative `~/` paths, so a green `pytest` is not a
   privacy clearance; a human must still review before publishing.
-- **`mac-app-uninstaller` scanner is scan-only**: its script must never contain
+- **`udalenie-prilozheniya-s-mac` scanner is scan-only**: its script must never contain
   deletion primitives (`rm -`, `.unlink(`, `rmtree`, `send2trash`, etc.) —
-  enforced by `tests/test_mac_app_uninstaller.py`.
+  enforced by `tests/test_udalenie_prilozheniya_s_mac.py`.
 - **Plugin manifest**: two manifests, two rules. The Codex manifest
   (`.codex-plugin/plugin.json`, checked by `tests/test_plugin_manifest.py`) has
   `name` = `team-skills`, a semver `version`, `skills` = `./skills/`, and an
@@ -324,9 +400,9 @@ changes here must keep the tests and the Russian user-facing messages intact.
     `test_usage_feedback.py`, `test_domain_playbook.py`,
     `test_plugin_manifest.py`
   - safety & policy: `test_privacy.py`, `test_language_policy.py`,
-    `test_mac_app_uninstaller.py`
+    `test_udalenie_prilozheniya_s_mac.py`
   - per-skill behavior: `test_dopsoglasheniya_po_oplate.py`,
-    `test_remont_smeta_builder.py`, `test_translate_daily_briefs.py`
+    `test_smeta_remonta_do_dogovora.py`, `test_perevod_smennyh_svodok.py`
   - delivery: `test_native_codex_delivery.py`,
     `test_plugin_version_bump.py`, `test_claude_sync.py`
 
