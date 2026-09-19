@@ -504,11 +504,14 @@ def gallery(data: dict, images: list[dict]) -> str:
         "{{ROWS}}": "".join(rows),
         "{{FOOTER}}": footer,
     }
-    for marker, value in replacements.items():
-        template = template.replace(marker, value)
-    if re.search(r"\{\{[A-Z_]+\}\}", template):
-        raise SeriesError("В шаблоне галереи остались незаполненные маркеры.")
-    return template
+    def replace_marker(match: re.Match[str]) -> str:
+        marker = match.group(0)
+        if marker not in replacements:
+            raise SeriesError("В шаблоне галереи остались незаполненные маркеры.")
+        return replacements[marker]
+
+    # Сканируем только шаблон: маркеры внутри данных остаются обычным текстом.
+    return re.sub(r"\{\{[A-Z_]+\}\}", replace_marker, template)
 
 
 def rename_new(source: Path, destination: Path) -> None:

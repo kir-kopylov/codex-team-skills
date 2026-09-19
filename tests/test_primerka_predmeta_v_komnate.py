@@ -295,6 +295,53 @@ def test_metadata_is_escaped_in_gallery(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    "marker", ["TITLE", "SUMMARY", "HEADINGS", "ROWS", "FOOTER", "CUSTOM_TOKEN"]
+)
+def test_template_markers_in_user_text_are_preserved(
+    tmp_path: Path, marker: str
+) -> None:
+    brief, data = make_brief(tmp_path, variants=1, source_views=1)
+    payload = "Текст пользователя {{" + marker + "}} сохраняется дословно."
+    data["title"] = payload
+    data["variants"][0]["name"] = payload
+    data["variants"][0]["description"] = payload
+    data["shots"][0]["label"] = payload
+    data["images"][0]["prompt"] = payload
+    data["images"][0]["notes"] = payload
+    data["limitations"] = [payload]
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    gallery = GalleryParser()
+    gallery.feed((out / "index.html").read_text(encoding="utf-8"))
+    assert gallery.text.count(payload) == 8
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    item = manifest["images"][0]
+    assert item["notes"] == payload
+    assert (out / item["prompt_path"]).read_text(encoding="utf-8").strip() == payload
+
+
+def test_unknown_marker_in_gallery_template_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import runpy
+
+    module = runpy.run_path(str(SCRIPT))
+    template = tmp_path / "template.html"
+    template.write_text("<h1>{{UNKNOWN}}</h1>", encoding="utf-8")
+    render = module["gallery"]
+    monkeypatch.setitem(render.__globals__, "TEMPLATE", template)
+    _, data = make_brief(tmp_path, variants=1, source_views=1)
+    images = [dict(item, prompt_path="prompts/example.txt") for item in data["images"]]
+
+    with pytest.raises(module["SeriesError"], match="незаполненные маркеры"):
+        render(data, images)
+
+
+@pytest.mark.parametrize(
     "failure", ["missing", "duplicate-slot", "unknown-variant", "unknown-shot"]
 )
 def test_incomplete_or_ambiguous_matrix_is_rejected(
