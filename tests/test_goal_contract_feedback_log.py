@@ -8,7 +8,7 @@ from pathlib import Path
 from conftest import ROOT
 
 
-SCRIPT = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper" / "scripts" / "log_usage_feedback.py"
+SCRIPT = ROOT / "plugins" / "team-skills" / "skills" / "kontrakt-tseli-do-starta" / "scripts" / "log_usage_feedback.py"
 
 
 def run_feedback_logger(tmp_path: Path, *args: str) -> dict[str, object]:

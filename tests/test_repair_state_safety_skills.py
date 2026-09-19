@@ -3,11 +3,11 @@ from __future__ import annotations
 from conftest import ROOT, load_registry
 
 
-SPLIT_BRAIN = ROOT / "plugins" / "team-skills" / "skills" / "windows-app-connectivity-split-brain"
-GOAL_SHAPER = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper"
+SPLIT_BRAIN = ROOT / "plugins" / "team-skills" / "skills" / "sloy-obryva-seti-windows"
+GOAL_SHAPER = ROOT / "plugins" / "team-skills" / "skills" / "kontrakt-tseli-do-starta"
 GOAL_SHAPER_V3 = ROOT / "plugins" / "team-skills" / "skills" / "goal-contract-shaper-v3"
-SKILL_METHODOLOGIST = ROOT / "plugins" / "team-skills" / "skills" / "skill-methodologist"
-GIT_REALITY_CHECK = ROOT / "plugins" / "team-skills" / "skills" / "git-worktree-reality-check"
+SKILL_METHODOLOGIST = ROOT / "plugins" / "team-skills" / "skills" / "kontrakt-navyka-do-sborki"
+GIT_REALITY_CHECK = ROOT / "plugins" / "team-skills" / "skills" / "sverka-git-pered-deystviem"
 
 
 def test_windows_app_connectivity_split_brain_declares_layer_matrix_and_evidence_refs() -> None:
@@ -53,7 +53,7 @@ def test_goal_contract_shaper_v3_is_explicit_experimental_completion_gate_varian
     for fragment in (
         "только при явном вызове `goal-contract-shaper-v3`",
         "Смысловой запрос без прямого вызова маршрутизируйте в базовый "
-        "`goal-contract-shaper`",
+        "`kontrakt-tseli-do-starta`",
         "не запускайте v3 и не спрашивайте о его применении",
         "Применяю экспериментальный навык **«Усиленная проверка контракта цели»** "
         "(обратная связь — @kir-kopylov):",
