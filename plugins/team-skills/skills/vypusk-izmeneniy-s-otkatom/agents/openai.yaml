@@ -1,0 +1,7 @@
+interface:
+  display_name: "Релизы Workspace Agent"
+  short_description: "Безопасная публикация и проверка Workspace Agent"
+  default_prompt: "«Выпусти изменение Workspace Agent с проверкой live-версии и откатом»."
+
+policy:
+  allow_implicit_invocation: true
