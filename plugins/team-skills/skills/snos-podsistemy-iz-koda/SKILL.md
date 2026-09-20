@@ -1,6 +1,6 @@
 ---
 name: snos-podsistemy-iz-koda
-description: "Используйте этот skill, когда пользователь уже решил убрать ненужную подсистему из repo: «снеси updater», «убери scheduler», «удали daemon целиком», «оставь только ручной запуск». Skill проверяет реальный scope, задаёт остаточный контракт, удаляет runtime, assets, docs, tests и CI, сохраняет только явно нужную одноразовую миграцию старых установок и доказывает, что оставшийся путь реально работает."
+description: "«Снеси updater», «убери scheduler, оставь ручной запуск», «выведи подсистему из эксплуатации», «удали из repo daemon, adapter, config, tests, документацию без хвостов»."
 ---
 
 # Subsystem Retirement Safeguard

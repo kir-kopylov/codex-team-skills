@@ -1,6 +1,6 @@
 ---
 name: sverka-git-pered-deystviem
-description: Проверяет фактическое состояние git repo перед commit, staging, push, Pull Request, stash, merge, rebase, удалением веток, remote cleanup или архивированием git-сессии. Используйте, когда пользователь спрашивает «что в рабочем дереве», «можно коммитить», «почему дерево грязное», «что значит ahead/behind», «можно удалить ветку», «почему fatal not a git repository», или когда следующее git-действие зависит от неподтвержденных repo, cwd, branch, upstream, staged/unstaged/untracked, stash, remote или PR state.
+description: "«Что в рабочем дереве», «дерево грязное», «можно коммитить», «что с ветками», «можно удалить ветку», «fatal: not a git repository», «перед commit»: read-only снимок git."
 ---
 
 # Git Worktree Reality Check
