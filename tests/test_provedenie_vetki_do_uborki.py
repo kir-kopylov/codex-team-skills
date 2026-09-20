@@ -461,11 +461,22 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "режим подписи и полный ожидаемый набор headers с их значениями",
         "Не подменяйте этот снимок текущими значениями Git config",
         "требует отдельного показа и нового одобрения после создания, но до push",
-        "Покажите пользователю этот снимок метаданных",
+        "Покажите пользователю все зафиксированные выше поля снимка",
+        "полные base/target refs и их OID",
+        "destination, staged tree",
+        "HEAD, будущих parents, merge-base и метаданные commit",
         "git diff --cached <expected-merge-base-oid> --",
         "git diff --cached <target-oid> --",
         "tree diff не доказывает отсутствие промежуточной неопубликованной истории",
         "не заменяет точное совпадение HEAD с target или base",
+        "единственным текущим кандидатом одобрения",
+        "Новый полный снимок сразу аннулирует прежний кандидат и его одобрение",
+        "Пользователь не обязан повторять все SHA, refs, destination и метаданные",
+        "`одобряю последний показанный снимок` достаточна",
+        "ровно один текущий кандидат",
+        "после его показа не менялось ни одно поле",
+        "одобрение относится ко всему снимку, а не только к staged tree",
+        "Ответ `да`, один OID staged tree, сокращённый SHA или ссылка на прежний снимок недостаточны",
         "Непосредственно перед `commit`",
         "сравните все зафиксированные значения",
         "полный список будущих parents",
@@ -506,6 +517,12 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
     ):
         assert invariant in section
 
+    full_show_index = section.index(
+        "Покажите пользователю все зафиксированные выше поля снимка"
+    )
+    current_candidate_index = section.index(
+        "единственным текущим кандидатом одобрения"
+    )
     approval_index = section.index("Получите явное одобрение")
     for preapproval_gate in (
         "выбранный до одобрения режим границы",
@@ -518,6 +535,8 @@ def test_explicit_approval_is_bound_to_the_exact_publish_candidate() -> None:
         "git diff --cached <expected-merge-base-oid> --",
     ):
         assert section.index(preapproval_gate) < approval_index
+
+    assert full_show_index < current_candidate_index < approval_index
 
     precommit_check_index = section.index("Непосредственно перед `commit`")
     stop_index = section.index("Ошибка обновления или любое изменение запрещает `commit`")
