@@ -152,13 +152,43 @@ def detect_header(rows: list[list[Any]]) -> int:
 
 
 def map_columns(headers: list[Any]) -> dict[str, int]:
-    mapping: dict[str, int] = {}
+    """Сопоставляет поля и колонки: точное совпадение заголовка важнее вхождения подстроки.
+
+    Наивный поиск подстроки отдавал колонку тому полю, чей alias просто раньше
+    встретился: в шапке `Статья расходов;Сумма;Квартира` сумма доставалась
+    колонке `Статья расходов` из-за подстроки `расход`. Поэтому кандидаты
+    собираются со счетом (точное совпадение, затем длина alias), одна колонка
+    достается одному полю, и колонка `Сумма` уходит полю `amount`.
+    """
     normalized = [compact(header) for header in headers]
+    field_order = {field: order for order, field in enumerate(HEADER_ALIASES)}
+    candidates: list[tuple[int, int, int, int, str]] = []
     for field, aliases in HEADER_ALIASES.items():
         for index, header in enumerate(normalized):
-            if any(compact(alias) in header for alias in aliases):
-                mapping[field] = index
-                break
+            if not header:
+                continue
+            best: tuple[int, int] | None = None
+            for alias in aliases:
+                key = compact(alias)
+                if not key:
+                    continue
+                if header == key:
+                    score = (2, len(key))
+                elif key in header:
+                    score = (1, len(key))
+                else:
+                    continue
+                if best is None or score > best:
+                    best = score
+            if best is not None:
+                candidates.append((best[0], best[1], field_order[field], index, field))
+    mapping: dict[str, int] = {}
+    taken: set[int] = set()
+    for exact, length, _, index, field in sorted(candidates, key=lambda item: (-item[0], -item[1], item[2], item[3])):
+        if field in mapping or index in taken:
+            continue
+        mapping[field] = index
+        taken.add(index)
     return mapping
 
 
@@ -187,12 +217,33 @@ def read_addresses(path: Path | None) -> list[str]:
     return [line.strip() for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
 
 
+def match_address(text: str, addresses: list[str]) -> str:
+    """Выбирает адрес из списка, а при пересечении значений берет самое длинное.
+
+    Первое совпадение подстроки уводило строку `Адрес 10` к адресу `Адрес 1`,
+    если короткое значение стояло в списке раньше. Сначала ищем совпадение
+    целого значения (по границам слова), затем самое длинное вхождение.
+    """
+    normalized = norm(text)
+    best = ""
+    best_score = (0, 0)
+    for address in addresses:
+        key = norm(address)
+        if not key or key not in normalized:
+            continue
+        whole = re.search(rf"(?<![0-9a-zа-я]){re.escape(key)}(?![0-9a-zа-я])", normalized) is not None
+        score = (1 if whole else 0, len(key))
+        if score > best_score:
+            best = address
+            best_score = score
+    return best
+
+
 def detect_apartment(row: list[Any], mapping: dict[str, int], addresses: list[str]) -> tuple[str, str]:
     text = row_text(row)
-    normalized = norm(text)
-    for address in addresses:
-        if norm(address) in normalized:
-            return address, "найдено по списку адресов"
+    address = match_address(text, addresses)
+    if address:
+        return address, "найдено по списку адресов"
     candidate = cell(row, mapping, "apartment")
     if candidate and any(ch.isdigit() for ch in candidate):
         return candidate, "найдено в аналитике"

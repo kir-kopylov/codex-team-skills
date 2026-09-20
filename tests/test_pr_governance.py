@@ -145,3 +145,18 @@ def test_pull_request_template_follows_description_contract() -> None:
     for _heading, fields in PR_DESCRIPTION_LAYOUT:
         for field in fields:
             assert f"`{field.removeprefix('- ')}`" in canonical
+
+
+FORK_SKILL_PATH = ROOT / "plugins/team-skills/skills/podacha-pravok-iz-forka/SKILL.md"
+
+
+def test_fork_skill_teaches_canonical_pr_description() -> None:
+    # Навык учит новичка. Своя копия шаблона с заголовком «Когда не применять»
+    # уводила его на красный gate: `check_pr_governance.py` ищет поле дословно.
+    skill = FORK_SKILL_PATH.read_text(encoding="utf-8")
+    section = skill.split("## Шаблон PR Body", 1)[1]
+    block = section.split("```markdown", 1)[1].split("```", 1)[0]
+    lines = [line for line in block.splitlines() if line.strip()]
+    assert lines == [item for heading, fields in PR_DESCRIPTION_LAYOUT for item in (heading, *fields)]
+    assert "Когда не применять" not in skill
+    assert check_pr_governance.extract_when_not_to_use(block) == ""
