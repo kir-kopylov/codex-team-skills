@@ -1,6 +1,6 @@
 ---
 name: razgrom-plana-na-naivnost
-description: "«Разнеси ответ в пыль», «жесткий forensic-аудит», «проверь на startup-bullshit», «fantasy architecture вместо production», «разбей по воронке, AI-агентам, экономике»."
+description: "«Разнеси ответ в пыль», «forensic-аудит плана, совета, архитектуры», «проверь на startup-bullshit», «разбей A/B-тест, воронку, AI-агентов», «пересобери решение после аудита»: механизм провала в production."
 ---
 
 # Production Forensic Auditor

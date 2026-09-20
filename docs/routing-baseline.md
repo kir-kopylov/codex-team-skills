@@ -144,6 +144,57 @@
 Разброс между двумя прогонами на одной модели — один вход из 198, поэтому
 разницу в один-два промаха нельзя считать результатом правки описания.
 
+## Правка По Найденным Парам
+
+Базовая линия выше — состояние до правки описаний. По её парам переписаны
+`description` тринадцати навыков: двенадцати владельцев промахов и одного
+навыка-магнита `goal-contract-shaper-v3`, который перетягивал смысловые запросы,
+хотя по контракту запуска он explicit-only. Имена навыков, `skill.yaml` и тела
+`SKILL.md` не менялись — только строка `description`.
+
+| Проверка | Было | Стало |
+| --- | --- | --- |
+| Входы примеров, без дословного триггера | 139 из 165 (84,2%) | 156 из 165 (94,5%) |
+| Входы примеров, с дословным триггером | 32 из 33 (97,0%) | 33 из 33 (100%) |
+| Входы примеров, все | 171 из 198 (86,4%) | 189 из 198 (95,5%) |
+| Фразы `natural_triggers` | 329 из 332 (99,1%) | 329 из 332 (99,1%) |
+
+Условие правила из `CONTRIBUTING.md` выполнено на обеих проверках: ни один вход,
+попадавший в свой навык до правки, не ушёл в чужой. Починено 18 входов примеров;
+ни один вход примеров не съехал в «ни один».
+
+По фразам `natural_triggers` доля не изменилась, но состав промахов другой:
+ушёл промах «подходит ли это для /goal» — он попадал в explicit-only
+`goal-contract-shaper-v3`, а теперь достаётся `kontrakt-tseli-do-starta`, как и
+требует контракт запуска. Оставшиеся три промаха — короткие фразы одного навыка
+`proverka-aktualnosti-v-momente` («проверь прямо сейчас», «проверь по моменту»,
+«подтверди в моменте»); в них почти нет содержания, и судья отвечает «ни один».
+
+Отпечатки наборов после правки: `9837e83baa0c` для входов примеров,
+`7fdb558298a1` для фраз `natural_triggers`.
+
+### Остаточные Промахи
+
+| Вход | Навык-владелец | Файл примера | Куда ушёл |
+| --- | --- | --- | --- |
+| I032 | `kontrakt-tseli-do-starta` | [good-06-partial-quote-confirmation.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-06-partial-quote-confirmation.md) | `pravilo-iz-zhurnala-sboev` |
+| I034 | `kontrakt-tseli-do-starta` | [good-08-runtime-missing-fallback.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-08-runtime-missing-fallback.md) | `sverka-aktivnoy-versii-navykov` |
+| I035 | `kontrakt-tseli-do-starta` | [good-09-real-question-gate.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-09-real-question-gate.md) | `karta-sistemy-do-pravok` |
+| I036 | `kontrakt-tseli-do-starta` | [good-10-local-blocked-progress.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-10-local-blocked-progress.md) | `karta-sistemy-do-pravok` |
+| I037 | `kontrakt-tseli-do-starta` | [good-11-checkpoint-tail-resume.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-11-checkpoint-tail-resume.md) | `shag-posle-prervannoy-tseli` |
+| I038 | `kontrakt-tseli-do-starta` | [good-12-lifecycle-handoff.md](../plugins/team-skills/skills/kontrakt-tseli-do-starta/examples/good-12-lifecycle-handoff.md) | `dobavlenie-navyka-v-biblioteku` |
+| I115 | `provedenie-vetki-do-uborki` | [good-02.md](../plugins/team-skills/skills/provedenie-vetki-do-uborki/examples/good-02.md) | `sverka-git-pered-deystviem` |
+| I166 | `sloy-obryva-seti-windows` | [good-03.md](../plugins/team-skills/skills/sloy-obryva-seti-windows/examples/good-03.md) | `peresmotr-predposylok-posle-povtora` |
+| I182 | `sverka-git-pered-deystviem` | [good-03.md](../plugins/team-skills/skills/sverka-git-pered-deystviem/examples/good-03.md) | `provedenie-vetki-do-uborki` |
+
+Шесть из девяти — у `kontrakt-tseli-do-starta`: его территория граничит сразу с
+несколькими навыками библиотеки, и одной правкой описания она не разводится.
+Вход I037 оставлен сознательно: восстановление состояния по журналу — работа
+`shag-posle-prervannoy-tseli`, а не контракта цели. Пара
+`provedenie-vetki-do-uborki` и `sverka-git-pered-deystviem` продолжает меняться
+местами на двух входах: обе правки сохранили пересечение по словам «ветка» и
+«дерево».
+
 ## Чего Эта Таблица Не Доказывает
 
 - Это не оценка качества навыков: измеряется только различимость `description`
