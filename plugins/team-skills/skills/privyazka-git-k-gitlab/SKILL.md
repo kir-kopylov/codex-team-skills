@@ -1,7 +1,6 @@
 ---
 name: privyazka-git-k-gitlab
-description: >-
-  Используйте этот skill, когда на новом Windows-компьютере нужно «подключить GitLab к Codex», «войти в GitLab для git», «сохранить Personal Access Token для всех репозиториев GitLab» или исправить повторный запрос пароля при HTTPS. Skill разводит создание токена, локальное сохранение в Git Credential Manager и удалённую проверку; ведёт по одному шагу, никогда не просит токен в чат, не угадывает URL репозитория и не проверяет repository-only токен через GitLab API. Не применять для SSH, нескольких GitLab-аккаунтов на одном host или входа в GitLab CLI/API.
+description: "«Подключи GitLab к Codex на новом компьютере», «вход в git по HTTPS-токену», «PAT на все репозитории, без выбора одного», «берёт старый токен». Windows, Credential Manager."
 ---
 
 # Подключение GitLab К Codex На Windows

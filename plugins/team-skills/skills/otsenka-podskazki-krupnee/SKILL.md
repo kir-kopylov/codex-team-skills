@@ -1,6 +1,6 @@
 ---
 name: otsenka-podskazki-krupnee
-description: "Используйте этот skill как offline/manual evaluator, когда пользователь, maintainer или eval runner явно передал диалог, sanitized trace, dissatisfaction feedback packet, строку из Team Codex Skill Feedback Inbox, GitHub Issue body или eval fixture и нужно проверить, правильно ли сработал krupnee Lift: режим observe / soft_hint / offer_lift / risk_override / do_not_intervene, telemetry, eval cases и риск утяжелить runtime. Не использовать как автоматический наблюдатель чужих эпизодов."
+description: "«Правильно ли сработал krupnee_lift», «разбери trace, диалог, feedback rows, GitHub Issue», «eval cases, telemetry krupnee», «lift предложен рано». Offline, не runtime."
 ---
 
 # Krupnee Review

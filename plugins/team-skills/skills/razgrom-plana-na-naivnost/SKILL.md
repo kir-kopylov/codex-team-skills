@@ -1,6 +1,6 @@
 ---
 name: razgrom-plana-na-naivnost
-description: Используйте этот skill, когда пользователь просит жестко разобрать ответ, план, pitch, архитектуру, AI-автоматизацию, growth-воронку или интернет-эксперимент на наивность, скрытые допущения, fantasy architecture, missing measurement layer и production reality. Срабатывает на фразы вроде "разнеси этот ответ", "жесткий forensic-аудит", "проверь на startup-bullshit", "где здесь фантазии вместо production", "разбей по методологии, воронке, AI-агентам и экономике".
+description: "«Разнеси ответ в пыль», «жесткий forensic-аудит», «проверь на startup-bullshit», «fantasy architecture вместо production», «разбей по воронке, AI-агентам, экономике»."
 ---
 
 # Production Forensic Auditor
