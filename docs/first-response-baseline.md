@@ -27,6 +27,43 @@
 часть навыков без своей памяти сбоев вела себя иначе. Тот прогон отброшен как
 неполный по составу источников, в таблице ниже — результат полного прогона.
 
+## Актуальность на момент публикации
+
+Замер сделан на `ce1dd24`. Пока он шёл, `main` ушёл вперёд до `4c2beaf`
+(PR #182, версия plugin поднята до `0.10.0`), и там у **19 из 64** навыков
+изменился `known-exceptions.yaml` — тот самый файл, который читает проба, —
+а у `prosto-na-paltsah` ещё и `SKILL.md`.
+
+Это значит: строки этих 19 навыков описывают поведение на `ce1dd24`, а не
+сегодняшнее. Среди них две строки с вердиктом `FAIL` —
+`podklyuchenie-sip-u-operatora` и `upakovka-navyka-odnim-faylom`: прежде чем их
+чинить, пробу нужно повторить на текущем `main`, потому что правило
+`do_next_time` могло уже закрыть дефект.
+
+Полный список затронутых навыков:
+
+- `a-postrochniy-razbor`
+- `dobavlenie-navyka-v-biblioteku`
+- `dopusk-saytov-do-tsikla`
+- `narabotki-sessii-v-vetku`
+- `obnovlenie-biblioteki-navykov`
+- `otbor-navykov-iz-chata`
+- `otsev-lozhnogo-uspeha-operatsii`
+- `peresmotr-predposylok-posle-povtora`
+- `podklyuchenie-sip-u-operatora`
+- `prosto-na-paltsah`
+- `provedenie-vetki-do-uborki`
+- `proverka-aktualnosti-v-momente`
+- `proverka-prichin-sboya`
+- `razbor-chata-na-artefakty`
+- `razgrom-plana-na-naivnost`
+- `smena-pravil-aktivnoy-zadachi`
+- `sverka-git-pered-deystviem`
+- `udalenie-prilozheniya-s-mac`
+- `upakovka-navyka-odnim-faylom`
+
+Остальные 45 строк на момент публикации соответствуют текущему `main`.
+
 ## Как читать вердикты
 
 Проверялись четыре признака запуска из `CONTRIBUTING.md` § «Запуск Навыка»:
