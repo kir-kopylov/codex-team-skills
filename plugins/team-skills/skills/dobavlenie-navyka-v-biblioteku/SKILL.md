@@ -1,7 +1,6 @@
 ---
 name: dobavlenie-navyka-v-biblioteku
-description: |
-  Используйте этот skill, когда нужно создать, перенести, обновить или довести до team-ready командный Codex skill в repo codex-team-skills; оформить повторяемый workflow или чужой draft; подготовить registry, examples, tests, CI и Pull Request. Перед крупной правкой применяйте discovery gate. До commit независимо проверяйте первый ответ каждого нового или существенно изменённого skill; для нескольких skills собирайте пакет и не публикуйте его до актуального PASS во всех строках. Срабатывает на фразы "добавь новый skill", "перенеси мой личный skill в командную библиотеку", "сделай из этого skill", "доведи skill до team-ready", "проверь skill перед PR", "проверь первые ответы всех изменённых skills перед PR", "почини skill под CI".
+description: "«Добавь новый skill», «сделай из этого skill», «перенеси мой личный skill в командную библиотеку», «оформи workflow как командный skill», «доведи до team-ready», «проверь перед PR», «почини под CI»: файлы, тесты и PR в repo."
 ---
 
 # Add Team Skill
