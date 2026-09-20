@@ -36,11 +36,11 @@ def test_chat_to_skill_miner_template_stops_before_contract_design() -> None:
     assert "Implementation-Ready" not in template
 
 
-def test_chat_to_skill_miner_is_team_ready_and_has_six_examples() -> None:
+def test_chat_to_skill_miner_is_team_ready_and_has_seven_examples() -> None:
     registry = yaml.safe_load((SKILL_DIR / "skill.yaml").read_text(encoding="utf-8"))
 
     assert registry["status"] == "team-ready"
-    assert len(registry["example_files"]) == 6
+    assert len(registry["example_files"]) == 7
     assert registry["last_reviewed"] == "2026-08-24"
     for relative_path in registry["example_files"]:
         assert (SKILL_DIR / relative_path).is_file()
