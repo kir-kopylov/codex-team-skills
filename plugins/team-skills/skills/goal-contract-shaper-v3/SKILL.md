@@ -1,6 +1,6 @@
 ---
 name: goal-contract-shaper-v3
-description: "v3 kontrakt-tseli-do-starta, только явно: «подходит ли сырая цель для /goal», «сформулируй проверяемый /goal-контракт», «completion gate»; роли, единицы, потери, ценность."
+description: "Только по явному вызову «goal-contract-shaper-v3» или «через v3»: экспериментальная A/B-версия того же shaping /goal-контракта. Смысловой запрос без прямого вызова идёт в базовый навык."
 ---
 
 # Goal Contract Shaper v3 (экспериментальная)

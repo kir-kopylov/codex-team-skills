@@ -1,6 +1,6 @@
 ---
 name: sverka-git-pered-deystviem
-description: "«Что в рабочем дереве», «дерево грязное», «можно коммитить», «что с ветками», «можно удалить ветку», «fatal: not a git repository», «перед commit»: read-only снимок git."
+description: "«Что в рабочем дереве», «дерево грязное», «можно коммитить», «можно ли удалить ветку», «fatal: not a git repository», «перед commit»: read-only снимок git до мутации, факты и вердикт. Работу в новую ветку и PR не переношу."
 ---
 
 # Git Worktree Reality Check

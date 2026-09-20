@@ -1,6 +1,6 @@
 ---
 name: sloy-obryva-seti-windows
-description: "«Telegram не видит интернет при VPN», «браузер работает, приложение нет», «Happ connected, app offline», «не видит proxy»: слои user-visible app UI, процесс/сокеты, app proxy config, Windows proxy, DNS/fakeDNS, routes/interfaces, VPN core."
+description: "«Telegram не видит интернет при VPN», «браузер работает, приложение нет», «Happ connected, app offline», «приложение не видит proxy»: первый разбор слоёв — процесс/сокеты, app proxy config, Windows proxy, DNS, routes, VPN core."
 ---
 
 # Windows App Connectivity Split Brain

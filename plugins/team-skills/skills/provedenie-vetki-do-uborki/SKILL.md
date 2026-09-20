@@ -1,6 +1,6 @@
 ---
 name: provedenie-vetki-do-uborki
-description: "«Вынеси WIP или старый commit в ветку», «сделай PR, не смешивая», «PR смержен, архивировать?», «убери branch clutter и remote branches», «пока шли тесты, main продвинулся»."
+description: "«Вынеси WIP или старый commit в ветку», «сделай PR, не смешивая», «PR смержен — архивировать ветку?», «убери remote branch clutter», «пока шли тесты, main продвинулся»: после merge обновляю main и убираю ветки."
 ---
 
 # Git PR Lifecycle Safeguard
