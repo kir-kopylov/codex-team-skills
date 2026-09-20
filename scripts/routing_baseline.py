@@ -3,9 +3,9 @@
 
 Три шага:
 
-    python scripts/routing_baseline.py build --source examples
-    python scripts/routing_baseline.py run --source examples --model claude-opus-5
-    python scripts/routing_baseline.py report --source examples --model claude-opus-5
+    python scripts/routing_baseline.py --source examples build
+    python scripts/routing_baseline.py --source examples run --model claude-opus-5
+    python scripts/routing_baseline.py --source examples report --model claude-opus-5
 
 `build` собирает набор и обезличенный список описаний всех навыков. Набор
 `examples` — вход каждого хорошего примера с разметкой «есть ли во входе
@@ -15,6 +15,11 @@
 без памяти, навыков, `CLAUDE.md` и инструментов, судья видит только список
 кодов и один вход. `report` считает доли попаданий, промахи и путаемые пары.
 
+Каждый ответ помечен отпечатком набора — хешем списка вариантов и входов. После
+правки `description` отпечаток меняется, старые ответы перестают считаться
+готовыми, и `report` их не смешивает с новыми. Неполный замер `report` не
+печатает: доля по куску набора завысила бы результат.
+
 Рабочая папка по умолчанию — `~/.codex/goal-runs/routing-baseline`: сырые
 ответы судьи в репозиторий не коммитятся.
 """
@@ -23,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import hashlib
 import json
 import os
 import pathlib
@@ -144,6 +150,14 @@ def build(out: pathlib.Path, source: str) -> None:
     print(f"набор записан: {out}")
 
 
+def fingerprint(out: pathlib.Path, source: str) -> str:
+    """Отпечаток набора: список вариантов плюс входы."""
+    digest = hashlib.sha256()
+    digest.update((out / "choice_list.txt").read_bytes())
+    digest.update((out / f"inputs-{source}.json").read_bytes())
+    return digest.hexdigest()[:12]
+
+
 def parse_answer(answer: str) -> str:
     match = re.search(r"\bS(\d{2})\b", answer)
     if match:
@@ -177,12 +191,15 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
     raw_dir.mkdir(parents=True, exist_ok=True)
     answers = raw_dir / "answers.jsonl"
 
+    stamp = fingerprint(out, source)
     already = set()
     if answers.exists():
         for line in answers.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 record = json.loads(line)
-                already.add((record["input_id"], record["run"], record["model"]))
+                already.add(
+                    (record["input_id"], record["run"], record["model"], record.get("set_hash"))
+                )
 
     choices = (out / "choice_list.txt").read_text(encoding="utf-8").strip()
     inputs = json.loads((out / f"inputs-{source}.json").read_text(encoding="utf-8"))
@@ -193,8 +210,9 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
         (item, attempt)
         for item in inputs
         for attempt in range(1, runs + 1)
-        if (item["id"], attempt, model) not in already
+        if (item["id"], attempt, model, stamp) not in already
     ]
+    print(f"отпечаток набора: {stamp}")
     print(f"заданий: {len(jobs)} (готовых пропущено: {len(inputs) * runs - len(jobs)})")
 
     lock = threading.Lock()
@@ -210,6 +228,7 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
             "run": attempt,
             "model": model,
             "source": source,
+            "set_hash": stamp,
             "owner": item["owner"],
             "file": item["file"],
             "literal_trigger": item["literal_trigger"],
@@ -234,7 +253,7 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
     print(f"сырые ответы: {answers}")
 
 
-def report(out: pathlib.Path, source: str, model: str) -> None:
+def report(out: pathlib.Path, source: str, model: str, runs: int, allow_partial: bool) -> None:
     meta = json.loads((out / "skills.json").read_text(encoding="utf-8"))
     codes = meta["codes"]
     names = {code: name for name, code in codes.items()}
@@ -243,22 +262,38 @@ def report(out: pathlib.Path, source: str, model: str) -> None:
         for item in json.loads((out / f"inputs-{source}.json").read_text(encoding="utf-8"))
     }
 
+    stamp = fingerprint(out, source)
     votes = collections.defaultdict(list)
     failures = 0
+    stale = 0
     for line in (out / "raw" / "answers.jsonl").read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
         if record["model"] != model or record.get("source", "examples") != source:
             continue
+        if record.get("set_hash") != stamp:
+            stale += 1
+            continue
         failures += record["returncode"] != 0
         votes[record["input_id"]].append(record["parsed"])
+
+    missing = [key for key in inputs if len(votes.get(key, [])) < runs]
+    broken = [key for key, given in votes.items() if "UNPARSED" in given]
+    if (missing or broken) and not allow_partial:
+        raise SystemExit(
+            f"замер неполный: входов без {runs} ответов — {len(missing)}, "
+            f"с неразобранным ответом — {len(broken)}, "
+            f"ответов от другого набора пропущено — {stale}. "
+            "Допрогоните `run` или повторите с `--allow-partial`."
+        )
+    needed = runs // 2 + 1
 
     rows, pairs = [], collections.Counter()
     for input_id, given in sorted(votes.items()):
         item = inputs[input_id]
         expected = codes[item["owner"]]
-        hit = sum(vote == expected for vote in given) >= 2
+        hit = sum(vote == expected for vote in given) >= needed
         top, top_count = collections.Counter(given).most_common(1)[0]
         went = "—" if hit else (names.get(top, top) if top_count >= 2 else "нет большинства")
         rows.append(
@@ -282,6 +317,9 @@ def report(out: pathlib.Path, source: str, model: str) -> None:
     summary = {
         "source": source,
         "model": model,
+        "set_hash": stamp,
+        "runs": runs,
+        "partial": bool(missing or broken),
         "failed_calls": failures,
         "total": share(lambda row: True),
         "no_literal": share(lambda row: not row["literal"]),
@@ -298,7 +336,12 @@ def report(out: pathlib.Path, source: str, model: str) -> None:
         hits, total = summary[key]
         tail = f" = {hits / total:.1%}" if total else ""
         print(f"{title}: {hits}/{total}{tail}")
+    print(f"отпечаток набора: {stamp}")
     print(f"вызовов с ошибкой: {failures}")
+    if stale:
+        print(f"пропущено ответов от другого набора: {stale}")
+    if missing or broken:
+        print(f"ЧАСТИЧНЫЙ ЗАМЕР: без полных {runs} ответов — {len(missing)}, с неразобранным — {len(broken)}")
     print(f"промахов: {len(summary['misses'])}")
     for pair in summary["pairs"]:
         print(f'  {pair["count"]}  {pair["owner"]} → {pair["went"]}')
@@ -323,6 +366,12 @@ def main() -> None:
     runner.add_argument("--workers", type=int, default=6)
     reporter = sub.add_parser("report", help="посчитать доли попаданий и промахи")
     reporter.add_argument("--model", default="claude-opus-5")
+    reporter.add_argument("--runs", type=int, default=3, help="сколько прогонов ожидается на вход")
+    reporter.add_argument(
+        "--allow-partial",
+        action="store_true",
+        help="напечатать отчёт по незаконченному замеру, пометив его частичным",
+    )
     args = parser.parse_args()
 
     if args.command == "build":
@@ -330,7 +379,7 @@ def main() -> None:
     elif args.command == "run":
         run(args.out, args.source, args.model, args.runs, args.limit, args.workers)
     else:
-        report(args.out, args.source, args.model)
+        report(args.out, args.source, args.model, args.runs, args.allow_partial)
 
 
 if __name__ == "__main__":
