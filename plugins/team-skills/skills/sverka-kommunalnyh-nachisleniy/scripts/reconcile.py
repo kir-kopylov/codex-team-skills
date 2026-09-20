@@ -27,7 +27,13 @@ def parse_amount(value: object, field: str) -> Decimal:
     else:
         text = text.replace(",", ".")
     try:
-        return Decimal(text).quantize(CENT, rounding=ROUND_HALF_UP)
+        parsed = Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError(f"{field}: некорректная сумма {value!r}") from exc
+    if not parsed.is_finite():
+        raise ValueError(f"{field}: некорректная сумма {value!r}")
+    try:
+        return parsed.quantize(CENT, rounding=ROUND_HALF_UP)
     except InvalidOperation as exc:
         raise ValueError(f"{field}: некорректная сумма {value!r}") from exc
 
@@ -36,7 +42,9 @@ def money(value: Decimal) -> str:
     return f"{value.quantize(CENT):.2f}"
 
 
-def reconcile(data: dict) -> dict:
+def reconcile(data: object) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("корень данных: ожидался объект с полем rows")
     rows = data.get("rows")
     if not isinstance(rows, list) or not rows:
         raise ValueError("rows: ожидался непустой список")

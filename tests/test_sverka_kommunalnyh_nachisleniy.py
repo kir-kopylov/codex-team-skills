@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from decimal import Decimal
 
 import pytest
@@ -76,3 +77,54 @@ def test_negative_charged_or_paid_is_rejected() -> None:
         MOD.reconcile(
             {"rows": [{"period": "2026-01", "charged": "-1", "paid": "0"}]}
         )
+
+
+@pytest.mark.parametrize("value", ["NaN", "nan", "-NaN", "sNaN", "Infinity", "-inf"])
+def test_non_finite_amount_is_rejected_as_value_error(value: str) -> None:
+    with pytest.raises(ValueError, match="некорректная сумма"):
+        MOD.parse_amount(value, "amount")
+
+
+def test_non_finite_amount_does_not_leak_decimal_error_from_reconcile() -> None:
+    with pytest.raises(ValueError, match="некорректная сумма"):
+        MOD.reconcile(
+            {"rows": [{"period": "2026-01", "charged": "NaN", "paid": "100"}]}
+        )
+
+
+def test_non_finite_opening_balance_is_rejected() -> None:
+    with pytest.raises(ValueError, match="некорректная сумма"):
+        MOD.reconcile(
+            {
+                "opening_balance": float("nan"),
+                "rows": [{"period": "2026-01", "charged": "100", "paid": "100"}],
+            }
+        )
+
+
+@pytest.mark.parametrize("data", [[], None, 5, "rows", ()])
+def test_non_object_root_is_rejected_as_value_error(data: object) -> None:
+    with pytest.raises(ValueError, match="корень данных"):
+        MOD.reconcile(data)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "[]",
+        "null",
+        "5",
+        '{"rows":[{"period":"2026-01","charged":"NaN","paid":"100"}]}',
+        '{"rows":[{"period":"2026-01","charged":NaN,"paid":"100"}]}',
+    ],
+)
+def test_cli_reports_structured_error_instead_of_traceback(
+    payload: str, tmp_path, capsys, monkeypatch
+) -> None:
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(payload, encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["reconcile.py", str(ledger)])
+    assert MOD.main() == 2
+    captured = capsys.readouterr()
+    assert json.loads(captured.err)["error"]
+    assert captured.out == ""
