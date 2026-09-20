@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -91,7 +92,7 @@ def test_clean_install_update_and_remove_commands_are_documented() -> None:
 
 
 def test_legacy_transition_is_evidence_gated() -> None:
-    guide = (ROOT / "START_HERE_RECONNECT_CODEX_SKILLS.md").read_text(encoding="utf-8")
+    guide = (ROOT / "plugins/team-skills/skills/obnovlenie-biblioteki-navykov/references/reconnect.md").read_text(encoding="utf-8")
     required_markers = (
         "# BEGIN codex-team-skills managed block",
         "~/.codex/config.toml",
@@ -106,6 +107,46 @@ def test_legacy_transition_is_evidence_gated() -> None:
     )
     for marker in required_markers:
         assert marker in guide
+
+
+def test_standalone_reconnect_upload_contains_the_complete_current_procedure(tmp_path) -> None:
+    filename = "START_HERE_RECONNECT_CODEX_SKILLS.md"
+    upload = tmp_path / filename
+    upload.write_bytes((ROOT / filename).read_bytes())
+    standalone = upload.read_text(encoding="utf-8")
+    reference_root = (
+        ROOT / "plugins/team-skills/skills/obnovlenie-biblioteki-navykov/references"
+    )
+    references = {
+        "reconnect.md": None,
+        "codex-cli-preflight.md": "## Дополнение 1. Проверка Доступной Штатной CLI",
+        "preserve-before-reconnect.md": "## Дополнение 2. Сохранение До Замены Установки",
+    }
+    embedded_blocks = []
+    for name, heading in references.items():
+        source = (reference_root / name).read_text(encoding="utf-8")
+        _, body = source.split("\n", 1)
+        expected = ((heading + "\n") if heading else "") + body
+        expected = expected.replace(
+            "(codex-cli-preflight.md)", "(#codex-cli-preflight)"
+        ).replace("(preserve-before-reconnect.md)", "(#preserve-before-reconnect)")
+        begin = f"<!-- BEGIN embedded:{name} -->\n"
+        end = f"<!-- END embedded:{name} -->"
+        assert standalone.count(begin) == standalone.count(end) == 1
+        actual = standalone.split(begin, 1)[1].split(end, 1)[0]
+        assert actual.strip() == expected.strip(), f"Устарела встроенная процедура {name}"
+        embedded_blocks.append(actual)
+
+    # На машине получателя есть только приложенный файл, без repo и нового plugin.
+    assert list(tmp_path.iterdir()) == [upload]
+    targets = re.findall(r"\[[^\]]+\]\(([^)]+)\)", "\n".join(embedded_blocks))
+    assert {"#codex-cli-preflight", "#preserve-before-reconnect"} <= set(targets)
+    for target in targets:
+        assert target.startswith("#"), f"Внешняя зависимость инструкции: {target}"
+        assert f'<a id="{target[1:]}"></a>' in standalone
+    assert standalone.index("## 3. Сохранение До Любой Замены") < standalone.index(
+        REMOVE_PLUGIN
+    )
 
 
 def test_ci_runs_native_marketplace_smoke_on_windows_and_macos() -> None:

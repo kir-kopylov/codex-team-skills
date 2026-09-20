@@ -24,6 +24,7 @@ example_files:
   - "examples/good-01.md"
   - "examples/good-02.md"
   - "examples/good-03.md"
+  - "examples/good-04-official-cli-fallback.md"
   - "examples/anti-01.md"
   - "examples/anti-02.md"
-last_reviewed: "2026-08-05"
+last_reviewed: "2026-09-17"
