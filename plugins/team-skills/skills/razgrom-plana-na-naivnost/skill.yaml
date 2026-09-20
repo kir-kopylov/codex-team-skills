@@ -25,6 +25,7 @@ example_files:
   - "examples/anti-01-no-target-text.md"
   - "examples/anti-02-personal-attack.md"
   - "examples/anti-03-full-template-after-format-limit.md"
+  - "examples/good-06-local-market-and-unavailable-sources.md"
 last_reviewed: "2026-08-04"
 authors:
   - "Кирилл Копылов"
