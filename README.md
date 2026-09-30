@@ -18,6 +18,7 @@
 - [quickstart.md](quickstart.md) — короткие команды установки, обновления и удаления;
 - [admin-onboarding-guide.md](admin-onboarding-guide.md) — инструкция организатору подключения;
 - [docs/claude-code-marketplace.md](docs/claude-code-marketplace.md) — отдельный путь для Claude Code;
+- [docs/chatgpt-workspace-marketplace.md](docs/chatgpt-workspace-marketplace.md) — общая установка в рабочей области веб-ChatGPT, проверка обновления и восстановление синхронизации;
 - [catalog.md](catalog.md) — каталог доступных skills.
 
 ## Как Устроен Проект
