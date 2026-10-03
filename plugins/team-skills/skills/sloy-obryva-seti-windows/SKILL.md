@@ -1,7 +1,6 @@
 ---
 name: sloy-obryva-seti-windows
-description: >-
-  Используйте этот экспериментальный skill, когда конкретное Windows GUI-приложение не видит сеть, хотя браузер, терминал, VPN UI или Windows могут выглядеть рабочими. Skill разводит слои user-visible UI, процесс/сокеты, app proxy config, Windows proxy, DNS, routes/interfaces, VPN core и внешнюю доступность, запрещая делать вывод о GUI-приложении по PowerShell/Codex sandbox как по прямому факту. Триггеры: "Telegram не видит интернет", "приложение не подключается через VPN", "браузер работает, а приложение нет", "Happ/VPN включен, но app offline".
+description: "«Telegram не видит интернет при VPN», «браузер работает, приложение нет», «Happ connected, app offline», «не видит proxy»: слои user-visible app UI, процесс/сокеты, app proxy config, Windows proxy, DNS/fakeDNS, routes/interfaces, VPN core."
 ---
 
 # Windows App Connectivity Split Brain

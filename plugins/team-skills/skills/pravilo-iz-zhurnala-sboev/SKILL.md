@@ -1,7 +1,6 @@
 ---
 name: pravilo-iz-zhurnala-sboev
-description: >-
-  Используйте этот skill, когда нужно по явному запросу разобрать приватные карточки сбоев или пользовательского фидбека одного существующего Codex skill либо всей библиотеки и предложить безопасный patch proposal к SKILL.md, known-exceptions.yaml, examples и tests. Skill срабатывает на фразы вроде "разбери exception log skill", "проверь все журналы библиотеки", "сделай reviewer по сбоям skill", "что добавить в known-exceptions", "разбери, почему skill повторяет ошибку". Приватные журналы пассивны: reviewer не запускается сам, не обходит библиотеку без явного выбора режима и не применяет patch без отдельного запроса.
+description: "«Разбери exception log», «журналы библиотеки», «что добавить в known-exceptions», «навык снова повторил ошибку»: reviewer сбоев — карточки ошибок в patch proposal."
 ---
 
 # Skill Exception Reviewer

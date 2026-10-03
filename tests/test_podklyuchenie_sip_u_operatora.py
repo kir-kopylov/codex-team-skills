@@ -42,7 +42,7 @@ def test_known_megafon_exceptions_are_preserved() -> None:
     data = yaml.safe_load((SKILL_DIR / "known-exceptions.yaml").read_text(encoding="utf-8"))
     exceptions = data["exceptions"]
 
-    assert len(exceptions) == 5
+    assert len(exceptions) == 6
     combined = "\n".join(
         " ".join(str(value) for value in item.values()) for item in exceptions
     ).lower()
@@ -52,6 +52,7 @@ def test_known_megafon_exceptions_are_preserved() -> None:
         "уведомления",
         "вкладкам",
         "повторный клик",
+        "услуга уже активна",
     ):
         assert expected in combined
 

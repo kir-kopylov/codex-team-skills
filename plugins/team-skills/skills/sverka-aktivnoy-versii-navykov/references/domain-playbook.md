@@ -18,7 +18,7 @@
 ## Interface Mechanics
 
 1. Remote SHA берётся read-only из `refs/heads/main`; manifest и наличие skill читаются именно из этого SHA.
-2. `codex --version`, `codex plugin --help` и `codex plugin list --json` выполняются в текущем запуске. Поля, которых JSON не вернул, остаются `UNKNOWN_NOT_EXPOSED`.
+2. Работающая официальная CLI выбирается по [общей предварительной проверке](../../obnovlenie-biblioteki-navykov/references/codex-cli-preflight.md). В этом навыке выполняется только read-only часть, с тем же Codex home/profile. Поля, которых JSON текущего успешного запуска не вернул, остаются `UNKNOWN_NOT_EXPOSED`.
 3. `installedPath` принимается только из JSON, после чего проверяется как обычный каталог внутри текущего Codex home. Предполагаемая структура cache не является API.
 4. Личный кандидат проверяется только непосредственно под доказанным пользовательским root: обычный каталог, без path escape, имя папки равно frontmatter `name`, имя есть в plugin.
 5. Список текущей сессии берётся из metadata самой сессии. Если поверхность его не показывает, диск не используется как замена.
@@ -27,9 +27,11 @@
 ## Recovery And Edge Cases
 
 - GitHub или сеть недоступны: remote получает `UNKNOWN_COMMAND_FAILED`; локальные слои всё равно проверяются.
-- CLI wrapper найден, но падает до plugin-команд: marketplace и installed получают `UNKNOWN_COMMAND_FAILED`, а не `NOT_INSTALLED`.
+- Команда `codex` из `PATH` найдена, но падает до plugin-команд: проверить уже установленный официальный binary приложения по общей процедуре, не меняя `PATH`, установку или Codex home/profile. Успех этого запуска позволяет продолжить карту; ошибка первого запуска остаётся отдельным наблюдением.
+- Все безопасно обнаруженные официальные кандидаты для целевого home/profile недоступны или не возвращают разбираемый JSON: marketplace и installed получают `UNKNOWN_COMMAND_FAILED`, а не `NOT_INSTALLED`. Назвать проверенные способы и ограничение; файловые и сессионные слои проверять независимо. Не скачивать CLI для завершения read-only карты.
 - Plugin отсутствует в корректном JSON: `NOT_INSTALLED`; не запускать установку.
 - JSON не раскрывает marketplace commit/ref: `UNKNOWN_NOT_EXPOSED`; source URL не превращать в SHA.
+- JSON не раскрывает `installedPath`: `UNKNOWN_NOT_EXPOSED`; не выполнять `plugin add/remove` ради обнаружения пути.
 - Несколько installed entries или path вне Codex home: показать наблюдаемое расхождение и остановить углубление этого слоя без очистки.
 - Одноимённая личная копия при неизвестном runtime source: только `POTENTIAL_PERSONAL_SHADOW`.
 - Сессия показывает имя без version/source: подтвердить имя, остальные поля оставить unknown.
