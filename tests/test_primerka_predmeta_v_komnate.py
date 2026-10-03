@@ -763,3 +763,31 @@ def test_punctuation_remote_urls_are_preserved(tmp_path: Path, url: str) -> None
 
     assert result.returncode == 0, result.stderr
     assert json.loads((out / "manifest.json").read_text(encoding="utf-8"))["images"][0]["notes"] == url
+
+
+@pytest.mark.parametrize("closing", ["»", "”", "’", "“", "」", "】", "）", "„", "‚", "＂", "＇"])
+def test_unicode_url_closer_cannot_hide_private_path(tmp_path: Path, closing: str) -> None:
+    brief, data = make_brief(tmp_path)
+    data["images"][0]["notes"] = "Карточка: «https://example.com/room.png" + closing + "/home/test-user/private/room.png"
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize("url", [
+    "https://example.com/room»public.png",
+    "https://example.com/room＂public.png",
+    "https://example.com/room＇public.png",
+    "https://example.com/room.png%C2%BB/other-public/room.png",
+    "https://guest@[2001:db8::1]:8443/room.png",
+])
+def test_safe_unicode_and_ipv6_remote_urls_are_preserved(tmp_path: Path, url: str) -> None:
+    brief, data = make_brief(tmp_path)
+    data["images"][0]["notes"] = url
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads((out / "manifest.json").read_text(encoding="utf-8"))["images"][0]["notes"] == url
