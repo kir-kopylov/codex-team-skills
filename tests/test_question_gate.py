@@ -15,6 +15,7 @@ CANONICAL_GATE = """Перед любым вопросом проведи кон
 
 SKILLS_DIR = ROOT / "plugins" / "team-skills" / "skills"
 QUESTION_DRIVEN_SKILLS = (
+    "primerka-predmeta-v-komnate",
     "dobavlenie-navyka-v-biblioteku",
     "dopusk-saytov-do-tsikla",
     "razbivka-marshruta-pod-limit",
