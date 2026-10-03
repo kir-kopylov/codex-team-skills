@@ -730,3 +730,36 @@ def test_safe_remote_url_parameters_preserve_original_text(tmp_path: Path, url: 
     assert result.returncode == 0, result.stderr
     manifest = json.loads((out / "manifest.json").read_text())
     assert manifest["images"][0]["notes"] == data["images"][0]["notes"]
+
+
+@pytest.mark.parametrize("field", ["prompt", "notes"])
+@pytest.mark.parametrize("separator", [",", ";"])
+@pytest.mark.parametrize("path", ["/home/test-user/private/room.png", "/Users/test-user/private/room.png", "/other-private/room.png"])
+def test_punctuation_url_suffix_cannot_hide_private_path(
+    tmp_path: Path, field: str, separator: str, path: str
+) -> None:
+    brief, data = make_brief(tmp_path)
+    value = "Карточка: https://example.com/room.png" + separator + path
+    data["images"][0][field] = value
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize("url", [
+    "https://example.com/room,large.png",
+    "https://example.com/room;large.png",
+    "https://example.com/room.png%2C/other-public/room.png",
+    "https://example.com/room.png%3B/other-public/room.png",
+    "https://example.com/room.png?values=1,2;3",
+])
+def test_punctuation_remote_urls_are_preserved(tmp_path: Path, url: str) -> None:
+    brief, data = make_brief(tmp_path)
+    data["images"][0]["notes"] = url
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads((out / "manifest.json").read_text(encoding="utf-8"))["images"][0]["notes"] == url

@@ -151,6 +151,10 @@ def reject_local_paths(value: object, name: str) -> None:
             except (ValueError, UnicodeError):
                 return candidate
             if parsed.scheme.lower() in {"http", "https"} and parsed.netloc and hostname:
+                # Сырая пунктуация может отделять ссылку от следующего пути.
+                # Закодированный разделитель остаётся частью удалённого пути.
+                for suffix in re.split(r"[,;]", parsed.path)[1:]:
+                    reject_local_paths(suffix, f"{name}: суффикс ссылки")
                 for component, is_fragment in ((parsed.query, False), (parsed.fragment, True)):
                     # Проверяем и закодированные, и вложенно закодированные значения.
                     decoded = component
