@@ -14,6 +14,7 @@ including Codex. It remains the authoritative source for:
 
 - the repository purpose and user/author modes;
 - the Russian-language policy;
+- the user-facing communication policy;
 - skill structure, registry fields, examples, and status rules;
 - privacy and feedback-log boundaries;
 - native marketplace and delivery architecture;
@@ -70,6 +71,9 @@ use only paths that exist in the repository or are documented by the runtime.
 
 - Fix the cause of a failed check. Do not weaken, skip, or bypass repository
   protections.
+- For every commentary update and final response, follow
+  `## Понятные Сообщения Пользователю` in `CLAUDE.md`, including when the task
+  does not otherwise require repository edits.
 - Do not commit unless the user asks. Before any push, show the exact scope that
   will be sent. After opening or updating a PR, triage the automated reviewer
   and answer human-facing PR comments in Russian.
