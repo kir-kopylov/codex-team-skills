@@ -187,3 +187,57 @@ def test_benign_jpeg_comment_nul_is_preserved(tmp_path: Path) -> None:
     assert (out / relative).read_bytes() == expected
     with zipfile.ZipFile(out / (data["job_id"] + ".zip")) as archive:
         assert archive.read(relative) == expected
+
+
+@pytest.mark.parametrize(("fmt", "suffix"), (("PNG", ".png"), *FORMATS))
+@pytest.mark.parametrize("comment", (PRIVATE_PATH.encode("ascii"), b"Synthetic public thumbnail"))
+def test_exif_embedded_thumbnail_is_rejected_before_export(
+    tmp_path: Path, fmt: str, suffix: str, comment: bytes
+) -> None:
+    """Вложенный JPEG не должен обходить проверку через числовые теги IFD1."""
+    from io import BytesIO
+
+    brief, _, source, picture = image_fixture(tmp_path, suffix)
+    stream = BytesIO()
+    Image.new("RGB", (16, 12), (90, 110, 130)).save(stream, format="JPEG")
+    raw = stream.getvalue()
+    thumbnail = raw[:2] + b"\xff\xfe" + struct.pack(">H", len(comment) + 2) + comment + raw[2:]
+    # Пустой IFD0 с указателем на IFD1; затем стандартные offset/length JPEG.
+    thumbnail_offset = 56
+    tiff = b"II*\x00" + struct.pack("<IHIH", 8, 0, 14, 3)
+    tiff += struct.pack("<HHII", 259, 3, 1, 6)
+    tiff += struct.pack("<HHII", 513, 4, 1, thumbnail_offset)
+    tiff += struct.pack("<HHII", 514, 4, 1, len(thumbnail))
+    tiff += struct.pack("<I", 0) + thumbnail
+    exif = b"Exif\x00\x00" + tiff
+    picture.save(source, format=fmt, exif=exif)
+    with Image.open(source) as stored:
+        ifd1 = stored.getexif().get_ifd(-1)
+        assert ifd1[513] == thumbnail_offset and ifd1[514] == len(thumbnail)
+    assert comment in source.read_bytes()
+
+    assert_rejected(brief, tmp_path / "выдача")
+    result = run_package(brief, tmp_path / "выдача")
+    assert "миниатюр" in result.stderr.lower()
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("comment", (PRIVATE_PATH.encode("ascii"), b"Synthetic public thumbnail"))
+def test_jfxx_embedded_thumbnail_is_rejected_before_export(tmp_path: Path, comment: bytes) -> None:
+    """JFXX тоже содержит вложенный JPEG с собственными комментариями."""
+    from io import BytesIO
+
+    brief, _, source, picture = image_fixture(tmp_path, ".jpg")
+    picture.save(source, format="JPEG")
+    stream = BytesIO()
+    Image.new("RGB", (16, 12), (90, 110, 130)).save(stream, format="JPEG")
+    raw = stream.getvalue()
+    thumbnail = raw[:2] + b"\xff\xfe" + struct.pack(">H", len(comment) + 2) + comment + raw[2:]
+    payload = b"JFXX\x00\x10" + thumbnail
+    raw = source.read_bytes()
+    source.write_bytes(raw[:2] + b"\xff\xe0" + struct.pack(">H", len(payload) + 2) + payload + raw[2:])
+    with Image.open(source) as stored:
+        assert any(marker == "APP0" and value == payload for marker, value in stored.applist)
+    assert comment in source.read_bytes()
+
+    assert_rejected(brief, tmp_path / "выдача")

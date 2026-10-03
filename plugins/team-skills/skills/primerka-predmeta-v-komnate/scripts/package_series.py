@@ -26,7 +26,8 @@ EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 VARIATION_MODES = {"auto_concepts", "provided_concepts", "product_references"}
 GENERATOR_POLICIES = {"auto", "preferred", "strict"}
 SOURCE_ROLES = {"anchor", "supporting"}
-REMOTE_HTTP_URL = re.compile(r"(?i)\bhttps?://[^\s`\"'<>|]+")
+REMOTE_HTTP_URL = re.compile(r"(?i)\bhttps?://[^\s`\"'<>|)}]+")
+REMOTE_DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z", re.I)
 LOCAL_PATH_PATTERNS = (
     (
         "абсолютный или сетевой путь Unix",
@@ -125,7 +126,22 @@ def reject_local_paths(value: object, name: str) -> None:
                 parsed = urlsplit(candidate)
                 hostname = parsed.hostname
                 _ = parsed.port
-            except ValueError:
+                if not hostname:
+                    return candidate
+                if ":" in hostname:
+                    from ipaddress import IPv6Address
+
+                    IPv6Address(hostname)
+                else:
+                    dns_name = hostname.encode("idna").decode("ascii")
+                    if dns_name.endswith("."):
+                        dns_name = dns_name[:-1]
+                    if len(dns_name) > 253 or any(
+                        not REMOTE_DNS_LABEL.fullmatch(label)
+                        for label in dns_name.split(".")
+                    ):
+                        return candidate
+            except (ValueError, UnicodeError):
                 return candidate
             if parsed.scheme.lower() in {"http", "https"} and parsed.netloc and hostname:
                 for component, is_fragment in ((parsed.query, False), (parsed.fragment, True)):
@@ -447,6 +463,8 @@ def reject_image_metadata(picture: object, source: Path) -> None:
 
         def check_ifd(values: dict) -> None:
             for tag, value in values.items():
+                if tag in {513, 514}:
+                    raise ValueError("встроенная EXIF-миниатюра не поддерживается; удалите её до упаковки")
                 if tag in range(40091, 40096):
                     scan(bytes(value).decode("utf-16-le").rstrip("\x00"))
                 elif tag == 37500 and value:
@@ -541,7 +559,7 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                 elif marker == "APP2" and payload.startswith(b"ICC_PROFILE\x00"):
                     icc_parts = True
                     scan_explicit_binary_paths(payload[14:])
-                elif marker == "APP0" and payload.startswith((b"JFIF\x00", b"JFXX\x00")):
+                elif marker == "APP0" and payload.startswith(b"JFIF\x00"):
                     continue
                 elif marker == "APP14" and payload.startswith(b"Adobe"):
                     continue

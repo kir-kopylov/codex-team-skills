@@ -454,6 +454,56 @@ def test_malformed_remote_url_does_not_hide_a_local_path(tmp_path: Path) -> None
     assert_rejected(brief, tmp_path / "выдача")
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.com)/home/alice/private.png",
+        "https://example.com/room.png)/home/alice/private.png",
+        "https://example.com}/home/alice/private.png",
+        "https://example.com%29/home/alice/private.png",
+        "https://example.com,/home/alice/private.png",
+        "https://example..com/home/alice/private.png",
+        "https://-example.com/home/alice/private.png",
+        "https://example-.com/home/alice/private.png",
+    ],
+)
+def test_url_boundaries_and_invalid_hosts_cannot_hide_local_paths(
+    tmp_path: Path, value: str
+) -> None:
+    brief, data = make_brief(
+        tmp_path, variants=1, source_views=1, images_per_variation=1
+    )
+    data["images"][0]["notes"] = f"Карточка: {value}"
+    write_brief(brief, data)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "(https://example.com/room.png)",
+        "https://example.com:443/room.png",
+        "https://[2001:db8::1]:443/room.png",
+        "https://пример.рф/room.png",
+        "https://example.com/%28room%29.png",
+    ],
+)
+def test_remote_url_boundaries_preserve_valid_links(tmp_path: Path, url: str) -> None:
+    brief, data = make_brief(
+        tmp_path, variants=1, source_views=1, images_per_variation=1
+    )
+    data["images"][0]["notes"] = f"Карточка: {url}"
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["images"][0]["notes"] == data["images"][0]["notes"]
+
+
 @pytest.mark.parametrize("field", REVIEW_FIELDS)
 @pytest.mark.parametrize("value", ["fail", "pending", True, None])
 def test_each_review_field_requires_explicit_pass(
