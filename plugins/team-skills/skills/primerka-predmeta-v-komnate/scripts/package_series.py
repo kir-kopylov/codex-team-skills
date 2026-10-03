@@ -15,7 +15,7 @@ import re
 import shutil
 import sys
 import tempfile
-from unicodedata import category
+from unicodedata import category, name as unicode_name
 from urllib.parse import unquote, urlsplit
 import zipfile
 
@@ -155,7 +155,9 @@ def reject_local_paths(value: object, name: str) -> None:
                 # Кавычки и парные скобки Unicode не должны скрывать следующий путь.
                 # ASCII [] разрешены только в уже проверенном узле IPv6.
                 for position, character in enumerate(candidate):
-                    if character not in "[]" and (category(character) in {"Pi", "Pf", "Ps", "Pe"} or character in "＂＇"):
+                    character_name = unicode_name(character, "")
+                    is_quote = "QUOTATION MARK" in character_name or "APOSTROPHE" in character_name
+                    if character not in "[]" and (category(character) in {"Pi", "Pf", "Ps", "Pe"} or is_quote):
                         reject_local_paths(candidate[position + 1:], f"{name}: текст за кавычкой или скобкой")
                 # Сырая пунктуация может отделять ссылку от следующего пути.
                 # Закодированный разделитель остаётся частью удалённого пути.

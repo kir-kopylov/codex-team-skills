@@ -765,7 +765,11 @@ def test_punctuation_remote_urls_are_preserved(tmp_path: Path, url: str) -> None
     assert json.loads((out / "manifest.json").read_text(encoding="utf-8"))["images"][0]["notes"] == url
 
 
-@pytest.mark.parametrize("closing", ["»", "”", "’", "“", "」", "】", "）", "„", "‚", "＂", "＇"])
+@pytest.mark.parametrize("closing", [
+    "»", "”", "’", "“", "」", "】", "）", "„", "‚", "＂", "＇",
+    "❛", "❜", "❝", "❞", "❟", "❠", "🙶", "🙷", "🙸", "ʼ", "ˮ", "՚", "ߴ", "ߵ", "ŉ",
+    "\U000e0022", "\U000e0027",
+])
 def test_unicode_url_closer_cannot_hide_private_path(tmp_path: Path, closing: str) -> None:
     brief, data = make_brief(tmp_path)
     data["images"][0]["notes"] = "Карточка: «https://example.com/room.png" + closing + "/home/test-user/private/room.png"
@@ -776,6 +780,9 @@ def test_unicode_url_closer_cannot_hide_private_path(tmp_path: Path, closing: st
 
 @pytest.mark.parametrize("url", [
     "https://example.com/room»public.png",
+    "https://example.com/room❞public.png",
+    "https://example.com/roomʼpublic.png",
+    "https://example.com/room.png%E2%9D%9E/other-public/room.png",
     "https://example.com/room＂public.png",
     "https://example.com/room＇public.png",
     "https://example.com/room.png%C2%BB/other-public/room.png",
