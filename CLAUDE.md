@@ -196,10 +196,13 @@ tests may pass the repository path as the source inside an isolated
 
 This repo ships a lightweight v1 loop for teaching skills from their own
 mistakes and from user feedback. The full design is in
-`docs/skill-exception-learning.md`; the honest maturity note there matters —
-the automated half of the loop has not been run end-to-end, so today's real
-value is the pre-filled `known-exceptions.yaml` entries and the mandatory
-feedback-collection contracts below. There are two private channels:
+`docs/skill-exception-learning.md`. The loop has now been run end-to-end once:
+on 2026-09-20 all 82 private cards from one machine (76 failure cards, 6 survey
+answers) were triaged — 49 failure cards became rules (49 new
+`known-exceptions.yaml` entries across 18 skills), 1 survey wish became a
+`SKILL.md` edit, 32 were refused with a reason.
+Harvest is still manual: a human starts the run, an independent judge checks each
+edit, and raw cards never enter the repo. There are two private channels:
 model-observed failures (`exception-log.jsonl`) and an explicit post-use user
 survey (`usage-feedback.jsonl`).
 

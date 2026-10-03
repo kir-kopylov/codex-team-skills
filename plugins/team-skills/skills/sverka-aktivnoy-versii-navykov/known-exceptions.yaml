@@ -24,3 +24,8 @@ exceptions:
     root_cause: "Read-only диагностика смешана с исправлением."
     do_next_time: "Завершить карту без изменений; мутацию выполнять только как новую задачу через obnovlenie-biblioteki-navykov."
     source_example: "examples/anti-02.md"
+  - id: "broken-path-launcher-called-unavailable-cli"
+    symptom: "Ошибка обёртки codex из PATH сразу закрыла наблюдение marketplace и установленного plugin как недоступное."
+    root_cause: "Неудача одного способа запуска была обобщена на все официальные CLI без проверки уже установленного binary приложения."
+    do_next_time: "Применить read-only часть общей процедуры выбора CLI из obnovlenie-biblioteki-navykov/references/codex-cli-preflight.md с тем же Codex home/profile. Только если безопасно обнаруженные официальные кандидаты не дали нужный результат, оставить UNKNOWN_COMMAND_FAILED, назвать границу проверки и продолжить независимые слои. Не устанавливать и не удалять plugin ради выяснения пути."
+    source_example: "examples/good-04-official-cli-fallback.md"

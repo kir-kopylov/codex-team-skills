@@ -28,6 +28,7 @@ STRICT_RUSSIAN_FILES = [
     ROOT / "docs" / "seed-skill-example.md",
     ROOT / "docs" / "skill-exception-learning.md",
     ROOT / "docs" / "claude-code-marketplace.md",
+    ROOT / "docs" / "routing-baseline.md",
     ROOT / "docs" / "security" / "2026-07-19-codex-delivery-retirement.md",
     ROOT / ".github" / "pull_request_template.md",
 ]

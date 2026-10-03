@@ -10,7 +10,7 @@
 
 Codex применяет skill и разбирает план через funnel logic: acquisition, activation, retention, referral, revenue, denominators, drop-off, lag, attribution window и guardrail metrics. Он показывает, что “рост регистраций” может быть vanity metric, если нет quality threshold, cohort retention, CAC, payback, incrementality и защиты от self-selection.
 
-Codex объясняет, где отсутствуют event schema, identity resolution, source of truth, data QA, attribution model, experiment design и economics. Он показывает production failure mode: бюджет масштабируется на шум, ретаргетинг каннибализирует organic, referral приводит low-quality signups, AI-персонализация не отделена от selection bias.
+Codex указывает, какие event schema, identity resolution, source of truth, data QA, attribution model, experiment design и economics не описаны в плане. Затем показывает условные риски: без проверки прироста эффектов бюджет может масштабироваться на шум; при совпадении платной и органической аудитории возможна каннибализация organic; без quality threshold referral может приводить low-quality signups; без контроля состава групп нельзя отделить AI-персонализацию от selection bias. Эти последствия не объявляются уже наблюдаемыми фактами.
 
 ## Нельзя
 

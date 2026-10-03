@@ -1,6 +1,6 @@
 ---
 name: provedenie-vetki-do-uborki
-description: Используйте этот skill, когда нужно безопасно провести локальный WIP или старый commit через цикл clean branch, tests, draft PR, mergeable check и cleanup после merge, либо когда есть риск смешать dirty tree, старую ветку, stale remote branch, merged PR или чужие изменения. Также запускайте его, если main мог продвинуться во время тестов и перед commit или push надо повторно проверить базу без потери WIP. Skill сначала выполняет read-only reality check, затем действует только по доказанному scope.
+description: "«Вынеси WIP или старый commit в ветку», «сделай PR, не смешивая», «PR смержен, архивировать?», «убери branch clutter и remote branches», «пока шли тесты, main продвинулся»."
 ---
 
 # Git PR Lifecycle Safeguard

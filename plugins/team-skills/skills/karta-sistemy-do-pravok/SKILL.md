@@ -1,6 +1,6 @@
 ---
 name: karta-sistemy-do-pravok
-description: Используйте, когда пользователь хочет превратить legacy или production system в долговечную проверяемую карту знаний, а не написать разовую документацию. Срабатывает на фразы «построй карту системы», «собери claims и evidence», «составь реестр unknowns», «построй knowledge graph», «отдели research от stable docs» и «продолжи документирование по roadmap». Skill владеет только domain events и projections; orchestration передаёт goal-runtime-enforcer.
+description: "«Построй карту системы», «собери claims, evidence, unknowns, graph», «отдели research от stable docs», «продолжи документирование по roadmap». Не разовые доки."
 ---
 
 # System Knowledge Builder
