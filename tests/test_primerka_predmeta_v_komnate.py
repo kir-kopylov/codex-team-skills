@@ -626,3 +626,51 @@ def test_help_and_argument_errors_are_localized() -> None:
     assert "--brief" in help_result.stdout
     assert error_result.returncode == 2
     assert "Ошибка параметров:" in error_result.stderr
+
+
+@pytest.mark.parametrize("field", ["prompt", "notes"])
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/?source=/Users/test-user/work/room.png",
+        "https://example.com/?source=/room.png",
+        "https://example.com/#source=/room.png",
+        "https://example.com/#/catalog?source=/room.png",
+        "https://example.com/#/catalog?source=%252FUsers%252Ftest-user%252Fwork%252Froom.png",
+        "https://example.com/#/Users/test-user/work/room.png",
+        "https://example.com/?source=%2FUsers%2Ftest-user%2Fwork%2Froom.png",
+        "https://example.com/?source=%252FUsers%252Ftest-user%252Fwork%252Froom.png",
+        "https://example.com/#source=file%3A%2F%2F%2Fhome%2Ftest-user%2Froom.png",
+        "https://example.com/?source=C%3A%5CUsers%5Ctest-user%5Croom.png",
+        "https://example.com/?source=%5C%5Cserver%5Cshare%5Croom.png",
+        "https://example.com/?source=~%2Fprojects%2Froom.png",
+        "https://example.com/?source=https%3A%2F%2Fexample.net%2F%3Fpath%3D%2Fhome%2Ftest-user%2Froom.png",
+    ],
+)
+def test_remote_url_parameters_cannot_hide_local_paths(
+    tmp_path: Path, field: str, url: str
+) -> None:
+    brief, data = make_brief(tmp_path, variants=1, source_views=1, images_per_variation=1)
+    data["images"][0][field] = f"Карточка: {url}"
+    write_brief(brief, data)
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://example.com/?model=rug&color=cream#details",
+        "https://example.com/?source=https%3A%2F%2Fexample.net%2Froom.png",
+        "https://example.com/#/catalog/rug",
+        "https://example.com/#/catalog?color=cream",
+    ],
+)
+def test_safe_remote_url_parameters_preserve_original_text(tmp_path: Path, url: str) -> None:
+    brief, data = make_brief(tmp_path, variants=1, source_views=1, images_per_variation=1)
+    data["images"][0]["notes"] = f"Карточка: {url}"
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+    result = run_package(brief, out)
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert manifest["images"][0]["notes"] == data["images"][0]["notes"]

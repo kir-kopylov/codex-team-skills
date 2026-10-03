@@ -15,7 +15,7 @@ import re
 import shutil
 import sys
 import tempfile
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 import zipfile
 
 
@@ -128,6 +128,28 @@ def reject_local_paths(value: object, name: str) -> None:
             except ValueError:
                 return candidate
             if parsed.scheme.lower() in {"http", "https"} and parsed.netloc and hostname:
+                for component, is_fragment in ((parsed.query, False), (parsed.fragment, True)):
+                    # Проверяем и закодированные, и вложенно закодированные значения.
+                    decoded = component
+                    while True:
+                        expanded = unquote(decoded)
+                        if expanded == decoded:
+                            break
+                        decoded = expanded
+                    if is_fragment and decoded.startswith("/") and not decoded.startswith("//"):
+                        # Прямой маршрут веб-приложения #/catalog допустим;
+                        # признаки локального расположения всё равно запрещены.
+                        route = urlsplit(decoded)
+                        reject_local_paths(route.query, f"{name}: параметры маршрута")
+                        reject_local_paths(route.fragment, f"{name}: фрагмент маршрута")
+                        for label, pattern in LOCAL_PATH_PATTERNS[1:]:
+                            if pattern.search(route.path):
+                                raise SeriesError(
+                                    f"{name} содержит {label} в параметрах ссылки; "
+                                    "удалите его до упаковки."
+                                )
+                    else:
+                        reject_local_paths(decoded, f"{name}: параметры ссылки")
                 return " " * len(candidate)
             return candidate
 
@@ -339,6 +361,223 @@ def read_brief(path: Path) -> dict:
     return data
 
 
+
+def reject_image_metadata(picture: object, source: Path) -> None:
+    """Проверить метаданные до копирования, не перекодируя растровые данные."""
+    from io import BytesIO
+    import struct
+    import xml.etree.ElementTree as ET
+    import zlib
+    from PIL import Image, ImageCms, PngImagePlugin
+
+    def scan(value: object) -> None:
+        if isinstance(value, str):
+            reject_local_paths(value, "Метаданные изображения")
+        elif isinstance(value, dict):
+            for key, child in value.items():
+                scan(key)
+                scan(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                scan(child)
+        elif isinstance(value, bytes) and value:
+            decode_text(value)
+
+    def decode_text(payload: bytes) -> None:
+        if payload.startswith(b"ASCII\x00\x00\x00"):
+            scan(payload[8:].rstrip(b"\x00").decode("ascii"))
+            return
+        if payload.startswith(b"UNICODE\x00"):
+            payload = payload[8:]
+            encodings = ("utf-16",) if payload.startswith((b"\xff\xfe", b"\xfe\xff")) else ("utf-16-be", "utf-16-le")
+        elif payload.startswith(b"JIS\x00\x00\x00\x00\x00"):
+            scan(payload[8:].rstrip(b"\x00").decode("shift_jis"))
+            return
+        elif payload.startswith((b"\xff\xfe", b"\xfe\xff")):
+            encodings = ("utf-16",)
+        else:
+            # NUL не должен скрывать обычный ASCII/UTF-8 путь за догадкой UTF-16.
+            scan(payload.decode("latin-1").replace("\x00", ""))
+            payload = payload.rstrip(b"\x00")
+            encodings = ("utf-16-be", "utf-16-le") if b"\x00" in payload else ("utf-8", "latin-1")
+        decoded = []
+        for encoding in encodings:
+            try:
+                text = payload.decode(encoding).rstrip("\x00")
+            except UnicodeError:
+                continue
+            if all(character.isprintable() or character in "\n\r\t" for character in text):
+                decoded.append(text)
+        if not decoded:
+            raise ValueError("неразбираемые текстовые метаданные; удалите их до упаковки")
+        for text in decoded:
+            scan(text)
+
+    def decompress_png(payload: bytes) -> bytes:
+        decoder = zlib.decompressobj()
+        decoded = decoder.decompress(payload, PngImagePlugin.MAX_TEXT_CHUNK + 1)
+        if len(decoded) > PngImagePlugin.MAX_TEXT_CHUNK or decoder.unconsumed_tail or decoder.unused_data or not decoder.eof:
+            raise ValueError("сжатые метаданные PNG не прошли ограниченную проверку")
+        return decoded
+
+    def check_xmp(payload: bytes) -> None:
+        def check_name(name: object) -> None:
+            if isinstance(name, str):
+                parts = name[1:].split("}", 1) if name.startswith("{") else [name]
+                scan(parts)
+
+        parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True, insert_pis=True))
+        root = ET.fromstring(payload, parser=parser)
+        for _, (_, namespace) in ET.iterparse(BytesIO(payload), events=("start-ns",)):
+            scan(namespace)
+        for element in root.iter():
+            check_name(element.tag)
+            scan(element.text)
+            scan(element.tail)
+            for name, value in element.attrib.items():
+                check_name(name)
+                scan(value)
+
+    def check_exif(payload: bytes) -> None:
+        tiff = payload[6:] if payload.startswith(b"Exif\x00\x00") else payload
+        if len(tiff) < 8 or tiff[:4] not in (b"II*\x00", b"MM\x00*"):
+            raise ValueError("неразбираемые EXIF-метаданные; удалите их до упаковки")
+        exif = Image.Exif()
+        exif.load(payload)
+
+        def check_ifd(values: dict) -> None:
+            for tag, value in values.items():
+                if tag in range(40091, 40096):
+                    scan(bytes(value).decode("utf-16-le").rstrip("\x00"))
+                elif tag == 37500 and value:
+                    raise ValueError("неподдерживаемые непрозрачные MakerNote; удалите их до упаковки")
+                else:
+                    scan(value)
+
+        check_ifd(dict(exif))
+        # Exif/GPS/Interop и таблица миниатюры не входят целиком в dict(IFD0).
+        nested = exif.get_ifd(34665) if 34665 in exif else {}
+        check_ifd(nested)
+        if 34853 in exif:
+            check_ifd(exif.get_ifd(34853))
+        if 40965 in nested:
+            check_ifd(exif.get_ifd(40965))
+        check_ifd(exif.get_ifd(-1))
+
+    def scan_explicit_binary_paths(payload: bytes) -> None:
+        # Случайный slash в бинарном профиле не является локальным путём.
+        explicit = (LOCAL_PATH_PATTERNS[1], LOCAL_PATH_PATTERNS[2], LOCAL_PATH_PATTERNS[3], LOCAL_PATH_PATTERNS[5], LOCAL_PATH_PATTERNS[6])
+        for encoding in ("latin-1", "utf-16-be", "utf-16-le"):
+            text = payload.decode(encoding, errors="ignore").replace("\x00", "")
+            for label, pattern in explicit:
+                if pattern.search(text):
+                    raise ValueError(f"метаданные содержат {label}; удалите их до упаковки")
+
+    def check_icc(payload: bytes) -> None:
+        try:
+            profile = ImageCms.ImageCmsProfile(BytesIO(payload)).profile
+        except Exception as exc:
+            raise ValueError("неразбираемый ICC-профиль; удалите его до упаковки") from exc
+        for attribute in dir(profile):
+            if not attribute.startswith("_"):
+                value = getattr(profile, attribute)
+                if isinstance(value, (str, list, tuple)):
+                    scan(value)
+        scan_explicit_binary_paths(payload)
+
+    try:
+        if picture.format == "PNG":
+            raw = source.read_bytes()
+            position = 8
+            structural = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"gAMA", b"cHRM", b"sRGB", b"sBIT", b"pHYs", b"bKGD", b"hIST", b"tIME"}
+            while position < len(raw):
+                length = struct.unpack_from(">I", raw, position)[0]
+                kind = raw[position + 4:position + 8]
+                end = position + 12 + length
+                if end > len(raw):
+                    raise ValueError("неполная запись метаданных PNG")
+                payload = raw[position + 8:position + 8 + length]
+                position = end
+                if kind in {b"tEXt", b"zTXt", b"iTXt"}:
+                    key, rest = payload.split(b"\x00", 1)
+                    scan(key.decode("latin-1"))
+                    if kind == b"tEXt":
+                        text = rest.decode("latin-1")
+                    elif kind == b"zTXt":
+                        if rest[0] != 0:
+                            raise ValueError("неподдерживаемое сжатие PNG-текста")
+                        text = decompress_png(rest[1:]).decode("latin-1")
+                    else:
+                        flag, method = rest[:2]
+                        language, translated, rest = rest[2:].split(b"\x00", 2)
+                        scan(language.decode("ascii"))
+                        scan(translated.decode("utf-8"))
+                        if flag not in (0, 1) or method != 0:
+                            raise ValueError("неподдерживаемое сжатие PNG-текста")
+                        text = (decompress_png(rest) if flag else rest).decode("utf-8")
+                    if key == b"XML:com.adobe.xmp":
+                        check_xmp(text.encode("utf-8"))
+                    else:
+                        scan(text)
+                elif kind == b"eXIf":
+                    check_exif(payload)
+                elif kind == b"iCCP":
+                    name, rest = payload.split(b"\x00", 1)
+                    scan(name.decode("latin-1"))
+                    if rest[0] != 0:
+                        raise ValueError("неподдерживаемое сжатие ICC-профиля")
+                    check_icc(decompress_png(rest[1:]))
+                elif kind not in structural:
+                    raise ValueError("неподдерживаемая запись метаданных PNG; удалите её до упаковки")
+        elif picture.format == "JPEG":
+            icc_parts = False
+            for marker, payload in picture.applist:
+                if marker == "COM":
+                    decode_text(payload)
+                elif marker == "APP1" and payload.startswith(b"Exif\x00\x00"):
+                    check_exif(payload)
+                elif marker == "APP1" and payload.startswith(b"http://ns.adobe.com/xap/1.0/\x00"):
+                    check_xmp(payload.split(b"\x00", 1)[1])
+                elif marker == "APP2" and payload.startswith(b"ICC_PROFILE\x00"):
+                    icc_parts = True
+                    scan_explicit_binary_paths(payload[14:])
+                elif marker == "APP0" and payload.startswith((b"JFIF\x00", b"JFXX\x00")):
+                    continue
+                elif marker == "APP14" and payload.startswith(b"Adobe"):
+                    continue
+                else:
+                    raise ValueError("неподдерживаемая запись метаданных JPEG; удалите её до упаковки")
+            if icc_parts:
+                check_icc(picture.info.get("icc_profile") or b"")
+        elif picture.format == "WEBP":
+            raw = source.read_bytes()
+            position = 12
+            while position < len(raw):
+                kind = raw[position:position + 4]
+                length = struct.unpack_from("<I", raw, position + 4)[0]
+                payload = raw[position + 8:position + 8 + length]
+                position += 8 + length + (length % 2)
+                if position > len(raw):
+                    raise ValueError("неполная запись метаданных WebP")
+                if kind == b"EXIF":
+                    check_exif(payload)
+                elif kind == b"XMP ":
+                    check_xmp(payload)
+                elif kind == b"ICCP":
+                    check_icc(payload)
+                elif kind not in {b"VP8 ", b"VP8L", b"VP8X", b"ALPH"}:
+                    raise ValueError("неподдерживаемая запись метаданных WebP; удалите её до упаковки")
+        # Служебные числовые поля безопасны; неизвестные текстовые поля не пропускаем.
+        for key, value in picture.info.items():
+            if key not in {"exif", "xmp", "icc_profile", "transparency", "XML:com.adobe.xmp"}:
+                scan(key)
+                scan(value)
+    except SeriesError as exc:
+        raise ValueError(str(exc)) from exc
+    except (UnicodeError, struct.error, zlib.error, ET.ParseError, IndexError, KeyError, TypeError) as exc:
+        raise ValueError("неразбираемые метаданные; удалите их до упаковки") from exc
+
+
 def validate_images(data: dict, base: Path) -> dict:
     try:
         from PIL import Image
@@ -422,6 +661,7 @@ def validate_images(data: dict, base: Path) -> dict:
                 picture.verify()
             with Image.open(source) as picture:
                 picture.load()
+                reject_image_metadata(picture, source)
             if digest(source) != checksum:
                 raise ValueError("файл изменился во время проверки")
             if checksum in hashes:
