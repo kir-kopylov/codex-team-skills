@@ -465,6 +465,9 @@ def test_malformed_remote_url_does_not_hide_a_local_path(tmp_path: Path) -> None
         "https://example..com/home/alice/private.png",
         "https://-example.com/home/alice/private.png",
         "https://example-.com/home/alice/private.png",
+        "[https://example.com/room.png]/home/alice/private.png",
+        "[https://[2001:db8::1]/room.png]/home/alice/private.png",
+        "https://[2001:db8::1]extra/home/alice/private.png",
     ],
 )
 def test_url_boundaries_and_invalid_hosts_cannot_hide_local_paths(
@@ -487,6 +490,9 @@ def test_url_boundaries_and_invalid_hosts_cannot_hide_local_paths(
         "https://[2001:db8::1]:443/room.png",
         "https://пример.рф/room.png",
         "https://example.com/%28room%29.png",
+        "https://user:public@[2001:db8::1]/room.png",
+        "https://user:public@[2001:db8::1]:8443/room.png",
+        "[https://[2001:db8::1]:443/room.png]",
     ],
 )
 def test_remote_url_boundaries_preserve_valid_links(tmp_path: Path, url: str) -> None:

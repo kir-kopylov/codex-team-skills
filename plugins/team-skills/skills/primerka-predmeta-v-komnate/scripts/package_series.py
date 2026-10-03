@@ -26,7 +26,11 @@ EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 VARIATION_MODES = {"auto_concepts", "provided_concepts", "product_references"}
 GENERATOR_POLICIES = {"auto", "preferred", "strict"}
 SOURCE_ROLES = {"anchor", "supporting"}
-REMOTE_HTTP_URL = re.compile(r"(?i)\bhttps?://[^\s`\"'<>|)}]+")
+REMOTE_HTTP_URL = re.compile(
+    r"(?i)\bhttps?://(?:[^\s`\"'<>|)}\[\]/?#]*@)?"
+    r"(?:\[[^\s`\"'<>|)}\[\]/?#]+\]|[^\s`\"'<>|)}\[\]/?#]+)"
+    r"[^\s`\"'<>|)}\[\]]*"
+)
 REMOTE_DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z", re.I)
 LOCAL_PATH_PATTERNS = (
     (
@@ -132,6 +136,9 @@ def reject_local_paths(value: object, name: str) -> None:
                     from ipaddress import IPv6Address
 
                     IPv6Address(hostname)
+                    authority = parsed.netloc.rsplit("@", 1)[-1]
+                    if not re.fullmatch(r"\[[^\[\]]+\](?::[0-9]*)?", authority):
+                        return candidate
                 else:
                     dns_name = hostname.encode("idna").decode("ascii")
                     if dns_name.endswith("."):
