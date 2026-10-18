@@ -26,7 +26,9 @@ example_files:
   - "examples/anti-02-personal-attack.md"
   - "examples/anti-03-full-template-after-format-limit.md"
   - "examples/good-06-local-market-and-unavailable-sources.md"
-last_reviewed: "2026-08-04"
+  - "examples/good-07-refusal-without-proven-cause.md"
+  - "examples/good-08-defect-without-proven-impact.md"
+last_reviewed: "2026-09-22"
 authors:
   - "Кирилл Копылов"
 source_asset: "Санитизированная методика инженерного аудита планов, текстов и архитектурных предложений по предметным линзам; исходные клиентские материалы, названия проектов и частные метрики не переносились."
