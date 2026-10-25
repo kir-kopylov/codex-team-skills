@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "cutoff": "2026-02-01",
+  "parties": [
+    "owner",
+    "operator",
+    "supplier",
+    "manager"
+  ],
+  "sources": [
+    {
+      "id": "s1",
+      "locator": "synthetic:document-1"
+    },
+    {
+      "id": "s2",
+      "locator": "synthetic:document-2"
+    },
+    {
+      "id": "s3",
+      "locator": "synthetic:document-3"
+    },
+    {
+      "id": "s4",
+      "locator": "synthetic:document-4"
+    },
+    {
+      "id": "s5",
+      "locator": "synthetic:document-5"
+    },
+    {
+      "id": "s6",
+      "locator": "synthetic:document-6"
+    },
+    {
+      "id": "s7",
+      "locator": "synthetic:document-7"
+    },
+    {
+      "id": "s8",
+      "locator": "synthetic:document-8"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "e1",
+      "object": "object-a",
+      "date": "2026-01-10",
+      "amount": "12000",
+      "currency": "KZT",
+      "confirmed": true,
+      "source_ids": [
+        "s1"
+      ]
+    }
+  ],
+  "movements": [
+    {
+      "id": "m1",
+      "date": "2026-01-10",
+      "amount": "12000",
+      "currency": "KZT",
+      "kind": "payment",
+      "payer": "manager",
+      "payee": "supplier",
+      "funds_owner": "operator",
+      "transaction_key": "synthetic-bank:payment-1",
+      "confirmed": true,
+      "source_ids": [
+        "s2",
+        "s3"
+      ]
+    },
+    {
+      "id": "m2",
+      "date": "2026-01-15",
+      "amount": "2000",
+      "currency": "KZT",
+      "kind": "refund",
+      "payer": "supplier",
+      "payee": "operator",
+      "funds_owner": null,
+      "transaction_key": "synthetic-bank:refund-1",
+      "confirmed": true,
+      "source_ids": [
+        "s4"
+      ]
+    },
+    {
+      "id": "m3",
+      "date": "2026-01-20",
+      "amount": "4000",
+      "currency": "KZT",
+      "kind": "reimbursement",
+      "payer": "owner",
+      "payee": "operator",
+      "funds_owner": "owner",
+      "transaction_key": "synthetic-bank:reimbursement-1",
+      "confirmed": true,
+      "source_ids": [
+        "s5"
+      ]
+    }
+  ],
+  "allocations": [
+    {
+      "id": "a1",
+      "movement_id": "m1",
+      "expense_id": "e1",
+      "amount": "12000",
+      "confirmed": true,
+      "source_ids": [
+        "s6"
+      ]
+    },
+    {
+      "id": "a2",
+      "movement_id": "m2",
+      "expense_id": "e1",
+      "amount": "2000",
+      "confirmed": true,
+      "source_ids": [
+        "s6"
+      ]
+    },
+    {
+      "id": "a3",
+      "movement_id": "m3",
+      "expense_id": "e1",
+      "amount": "4000",
+      "confirmed": true,
+      "source_ids": [
+        "s6"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "c1",
+      "expense_id": "e1",
+      "applicable": true,
+      "debtor": "owner",
+      "creditor": "operator",
+      "proposed_amount": "12000",
+      "agreed_amount": "12000",
+      "agreement_source_ids": [
+        "s7"
+      ],
+      "payments_complete": true,
+      "refunds_complete": true,
+      "reimbursements_complete": true,
+      "coverage_source_ids": [
+        "s8"
+      ],
+      "payment_allocation_ids": [
+        "a1"
+      ],
+      "refund_allocation_ids": [
+        "a2"
+      ],
+      "reimbursement_allocation_ids": [
+        "a3"
+      ]
+    }
+  ]
+}
