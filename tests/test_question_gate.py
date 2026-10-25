@@ -32,6 +32,7 @@ QUESTION_DRIVEN_SKILLS = (
     "razbor-bardaka",
     "remont-dogovor-i-raspiski",
     "smeta-remonta-do-dogovora",
+    "sverka-rashodov-po-istochnikam",
     "uskorenie-zapisi-ekrana",
     "semantika-direkta-po-adresam",
     "vtoroy-mozg",
