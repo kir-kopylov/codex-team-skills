@@ -1,5 +1,5 @@
 owner: '@kir-kopylov'
-status: experimental
+status: team-ready
 summary: Проверяет свежие брони eHous, ближайший заезд и автора изменения дат без
   записи в базу.
 use_cases:
@@ -18,5 +18,5 @@ example_files:
 - examples/good-03.md
 - examples/anti-01.md
 - examples/anti-02.md
-last_reviewed: '2026-11-02'
+last_reviewed: '2026-11-09'
 source_asset: "Обезличенный перенос личного навыка ehous-booking-check, проверенного на рабочем подключении eHous."
