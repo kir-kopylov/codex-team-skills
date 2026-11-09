@@ -1,5 +1,5 @@
 owner: '@kir-kopylov'
-status: team-ready
+status: experimental
 summary: Проверяет свежие брони eHous, ближайший заезд и автора изменения дат без
   записи в базу.
 use_cases:
