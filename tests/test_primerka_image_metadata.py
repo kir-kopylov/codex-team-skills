@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -150,6 +151,94 @@ def test_benign_metadata_is_accepted_without_reencoding(
     assert (out / relative).read_bytes() == expected
     with zipfile.ZipFile(out / (data["job_id"] + ".zip")) as archive:
         assert archive.read(relative) == expected
+
+
+@pytest.mark.parametrize("after_idat", (False, True))
+def test_png_provenance_is_removed_only_in_export(tmp_path: Path, after_idat: bool) -> None:
+    brief, data, source, picture = image_fixture(tmp_path, ".png")
+    picture.putalpha(96)
+    info = PngImagePlugin.PngInfo()
+    info.add(b"gAMA", struct.pack(">I", 45455))
+    info.add_text("Description", "Synthetic public preview")
+    picture.save(source, pnginfo=info)
+    expected = source.read_bytes()
+    info.add(b"caBX", PRIVATE_PATH.encode("ascii"), after_idat=after_idat)
+    picture.save(source, pnginfo=info)
+    original = source.read_bytes()
+    assert b"caBX" in original
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    assert source.read_bytes() == original
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    image = manifest["images"][0]
+    assert image["sha256"] == hashlib.sha256(expected).hexdigest()
+    assert (out / image["path"]).read_bytes() == expected
+    with zipfile.ZipFile(out / (data["job_id"] + ".zip")) as archive:
+        assert archive.read(image["path"]) == expected
+
+
+@pytest.mark.parametrize(
+    ("kind", "payload", "error"),
+    (
+        (b"tEXt", b"SourceFile\x00" + PRIVATE_PATH.encode("ascii"), "Метаданные изображения"),
+        (b"vpAG", b"opaque block", "неподдерживаемая запись метаданных PNG"),
+    ),
+)
+def test_png_provenance_preserves_checks_on_other_metadata(
+    tmp_path: Path, kind: bytes, payload: bytes, error: str
+) -> None:
+    brief, _, source, picture = image_fixture(tmp_path, ".png")
+    info = PngImagePlugin.PngInfo()
+    info.add(b"caBX", b"synthetic provenance")
+    info.add(kind, payload)
+    picture.save(source, pnginfo=info)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode != 0
+    assert error in result.stderr
+    assert not out.exists()
+
+
+def test_png_provenance_cannot_follow_end_of_file(tmp_path: Path) -> None:
+    brief, _, source, picture = image_fixture(tmp_path, ".png")
+    info = PngImagePlugin.PngInfo()
+    payload = b"synthetic provenance"
+    info.add(b"caBX", payload)
+    picture.save(source, pnginfo=info)
+    raw = source.read_bytes()
+    start = raw.index(b"caBX") - 4
+    end = start + 12 + len(payload)
+    source.write_bytes(raw[:start] + raw[end:] + raw[start:end])
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode != 0
+    assert "неверный конец PNG" in result.stderr
+    assert not out.exists()
+
+
+def test_png_duplicates_are_detected_after_provenance_removal(tmp_path: Path) -> None:
+    brief, data = make_brief(tmp_path, variants=2, source_views=1, images_per_variation=1)
+    picture = Image.new("RGB", (32, 24), (30, 80, 120))
+    sources = [brief.parent / item["path"] for item in data["images"]]
+    for number, source in enumerate(sources):
+        info = PngImagePlugin.PngInfo()
+        info.add(b"caBX", bytes([number]))
+        picture.save(source, pnginfo=info)
+    assert sources[0].read_bytes() != sources[1].read_bytes()
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode != 0
+    assert "точный дубликат файла" in result.stderr
+    assert not out.exists()
 
 
 @pytest.mark.parametrize(
