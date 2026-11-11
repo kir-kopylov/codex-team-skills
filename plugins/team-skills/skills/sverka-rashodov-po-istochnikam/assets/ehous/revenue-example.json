@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "objects": ["Учебная А", "Учебная Б"],
+    "from": "2030-06-01",
+    "through": "2030-06-20",
+    "timezone": "Asia/Almaty",
+    "decimals": 2,
+    "rounding": "half_up"
+  },
+  "ehous": {
+    "source": "Учебная датированная выгрузка eHous",
+    "read_at": "2030-06-22T12:00:00+05:00",
+    "as_of": "2030-06-20",
+    "coverage_source": "Учебная ведомость охвата обоих объектов, текущих заявок и архива на 20 июня",
+    "rows": [
+      {
+        "id": "100001",
+        "object": "Учебная А",
+        "currency": "KZT",
+        "source": "Учебная выгрузка eHous, заявка 100001",
+        "channel": "Учебный канал А",
+        "status": "Выезд",
+        "arrival": "2030-06-10",
+        "departure": "2030-06-12",
+        "nights": 2,
+        "eligible": true,
+        "full": {"amount": "100000", "basis": "gross", "source": "Учебный реестр начислений, строка 1"},
+        "commission": {"kind": "amount", "value": "15000", "source": "Учебное подтверждение комиссии, строка 1"},
+        "payout_coverage_source": "Учебная выписка и сверка всех выплат по заявке 100001 на дату среза"
+      },
+      {
+        "id": "100002",
+        "object": "Учебная Б",
+        "currency": "KZT",
+        "source": "Учебная выгрузка eHous, заявка 100002",
+        "channel": "Учебный канал Б",
+        "status": "Заселение",
+        "arrival": "2030-06-19",
+        "departure": "2030-06-23",
+        "nights": 4,
+        "eligible": true,
+        "full": {"amount": "90000", "basis": "gross", "source": "Учебный реестр начислений, строка 2"},
+        "nightly": {
+          "basis": "gross",
+          "source": "Учебный тариф по датам, строка 2",
+          "dates": {"2030-06-19": "8000", "2030-06-20": "22000", "2030-06-21": "33000", "2030-06-22": "27000"}
+        },
+        "commission": {"kind": "amount", "value": "5400", "source": "Учебное подтверждение удержания за 19–20 июня"},
+        "other_charges": [{"kind": "penalty", "amount": "4000", "source": "Учебный реестр дополнительных начислений"}]
+      }
+    ]
+  },
+  "report": {
+    "source": "Учебный отчёт на 20 июня",
+    "coverage_source": "В учебном отчёте проверены оба объекта и весь указанный период",
+    "rows": [
+      {
+        "id": "100001", "object": "Учебная А", "currency": "KZT", "source": "Учебный отчёт, строка 1",
+        "channel": "Учебный канал А", "status": "Выезд", "arrival": "2030-06-10", "departure": "2030-06-12",
+        "nights": 2, "amount": "100000", "basis": "gross", "period": "scope"
+      },
+      {
+        "id": "100002", "object": "Учебная Б", "currency": "KZT", "source": "Учебный отчёт, строка 2",
+        "channel": "Учебный канал Б", "status": "Заселение", "arrival": "2030-06-19", "departure": "2030-06-23",
+        "nights": 4, "amount": "25500", "basis": "net", "period": "scope"
+      }
+    ]
+  },
+  "payments": [
+    {
+      "id": "учебная-выплата-1",
+      "date": "2030-06-15",
+      "recipient": "Учебный получатель",
+      "currency": "KZT",
+      "amount": "85000",
+      "source": "Учебная выписка, строка 1",
+      "kind": "rent",
+      "allocations": [{"booking_id": "100001", "object": "Учебная А", "amount": "85000", "source": "Учебный отчёт о выплате по заявке 100001"}]
+    }
+  ]
+}
