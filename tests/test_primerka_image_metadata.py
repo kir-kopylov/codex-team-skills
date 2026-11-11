@@ -241,3 +241,72 @@ def test_jfxx_embedded_thumbnail_is_rejected_before_export(tmp_path: Path, comme
     assert comment in source.read_bytes()
 
     assert_rejected(brief, tmp_path / "выдача")
+
+
+def insert_jpeg_after_scan(path: Path, marker: bytes, payload: bytes, *, between_scans: bool) -> None:
+    raw = path.read_bytes()
+    assert raw.endswith(b"\xff\xd9")
+    offset = raw.rindex(b"\xff\xda") if between_scans else len(raw) - 2
+    assert offset > raw.index(b"\xff\xda")
+    segment = marker + struct.pack(">H", len(payload) + 2) + payload
+    path.write_bytes(raw[:offset] + segment + raw[offset:])
+    # Отдельно доказываем, что отказ вызван метаданными, а не поломанным растром.
+    with Image.open(path) as stored:
+        stored.load()
+        assert stored.size == (32, 24)
+
+
+@pytest.mark.parametrize(
+    ("between_scans", "marker", "payload"),
+    (
+        (False, b"\xff\xfe", PRIVATE_PATH.encode("ascii")),
+        (True, b"\xff\xfe", PRIVATE_PATH.encode("ascii")),
+        (True, b"\xff\xe1", XMP_PREFIX + xmp_packet(PRIVATE_PATH)),
+    ),
+)
+def test_jpeg_private_metadata_after_scan_is_rejected(
+    tmp_path: Path, between_scans: bool, marker: bytes, payload: bytes
+) -> None:
+    brief, _, source, picture = image_fixture(tmp_path, ".jpg")
+    picture.save(source, format="JPEG", progressive=between_scans)
+    insert_jpeg_after_scan(source, marker, payload, between_scans=between_scans)
+
+    assert_rejected(brief, tmp_path / "выдача")
+
+
+@pytest.mark.parametrize(
+    ("between_scans", "carrier"),
+    ((False, "comment"), (True, "comment"), (True, "icc")),
+)
+def test_jpeg_public_metadata_after_scan_is_preserved(
+    tmp_path: Path, between_scans: bool, carrier: str
+) -> None:
+    brief, data, source, picture = image_fixture(tmp_path, ".jpg")
+    picture.save(source, format="JPEG", progressive=between_scans)
+    if carrier == "icc":
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+        marker, payload = b"\xff\xe2", b"ICC_PROFILE\x00\x01\x01" + profile
+    else:
+        marker, payload = b"\xff\xfe", b"Synthetic public preview"
+    insert_jpeg_after_scan(source, marker, payload, between_scans=between_scans)
+    expected = source.read_bytes()
+    before = snapshot(brief.parent)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    assert snapshot(brief.parent) == before
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    relative = manifest["images"][0]["path"]
+    assert (out / relative).read_bytes() == expected
+    with zipfile.ZipFile(out / (data["job_id"] + ".zip")) as archive:
+        assert archive.read(relative) == expected
+
+
+def test_jpeg_unchecked_trailer_after_eoi_is_rejected(tmp_path: Path) -> None:
+    brief, _, source, picture = image_fixture(tmp_path, ".jpg")
+    picture.save(source, format="JPEG")
+    source.write_bytes(source.read_bytes() + PRIVATE_PATH.encode("ascii"))
+
+    assert_rejected(brief, tmp_path / "выдача")

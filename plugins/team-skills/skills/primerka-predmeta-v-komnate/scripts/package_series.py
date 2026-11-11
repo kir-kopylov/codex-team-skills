@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 import copy
 import ctypes
 import hashlib
@@ -396,6 +397,51 @@ def read_brief(path: Path) -> dict:
     return data
 
 
+def jpeg_metadata_segments(raw: bytes) -> Iterator[tuple[str, bytes]]:
+    """Прочитать APP и COM до конца JPEG, включая промежутки между сканами."""
+    if not raw.startswith(b"\xff\xd8"):
+        raise ValueError("не найдено начало JPEG")
+    position = 2
+    in_scan = False
+    structural = (set(range(0xC0, 0xD0)) - {0xC8}) | set(range(0xDA, 0xE0))
+    while position < len(raw):
+        if in_scan:
+            position = raw.find(b"\xff", position)
+            if position < 0:
+                break
+        if raw[position] != 0xFF:
+            raise ValueError("неразбираемая граница сегмента JPEG")
+        while position < len(raw) and raw[position] == 0xFF:
+            position += 1
+        if position == len(raw):
+            break
+        marker = raw[position]
+        position += 1
+        # FF00 и RST0–RST7 принадлежат потоку растра; это не метаданные.
+        if in_scan and (marker == 0 or 0xD0 <= marker <= 0xD7):
+            continue
+        if marker == 0xD9:
+            if position != len(raw):
+                raise ValueError("непроверенные данные после конца JPEG; удалите их до упаковки")
+            return
+        if marker == 0x01:
+            continue  # TEM не имеет полезной нагрузки.
+        app = 0xE0 <= marker <= 0xEF
+        if not app and marker != 0xFE and marker not in structural:
+            raise ValueError("неподдерживаемый сегмент JPEG; удалите его до упаковки")
+        if position + 2 > len(raw):
+            raise ValueError("неполная длина сегмента JPEG")
+        size = int.from_bytes(raw[position:position + 2], "big")
+        end = position + size
+        if size < 2 or end > len(raw):
+            raise ValueError("неполный сегмент JPEG")
+        if app or marker == 0xFE:
+            name = f"APP{marker - 0xE0}" if app else "COM"
+            yield name, raw[position + 2:end]
+        position = end
+        in_scan = marker == 0xDA
+    raise ValueError("не найден конец JPEG")
+
 
 def reject_image_metadata(picture: object, source: Path) -> None:
     """Проверить метаданные до копирования, не перекодируя растровые данные."""
@@ -567,8 +613,9 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                 elif kind not in structural:
                     raise ValueError("неподдерживаемая запись метаданных PNG; удалите её до упаковки")
         elif picture.format == "JPEG":
-            icc_parts = False
-            for marker, payload in picture.applist:
+            icc_parts: dict[int, bytes] = {}
+            icc_count: int | None = None
+            for marker, payload in jpeg_metadata_segments(source.read_bytes()):
                 if marker == "COM":
                     decode_text(payload)
                 elif marker == "APP1" and payload.startswith(b"Exif\x00\x00"):
@@ -576,16 +623,24 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                 elif marker == "APP1" and payload.startswith(b"http://ns.adobe.com/xap/1.0/\x00"):
                     check_xmp(payload.split(b"\x00", 1)[1])
                 elif marker == "APP2" and payload.startswith(b"ICC_PROFILE\x00"):
-                    icc_parts = True
-                    scan_explicit_binary_paths(payload[14:])
+                    if len(payload) < 14:
+                        raise ValueError("неполный сегмент ICC-профиля JPEG")
+                    part, count = payload[12:14]
+                    if not 1 <= part <= count or part in icc_parts or icc_count not in (None, count):
+                        raise ValueError("несогласованные части ICC-профиля JPEG")
+                    icc_count = count
+                    icc_parts[part] = payload[14:]
+                    scan_explicit_binary_paths(icc_parts[part])
                 elif marker == "APP0" and payload.startswith(b"JFIF\x00"):
                     continue
                 elif marker == "APP14" and payload.startswith(b"Adobe"):
                     continue
                 else:
                     raise ValueError("неподдерживаемая запись метаданных JPEG; удалите её до упаковки")
-            if icc_parts:
-                check_icc(picture.info.get("icc_profile") or b"")
+            if icc_count is not None:
+                if len(icc_parts) != icc_count:
+                    raise ValueError("неполный ICC-профиль JPEG")
+                check_icc(b"".join(icc_parts[i] for i in range(1, icc_count + 1)))
         elif picture.format == "WEBP":
             raw = source.read_bytes()
             position = 12
