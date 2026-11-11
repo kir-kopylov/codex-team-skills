@@ -142,7 +142,7 @@ def test_benign_metadata_is_accepted_without_reencoding(
     expected = source.read_bytes()
     out = tmp_path / "выдача"
 
-    result = run_package(brief, out)
+    result = run_package(brief, out, create_zip=True)
 
     assert result.returncode == 0, result.stderr
     assert snapshot(brief.parent) == before
@@ -168,7 +168,7 @@ def test_png_provenance_is_removed_only_in_export(tmp_path: Path, after_idat: bo
     assert b"caBX" in original
     out = tmp_path / "выдача"
 
-    result = run_package(brief, out)
+    result = run_package(brief, out, create_zip=True)
 
     assert result.returncode == 0, result.stderr
     assert source.read_bytes() == original
@@ -267,7 +267,7 @@ def test_benign_jpeg_comment_nul_is_preserved(tmp_path: Path) -> None:
     expected = source.read_bytes()
     out = tmp_path / "выдача"
 
-    result = run_package(brief, out)
+    result = run_package(brief, out, create_zip=True)
 
     assert result.returncode == 0, result.stderr
     assert snapshot(brief.parent) == before
@@ -382,7 +382,7 @@ def test_jpeg_public_metadata_after_scan_is_preserved(
     before = snapshot(brief.parent)
     out = tmp_path / "выдача"
 
-    result = run_package(brief, out)
+    result = run_package(brief, out, create_zip=True)
 
     assert result.returncode == 0, result.stderr
     assert snapshot(brief.parent) == before
