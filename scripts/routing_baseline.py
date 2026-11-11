@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""Проверка маршрутизации на входах из examples/good-*.md.
+"""Ограниченная проверка маршрутизации по описаниям навыков.
 
 Три шага:
 
-    python scripts/routing_baseline.py --source examples build
-    python scripts/routing_baseline.py --source examples run --model claude-opus-5
-    python scripts/routing_baseline.py --source examples report --model claude-opus-5
+    python scripts/routing_baseline.py --source examples build --skill имя-навыка
+    python scripts/routing_baseline.py --source examples run --model идентификатор --dry-run
+    python scripts/routing_baseline.py --source examples report --model идентификатор
 
-`build` собирает набор и обезличенный список описаний всех навыков. Набор
+`build` требует --skill/--related либо явно выбранный --full. Все описания
+библиотеки остаются вариантами выбора; коды стабильны по имени. Набор
 `examples` — вход каждого хорошего примера с разметкой «есть ли во входе
 дословный natural_trigger»; набор `triggers` — сами фразы `natural_triggers`,
 та самая проверка, которая упирается в потолок.
-`run` спрашивает независимого судью: каждый вызов — отдельный процесс `claude`
+`run` — необязательный адаптер Claude: каждый вызов — отдельный процесс `claude`
 без памяти, навыков, `CLAUDE.md` и инструментов, судья видит только список
 кодов и один вход. `report` считает доли попаданий, промахи и путаемые пары.
 
@@ -32,7 +33,6 @@ import hashlib
 import json
 import os
 import pathlib
-import random
 import re
 import subprocess
 import threading
@@ -47,12 +47,11 @@ DEFAULT_OUT = pathlib.Path.home() / ".codex" / "goal-runs" / "routing-baseline"
 
 EVAL_STATUSES = {"team-ready", "experimental"}
 EXPLICIT_ONLY = {"goal-contract-shaper-v3"}
-SHUFFLE_SEED = 20260920
 
 SYSTEM_PROMPT = (
     "Ты маршрутизатор запросов. Тебе дан список процедур с кодами и один запрос "
     "пользователя. Выбери ровно одну процедуру, которая должна обработать запрос, "
-    "или ответь «ни один», если ни одна не подходит. Отвечай ТОЛЬКО кодом вида S07 "
+    "или ответь «ни один», если ни одна не подходит. Отвечай ТОЛЬКО данным кодом "
     "или словами «ни один». Без объяснений."
 )
 
@@ -81,11 +80,39 @@ def load_skills() -> dict:
     return skills
 
 
-def build(out: pathlib.Path, source: str) -> None:
-    skills = load_skills()
+def build(
+    out: pathlib.Path,
+    source: str,
+    skills: list[str] | None = None,
+    related: list[str] | None = None,
+    full: bool = False,
+) -> None:
+    catalog = load_skills()
+    targets, neighbors = sorted(set(skills or [])), sorted(set(related or []))
+    if full and (targets or neighbors):
+        raise SystemExit("--full нельзя сочетать с --skill или --related")
+    if not full and not targets:
+        raise SystemExit("укажите --skill либо явно запросите --full")
+    eligible = {
+        name for name, item in catalog.items()
+        if item["status"] in EVAL_STATUSES and name not in EXPLICIT_ONLY
+    }
+    selected = eligible if full else set(targets + neighbors)
+    unknown = selected - set(catalog)
+    if unknown:
+        raise SystemExit(f"неизвестные навыки: {', '.join(sorted(unknown))}")
+    if selected - eligible:
+        raise SystemExit("в охвате есть навык без смыслового автозапуска")
+    scope = {
+        "mode": "full" if full else "targeted",
+        "skills": targets,
+        "related": neighbors,
+        "selected_skills": sorted(selected),
+        "source": source,
+    }
     inputs = []
-    for name, skill in skills.items():
-        if skill["status"] not in EVAL_STATUSES or name in EXPLICIT_ONLY:
+    for name, skill in catalog.items():
+        if name not in selected:
             continue
         if source == "triggers":
             for trigger in skill["natural_triggers"]:
@@ -122,27 +149,35 @@ def build(out: pathlib.Path, source: str) -> None:
                 }
             )
 
-    order = sorted(skills)
-    random.Random(SHUFFLE_SEED).shuffle(order)
-    codes = {name: f"S{i + 1:02d}" for i, name in enumerate(order)}
+    codes = {
+        name: "S" + hashlib.sha256(name.encode("utf-8")).hexdigest()[:10]
+        for name in catalog
+    }
+    if len(set(codes.values())) != len(codes):
+        raise SystemExit("коллизия кодов навыков: набор не создан")
+    order = sorted(catalog, key=codes.get)
 
     out.mkdir(parents=True, exist_ok=True)
     (out / "skills.json").write_text(
-        json.dumps({"codes": codes, "skills": skills}, ensure_ascii=False, indent=2),
+        json.dumps({"codes": codes, "skills": catalog}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     (out / f"inputs-{source}.json").write_text(
         json.dumps(inputs, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     (out / "choice_list.txt").write_text(
-        "\n".join(f'{codes[name]}: {skills[name]["description"]}' for name in order) + "\n",
+        "\n".join(f'{codes[name]}: {catalog[name]["description"]}' for name in order) + "\n",
         encoding="utf-8",
     )
 
+    (out / f"scope-{source}.json").write_text(
+        json.dumps(scope, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     lengths = sorted(len(item["text"]) for item in inputs)
     middle = lengths[len(lengths) // 2] if lengths else 0
     print(f"набор: {source}")
-    print(f"навыков всего: {len(skills)}")
+    print(f"охват: {scope['mode']}")
+    print(f"навыков всего: {len(catalog)}")
     print(f"навыков в наборе: {len({item['owner'] for item in inputs})}")
     print(f"входов: {len(inputs)}")
     print(f"с дословным триггером: {sum(item['literal_trigger'] for item in inputs)}")
@@ -155,16 +190,101 @@ def fingerprint(out: pathlib.Path, source: str) -> str:
     digest = hashlib.sha256()
     digest.update((out / "choice_list.txt").read_bytes())
     digest.update((out / f"inputs-{source}.json").read_bytes())
+    scope = out / f"scope-{source}.json"
+    if scope.exists():
+        digest.update(scope.read_bytes())
     return digest.hexdigest()[:12]
 
 
-def parse_answer(answer: str) -> str:
-    match = re.search(r"\bS(\d{2})\b", answer)
-    if match:
-        return f"S{match.group(1)}"
-    if "ни один" in answer.lower():
+def parse_answer(answer: str, known_codes) -> str:
+    answer = answer.strip()
+    if answer in known_codes:
+        return answer
+    if answer.casefold() == "ни один":
         return "NONE"
     return "UNPARSED"
+
+
+def load_dataset(out: pathlib.Path, source: str):
+    meta = json.loads((out / "skills.json").read_text(encoding="utf-8"))
+    inputs = json.loads((out / f"inputs-{source}.json").read_text(encoding="utf-8"))
+    codes = meta["codes"]
+    if len(set(codes.values())) != len(codes):
+        raise SystemExit("коды навыков неоднозначны")
+    if not inputs or len({item["id"] for item in inputs}) != len(inputs):
+        raise SystemExit("набор пуст либо содержит повторные идентификаторы")
+    if any(item["owner"] not in codes for item in inputs):
+        raise SystemExit("владелец входа отсутствует в списке вариантов")
+    path = out / f"scope-{source}.json"
+    scope = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {
+        "mode": "legacy", "source": source,
+    }
+    if scope.get("source") != source or scope.get("mode") not in {
+        "targeted", "full", "legacy",
+    }:
+        raise SystemExit("неверные метаданные охвата")
+    if scope["mode"] == "targeted":
+        targets, related = scope.get("skills", []), scope.get("related", [])
+        selected = sorted(set(targets + related))
+        if not targets or selected != scope.get("selected_skills"):
+            raise SystemExit("неполные метаданные выбранных навыков")
+        if any(item["owner"] not in selected for item in inputs):
+            raise SystemExit("вход находится вне сохранённого охвата")
+    return meta, inputs, scope
+
+
+def valid_attempts(out, source, model, runs, inputs, known_codes):
+    """Первый успешный корректный ответ на пару input/run — один голос."""
+    stamp = fingerprint(out, source)
+    items = {item["id"]: item for item in inputs}
+    valid = {}
+    stats = {"failed_calls": 0, "invalid_calls": 0, "duplicate_calls": 0, "stale": 0}
+    path = out / "raw" / "answers.jsonl"
+    if not path.exists():
+        return valid, stats
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            stats["invalid_calls"] += 1
+            continue
+        if not isinstance(record, dict):
+            stats["invalid_calls"] += 1
+            continue
+        if record.get("model") != model or record.get("source", "examples") != source:
+            continue
+        if record.get("set_hash") != stamp:
+            stats["stale"] += 1
+            continue
+        input_id, attempt = record.get("input_id"), record.get("run")
+        if not isinstance(input_id, str) or input_id not in items or type(attempt) is not int or attempt < 1:
+            stats["invalid_calls"] += 1
+            continue
+        if attempt > runs:
+            continue
+        if type(record.get("returncode")) is not int:
+            stats["invalid_calls"] += 1
+            continue
+        if record["returncode"] != 0:
+            stats["failed_calls"] += 1
+            continue
+        raw = record.get("raw")
+        parsed = parse_answer(raw, known_codes) if isinstance(raw, str) else "UNPARSED"
+        item = items[input_id]
+        if parsed == "UNPARSED" or any(
+            key in record and record[key] != item[key]
+            for key in ("owner", "file", "literal_trigger")
+        ):
+            stats["invalid_calls"] += 1
+            continue
+        key = (input_id, attempt)
+        if key in valid:
+            stats["duplicate_calls"] += 1
+            continue
+        valid[key] = parsed
+    return valid, stats
 
 
 def ask_judge(cli: str, workdir: pathlib.Path, choices: str, text: str, model: str):
@@ -185,24 +305,17 @@ def ask_judge(cli: str, workdir: pathlib.Path, choices: str, text: str, model: s
     return done.returncode, (done.stdout or "").strip(), (done.stderr or "").strip()
 
 
-def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, workers: int) -> None:
-    cli = os.environ.get("ROUTING_BASELINE_CLI", "claude")
-    raw_dir = out / "raw"
-    raw_dir.mkdir(parents=True, exist_ok=True)
-    answers = raw_dir / "answers.jsonl"
-
+def run(
+    out: pathlib.Path, source: str, model: str, runs: int = 1,
+    limit: int = 0, workers: int = 6, full: bool = False, dry_run: bool = False,
+) -> None:
+    if runs < 1 or workers < 1 or limit < 0:
+        raise SystemExit("--runs и --workers должны быть положительными, --limit — неотрицательным")
+    meta, inputs, scope = load_dataset(out, source)
+    if scope["mode"] != "targeted" and not full:
+        raise SystemExit("полный или старый набор требует явного run --full")
     stamp = fingerprint(out, source)
-    already = set()
-    if answers.exists():
-        for line in answers.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                record = json.loads(line)
-                already.add(
-                    (record["input_id"], record["run"], record["model"], record.get("set_hash"))
-                )
-
-    choices = (out / "choice_list.txt").read_text(encoding="utf-8").strip()
-    inputs = json.loads((out / f"inputs-{source}.json").read_text(encoding="utf-8"))
+    already, _ = valid_attempts(out, source, model, runs, inputs, set(meta["codes"].values()))
     if limit:
         inputs = inputs[:limit]
 
@@ -210,10 +323,22 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
         (item, attempt)
         for item in inputs
         for attempt in range(1, runs + 1)
-        if (item["id"], attempt, model, stamp) not in already
+        if (item["id"], attempt) not in already
     ]
     print(f"отпечаток набора: {stamp}")
     print(f"заданий: {len(jobs)} (готовых пропущено: {len(inputs) * runs - len(jobs)})")
+    if dry_run:
+        print("проверка расхода: процессы судьи не запускались")
+        return
+    if not jobs:
+        return
+
+    cli = os.environ.get("ROUTING_BASELINE_CLI", "claude")
+    choices = (out / "choice_list.txt").read_text(encoding="utf-8").strip()
+    known_codes = set(meta["codes"].values())
+    raw_dir = out / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    answers = raw_dir / "answers.jsonl"
 
     lock = threading.Lock()
     handle = answers.open("a", encoding="utf-8")
@@ -222,7 +347,10 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
     def work(job):
         item, attempt = job
         started = time.time()
-        code, stdout, stderr = ask_judge(cli, out, choices, item["text"], model)
+        try:
+            code, stdout, stderr = ask_judge(cli, out, choices, item["text"], model)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            code, stdout, stderr = -1, "", str(exc)
         record = {
             "input_id": item["id"],
             "run": attempt,
@@ -235,7 +363,7 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
             "returncode": code,
             "raw": stdout,
             "stderr": stderr[:500],
-            "parsed": parse_answer(stdout),
+            "parsed": parse_answer(stdout, known_codes),
             "seconds": round(time.time() - started, 1),
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
         }
@@ -253,38 +381,28 @@ def run(out: pathlib.Path, source: str, model: str, runs: int, limit: int, worke
     print(f"сырые ответы: {answers}")
 
 
-def report(out: pathlib.Path, source: str, model: str, runs: int, allow_partial: bool) -> None:
-    meta = json.loads((out / "skills.json").read_text(encoding="utf-8"))
+def report(
+    out: pathlib.Path, source: str, model: str, runs: int = 1, allow_partial: bool = False,
+) -> None:
+    if runs < 1:
+        raise SystemExit("--runs должен быть положительным")
+    meta, input_rows, scope = load_dataset(out, source)
     codes = meta["codes"]
     names = {code: name for name, code in codes.items()}
-    inputs = {
-        item["id"]: item
-        for item in json.loads((out / f"inputs-{source}.json").read_text(encoding="utf-8"))
-    }
+    inputs = {item["id"]: item for item in input_rows}
 
     stamp = fingerprint(out, source)
     votes = collections.defaultdict(list)
-    failures = 0
-    stale = 0
-    for line in (out / "raw" / "answers.jsonl").read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        record = json.loads(line)
-        if record["model"] != model or record.get("source", "examples") != source:
-            continue
-        if record.get("set_hash") != stamp:
-            stale += 1
-            continue
-        failures += record["returncode"] != 0
-        votes[record["input_id"]].append(record["parsed"])
+    attempts, stats = valid_attempts(out, source, model, runs, input_rows, set(names))
+    for (input_id, attempt), parsed in sorted(attempts.items()):
+        votes[input_id].append(parsed)
 
     missing = [key for key in inputs if len(votes.get(key, [])) < runs]
-    broken = [key for key, given in votes.items() if "UNPARSED" in given]
-    if (missing or broken) and not allow_partial:
+    if missing and not allow_partial:
         raise SystemExit(
             f"замер неполный: входов без {runs} ответов — {len(missing)}, "
-            f"с неразобранным ответом — {len(broken)}, "
-            f"ответов от другого набора пропущено — {stale}. "
+            f"некорректных ответов — {stats['invalid_calls']}, "
+            f"ответов от другого набора пропущено — {stats['stale']}. "
             "Допрогоните `run` или повторите с `--allow-partial`."
         )
     needed = runs // 2 + 1
@@ -295,7 +413,7 @@ def report(out: pathlib.Path, source: str, model: str, runs: int, allow_partial:
         expected = codes[item["owner"]]
         hit = sum(vote == expected for vote in given) >= needed
         top, top_count = collections.Counter(given).most_common(1)[0]
-        went = "—" if hit else (names.get(top, top) if top_count >= 2 else "нет большинства")
+        went = "—" if hit else (names.get(top, top) if top_count >= needed else "нет большинства")
         rows.append(
             {
                 "id": input_id,
@@ -319,8 +437,11 @@ def report(out: pathlib.Path, source: str, model: str, runs: int, allow_partial:
         "model": model,
         "set_hash": stamp,
         "runs": runs,
-        "partial": bool(missing or broken),
-        "failed_calls": failures,
+        "scope": scope,
+        "partial": bool(missing),
+        "failed_calls": stats["failed_calls"],
+        "invalid_calls": stats["invalid_calls"],
+        "duplicate_calls": stats["duplicate_calls"],
         "total": share(lambda row: True),
         "no_literal": share(lambda row: not row["literal"]),
         "literal": share(lambda row: row["literal"]),
@@ -337,11 +458,14 @@ def report(out: pathlib.Path, source: str, model: str, runs: int, allow_partial:
         tail = f" = {hits / total:.1%}" if total else ""
         print(f"{title}: {hits}/{total}{tail}")
     print(f"отпечаток набора: {stamp}")
-    print(f"вызовов с ошибкой: {failures}")
-    if stale:
-        print(f"пропущено ответов от другого набора: {stale}")
-    if missing or broken:
-        print(f"ЧАСТИЧНЫЙ ЗАМЕР: без полных {runs} ответов — {len(missing)}, с неразобранным — {len(broken)}")
+    print(f"охват: {scope['mode']}")
+    print(f"вызовов с ошибкой: {stats['failed_calls']}")
+    print(f"некорректных ответов: {stats['invalid_calls']}")
+    print(f"повторных ответов: {stats['duplicate_calls']}")
+    if stats["stale"]:
+        print(f"пропущено ответов от другого набора: {stats['stale']}")
+    if missing:
+        print(f"ЧАСТИЧНЫЙ ЗАМЕР: без полных {runs} ответов — {len(missing)}")
     print(f"промахов: {len(summary['misses'])}")
     for pair in summary["pairs"]:
         print(f'  {pair["count"]}  {pair["owner"]} → {pair["went"]}')
@@ -358,15 +482,21 @@ def main() -> None:
         help="набор входов: тексты хороших примеров или фразы natural_triggers",
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("build", help="собрать набор входов и обезличенный список")
-    runner = sub.add_parser("run", help="спросить независимого судью")
-    runner.add_argument("--model", default="claude-opus-5", help="полный идентификатор модели, не алиас")
-    runner.add_argument("--runs", type=int, default=3)
+    builder = sub.add_parser("build", help="собрать явно выбранный охват")
+    selection = builder.add_mutually_exclusive_group(required=True)
+    selection.add_argument("--skill", action="append", help="проверяемый навык; можно повторять")
+    selection.add_argument("--full", action="store_true", help="полная библиотека по отдельному запросу")
+    builder.add_argument("--related", action="append", help="соседний навык; можно повторять")
+    runner = sub.add_parser("run", help="необязательный запуск через Claude CLI")
+    runner.add_argument("--model", required=True, help="явный идентификатор модели судьи")
+    runner.add_argument("--runs", type=int, default=1)
     runner.add_argument("--limit", type=int, default=0, help="только первые N входов")
     runner.add_argument("--workers", type=int, default=6)
+    runner.add_argument("--full", action="store_true", help="явно разрешить полный или старый набор")
+    runner.add_argument("--dry-run", action="store_true", help="показать число вызовов без запуска судьи")
     reporter = sub.add_parser("report", help="посчитать доли попаданий и промахи")
-    reporter.add_argument("--model", default="claude-opus-5")
-    reporter.add_argument("--runs", type=int, default=3, help="сколько прогонов ожидается на вход")
+    reporter.add_argument("--model", required=True, help="идентификатор судьи в сохранённых ответах")
+    reporter.add_argument("--runs", type=int, default=1, help="сколько прогонов ожидается на вход")
     reporter.add_argument(
         "--allow-partial",
         action="store_true",
@@ -375,9 +505,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "build":
-        build(args.out, args.source)
+        build(args.out, args.source, skills=args.skill, related=args.related, full=args.full)
     elif args.command == "run":
-        run(args.out, args.source, args.model, args.runs, args.limit, args.workers)
+        run(args.out, args.source, args.model, args.runs, args.limit, args.workers, args.full, args.dry_run)
     else:
         report(args.out, args.source, args.model, args.runs, args.allow_partial)
 
