@@ -882,7 +882,7 @@ def rename_new(source: Path, destination: Path) -> None:
         raise OSError(code, os.strerror(code), str(destination))
 
 
-def package(brief_path: Path, out: Path) -> int:
+def package(brief_path: Path, out: Path, *, create_zip: bool = False) -> int:
     if os.path.lexists(out):
         raise SeriesError(f"Папка результата уже существует; выберите новую: {out}")
     data = read_brief(brief_path)
@@ -992,25 +992,26 @@ def package(brief_path: Path, out: Path) -> int:
             gallery(data, output_images), encoding="utf-8"
         )
 
-        archive_name = f"{data['job_id']}.zip"
-        members = sorted(path for path in staging.rglob("*") if path.is_file())
-        with zipfile.ZipFile(
-            staging / archive_name, "w", zipfile.ZIP_DEFLATED
-        ) as archive:
-            for member in members:
-                archive.write(member, member.relative_to(staging).as_posix())
-        expected_members = [member.relative_to(staging).as_posix() for member in members]
-        try:
-            with zipfile.ZipFile(staging / archive_name) as archive:
-                archived_members = archive.namelist()
-                if archive.testzip() is not None:
-                    raise SeriesError("ZIP не прошёл проверку целостности.")
-        except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
-            raise SeriesError(f"Не удалось проверить ZIP: {exc}") from exc
-        if len(archived_members) != len(set(archived_members)):
-            raise SeriesError("ZIP содержит повторные пути.")
-        if archived_members != expected_members:
-            raise SeriesError("Состав ZIP не совпадает с составом пакета.")
+        if create_zip:
+            archive_name = f"{data['job_id']}.zip"
+            members = sorted(path for path in staging.rglob("*") if path.is_file())
+            with zipfile.ZipFile(
+                staging / archive_name, "w", zipfile.ZIP_DEFLATED
+            ) as archive:
+                for member in members:
+                    archive.write(member, member.relative_to(staging).as_posix())
+            expected_members = [member.relative_to(staging).as_posix() for member in members]
+            try:
+                with zipfile.ZipFile(staging / archive_name) as archive:
+                    archived_members = archive.namelist()
+                    if archive.testzip() is not None:
+                        raise SeriesError("ZIP не прошёл проверку целостности.")
+            except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
+                raise SeriesError(f"Не удалось проверить ZIP: {exc}") from exc
+            if len(archived_members) != len(set(archived_members)):
+                raise SeriesError("ZIP содержит повторные пути.")
+            if archived_members != expected_members:
+                raise SeriesError("Состав ZIP не совпадает с составом пакета.")
         rename_new(staging, out)
     return len(files)
 
@@ -1039,7 +1040,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = RussianParser(
         description=__doc__,
         add_help=False,
-        usage="%(prog)s --brief ПУТЬ --out НОВАЯ_ПАПКА",
+        usage="%(prog)s --brief ПУТЬ --out НОВАЯ_ПАПКА [--zip]",
     )
     parser._positionals.title = "Позиционные параметры"
     parser._optionals.title = "Параметры"
@@ -1058,9 +1059,13 @@ def main(argv: list[str] | None = None) -> int:
         help="новая папка в существующем каталоге",
         metavar="НОВАЯ_ПАПКА",
     )
+    parser.add_argument(
+        "--zip", action="store_true", dest="create_zip",
+        help="дополнительно собрать ZIP с галереей и изображениями",
+    )
     args = parser.parse_args(argv)
     try:
-        count = package(args.brief.absolute(), args.out.absolute())
+        count = package(args.brief.absolute(), args.out.absolute(), create_zip=args.create_zip)
     except (SeriesError, OSError, ValueError) as exc:
         print(f"Ошибка: {exc}", file=sys.stderr)
         return 2

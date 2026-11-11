@@ -138,7 +138,9 @@ def write_brief(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def run_package(brief: Path, out: Path, *, cwd: Path | None = None):
+def run_package(
+    brief: Path, out: Path, *, cwd: Path | None = None, create_zip: bool = False
+):
     return subprocess.run(
         [
             sys.executable,
@@ -147,6 +149,7 @@ def run_package(brief: Path, out: Path, *, cwd: Path | None = None):
             str(brief),
             "--out",
             str(out),
+            *(["--zip"] if create_zip else []),
         ],
         cwd=cwd or ROOT,
         capture_output=True,
@@ -172,8 +175,9 @@ def assert_rejected(brief: Path, out: Path) -> None:
     assert snapshot(brief.parent) == before
 
 
+@pytest.mark.parametrize("create_zip", (False, True))
 def test_complete_package_is_portable_and_preserves_original_bytes(
-    tmp_path: Path,
+    tmp_path: Path, create_zip: bool,
 ) -> None:
     brief, data = make_brief(
         tmp_path, variants=4, source_views=1, images_per_variation=2
@@ -185,7 +189,7 @@ def test_complete_package_is_portable_and_preserves_original_bytes(
     unrelated_cwd = tmp_path / "другая рабочая папка"
     unrelated_cwd.mkdir()
 
-    result = run_package(brief, out, cwd=unrelated_cwd)
+    result = run_package(brief, out, cwd=unrelated_cwd, create_zip=create_zip)
 
     assert result.returncode == 0, result.stderr
     assert snapshot(brief.parent) == before
@@ -238,17 +242,20 @@ def test_complete_package_is_portable_and_preserves_original_bytes(
                 assert (out / unquote(url.path)).exists()
 
     archive_path = out / "testovaya-seriya.zip"
-    assert archive_path.is_file()
-    expected_members = set(snapshot(out)) - {archive_path.name}
-    with zipfile.ZipFile(archive_path) as archive:
-        assert archive.testzip() is None
-        assert len(archive.namelist()) == len(set(archive.namelist()))
-        assert set(archive.namelist()) == expected_members
+    assert archive_path.is_file() is create_zip
+    if create_zip:
+        expected_members = set(snapshot(out)) - {archive_path.name}
+        with zipfile.ZipFile(archive_path) as archive:
+            assert archive.testzip() is None
+            assert len(archive.namelist()) == len(set(archive.namelist()))
+            assert set(archive.namelist()) == expected_members
+    else:
+        assert not list(out.rglob("*.zip"))
 
     moved = tmp_path / "перенесённая серия"
     shutil.move(str(out), moved)
     assert (moved / "index.html").is_file()
-    assert (moved / "testovaya-seriya.zip").is_file()
+    assert all((moved / path).is_file() for path in image_sources)
 
 
 def test_two_real_source_views_build_six_cell_matrix(tmp_path: Path) -> None:
