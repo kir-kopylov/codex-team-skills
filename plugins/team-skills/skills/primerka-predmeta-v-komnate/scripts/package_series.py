@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Проверить и упаковать локальную серию; изображения не изменяются."""
+"""Проверить и упаковать локальную серию без перекодирования изображений."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ import copy
 import ctypes
 import hashlib
 import html
+from io import BytesIO
 import json
 import os
 from pathlib import Path
 import re
-import shutil
 import sys
 import tempfile
 from unicodedata import category, name as unicode_name
@@ -69,11 +69,6 @@ REVIEW_NOTICE = (
 
 class SeriesError(Exception):
     """Ожидаемая ошибка исходных данных или упаковки."""
-
-
-def digest(path: Path) -> str:
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def require_fields(
@@ -443,9 +438,8 @@ def jpeg_metadata_segments(raw: bytes) -> Iterator[tuple[str, bytes]]:
     raise ValueError("не найден конец JPEG")
 
 
-def reject_image_metadata(picture: object, source: Path) -> None:
-    """Проверить метаданные до копирования, не перекодируя растровые данные."""
-    from io import BytesIO
+def export_image_bytes(picture: object, raw: bytes) -> bytes:
+    """Проверить метаданные и подготовить копию для пакета без перекодирования."""
     import struct
     import xml.etree.ElementTree as ET
     import zlib
@@ -568,9 +562,10 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                     scan(value)
         scan_explicit_binary_paths(payload)
 
+    retained_parts: list[bytes] = []
+    retained_from = 0
     try:
         if picture.format == "PNG":
-            raw = source.read_bytes()
             position = 8
             structural = {b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"gAMA", b"cHRM", b"sRGB", b"sBIT", b"pHYs", b"bKGD", b"hIST", b"tIME"}
             while position < len(raw):
@@ -579,6 +574,13 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                 end = position + 12 + length
                 if end > len(raw):
                     raise ValueError("неполная запись метаданных PNG")
+                if kind == b"IEND" and (length != 0 or end != len(raw)):
+                    raise ValueError("неверный конец PNG или данные после него")
+                if kind == b"caBX":
+                    # C2PA не участвует в отрисовке. Все остальные записи копируются целиком.
+                    retained_parts.append(raw[retained_from:position])
+                    retained_from = position = end
+                    continue
                 payload = raw[position + 8:position + 8 + length]
                 position = end
                 if kind in {b"tEXt", b"zTXt", b"iTXt"}:
@@ -615,7 +617,7 @@ def reject_image_metadata(picture: object, source: Path) -> None:
         elif picture.format == "JPEG":
             icc_parts: dict[int, bytes] = {}
             icc_count: int | None = None
-            for marker, payload in jpeg_metadata_segments(source.read_bytes()):
+            for marker, payload in jpeg_metadata_segments(raw):
                 if marker == "COM":
                     decode_text(payload)
                 elif marker == "APP1" and payload.startswith(b"Exif\x00\x00"):
@@ -642,7 +644,6 @@ def reject_image_metadata(picture: object, source: Path) -> None:
                     raise ValueError("неполный ICC-профиль JPEG")
                 check_icc(b"".join(icc_parts[i] for i in range(1, icc_count + 1)))
         elif picture.format == "WEBP":
-            raw = source.read_bytes()
             position = 12
             while position < len(raw):
                 kind = raw[position:position + 4]
@@ -670,7 +671,13 @@ def reject_image_metadata(picture: object, source: Path) -> None:
         raise ValueError("неразбираемые метаданные; удалите их до упаковки") from exc
 
 
-def validate_images(data: dict, base: Path) -> dict:
+    if retained_parts:
+        retained_parts.append(raw[retained_from:])
+        return b"".join(retained_parts)
+    return raw
+
+
+def validate_images(data: dict, base: Path, staging: Path) -> dict:
     try:
         from PIL import Image
     except ImportError as exc:
@@ -740,8 +747,8 @@ def validate_images(data: dict, base: Path) -> dict:
                 raise ValueError("символические ссылки не поддерживаются")
             if not source.is_file():
                 raise ValueError("файл не найден или не является обычным файлом")
-            checksum = digest(source)
-            with Image.open(source) as picture:
+            raw = source.read_bytes()
+            with Image.open(BytesIO(raw)) as picture:
                 fmt = picture.format
                 if fmt not in FORMATS or source.suffix.lower() not in FORMATS[fmt]:
                     raise ValueError("допустимы PNG/JPEG/WebP с соответствующим расширением")
@@ -751,22 +758,22 @@ def validate_images(data: dict, base: Path) -> dict:
                     raise ValueError("анимация и несколько кадров не поддерживаются")
                 width, height = picture.size
                 picture.verify()
-            with Image.open(source) as picture:
+            with Image.open(BytesIO(raw)) as picture:
                 picture.load()
-                reject_image_metadata(picture, source)
-            if digest(source) != checksum:
-                raise ValueError("файл изменился во время проверки")
+                exported = export_image_bytes(picture, raw)
+            checksum = hashlib.sha256(exported).hexdigest()
             if checksum in hashes:
                 raise ValueError(f"точный дубликат файла для {hashes[checksum]}")
         except (OSError, ValueError, SyntaxError, Image.DecompressionBombError) as exc:
             errors.append(f"{label}: изображение не принято — {exc}.")
             continue
+        image_path = Path("images") / f"{variant}-{shot}{EXTENSIONS[fmt]}"
+        (staging / image_path).write_bytes(exported)
         hashes[checksum] = label
         accepted[slot] = {
             "item": item,
-            "source": source,
+            "path": image_path,
             "sha256": checksum,
-            "extension": EXTENSIONS[fmt],
             "format": fmt,
             "width": width,
             "height": height,
@@ -879,7 +886,6 @@ def package(brief_path: Path, out: Path) -> int:
     if os.path.lexists(out):
         raise SeriesError(f"Папка результата уже существует; выберите новую: {out}")
     data = read_brief(brief_path)
-    accepted = validate_images(data, brief_path.parent)
     portable_input = copy.deepcopy(data)
     for item in portable_input["images"]:
         item.pop("path", None)
@@ -889,7 +895,9 @@ def package(brief_path: Path, out: Path) -> int:
 
     with tempfile.TemporaryDirectory(prefix=".interior-series-", dir=out.parent) as temp:
         staging = Path(temp) / "package"
-        staging.mkdir()
+        (staging / "images").mkdir(parents=True)
+        (staging / "prompts").mkdir()
+        accepted = validate_images(data, brief_path.parent, staging)
         output_images: list[dict] = []
         files: list[dict] = []
 
@@ -899,18 +907,9 @@ def package(brief_path: Path, out: Path) -> int:
                 accepted_item = accepted[slot]
                 item = accepted_item["item"]
                 stem = f"{variant['id']}-{shot['id']}"
-                image_relative = Path("images") / f"{stem}{accepted_item['extension']}"
+                image_relative = accepted_item["path"]
                 prompt_relative = Path("prompts") / f"{stem}.txt"
-                image_target = staging / image_relative
                 prompt_target = staging / prompt_relative
-                image_target.parent.mkdir(parents=True, exist_ok=True)
-                prompt_target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(accepted_item["source"], image_target)
-                if digest(image_target) != accepted_item["sha256"]:
-                    raise SeriesError(
-                        f"Исходный файл изменился во время упаковки: "
-                        f"{accepted_item['source']}"
-                    )
                 prompt_target.write_text(item["prompt"].rstrip() + "\n", encoding="utf-8")
                 portable_item = {
                     "variant": variant["id"],
