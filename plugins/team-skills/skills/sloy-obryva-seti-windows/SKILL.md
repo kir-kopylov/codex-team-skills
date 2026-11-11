@@ -1,6 +1,6 @@
 ---
 name: sloy-obryva-seti-windows
-description: "«Telegram не видит интернет при VPN», «браузер работает, приложение нет», «Happ connected, app offline», «не видит proxy»: слои user-visible app UI, процесс/сокеты, app proxy config, Windows proxy, DNS/fakeDNS, routes/interfaces, VPN core."
+description: "«Telegram не видит интернет при VPN», «браузер работает, приложение нет», «Happ connected, app offline», «не видит proxy»: обрыв связи в Windows."
 ---
 
 # Windows App Connectivity Split Brain
@@ -53,8 +53,8 @@ description: "«Telegram не видит интернет при VPN», «бра
 2. Соберите короткий `repair_state_bundle` по `references/repair-state-bundle.md`: цель, completion gate, ledger, do-not-repeat, текущий layer verdict и свежие evidence.
 3. Разведите наблюдения по слоям, не смешивая источники:
    - user-visible app UI;
-   - процесс и его сокеты;
-   - настройки proxy внутри приложения;
+   - процесс/сокеты;
+   - настройки proxy внутри приложения (`app proxy config`);
    - Windows proxy и переменные окружения;
    - DNS/fakeDNS;
    - routes/interfaces/TUN;

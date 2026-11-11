@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+body{font:16px system-ui;margin:24px;color:#252525;background:#f7f6f3}
+.scroll{overflow:auto}
+table{border-collapse:collapse;background:white}
+th,td{padding:16px;border:1px solid #ddd;vertical-align:top}
+th{min-width:190px;text-align:left}
+td{min-width:300px;max-width:540px}
+img{width:100%;height:auto;display:block}
+th p{font-weight:normal}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+a{color:#155b7b}
+footer{max-width:1000px}
+</style>
+<h1>{{TITLE}}</h1>
+<p>{{SUMMARY}}</p>
+<div class="scroll">
+<table>
+<thead><tr><th scope="col">Вариант</th>{{HEADINGS}}</tr></thead>
+<tbody>{{ROWS}}</tbody>
+</table>
+</div>
+<footer>{{FOOTER}}</footer>
+</html>

@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "job_id": "divany-v-gostinoy",
+  "title": "Варианты дивана в гостиной",
+  "target": {
+    "item": "диван",
+    "operation": "replace",
+    "quantity": 1,
+    "location": "на месте существующего дивана"
+  },
+  "variation_mode": "auto_concepts",
+  "design_goal": "Сопоставимое визуальное сравнение в существующем интерьере.",
+  "constraints": [
+    "Менять только диван."
+  ],
+  "preserve": [
+    "Отделка, проёмы, встроенная мебель, камера и освещение."
+  ],
+  "counts": {
+    "variations": 2,
+    "images_per_variation": 2,
+    "expected_images": 4
+  },
+  "variants": [
+    {
+      "id": "01",
+      "name": "Прямой светлый",
+      "description": "Прямая форма, узкие подлокотники и светлая матовая ткань."
+    },
+    {
+      "id": "02",
+      "name": "Скруглённый тёмный",
+      "description": "Мягко скруглённая форма и тёмная плотная ткань."
+    }
+  ],
+  "source_views": [
+    {
+      "id": "v01",
+      "label": "Основной вид",
+      "role": "anchor"
+    }
+  ],
+  "shots": [
+    {
+      "id": "v01-t01",
+      "source_view": "v01",
+      "take": 1,
+      "label": "Основной вид, дубль 1"
+    },
+    {
+      "id": "v01-t02",
+      "source_view": "v01",
+      "take": 2,
+      "label": "Основной вид, дубль 2"
+    }
+  ],
+  "generator": {
+    "requested": null,
+    "policy": "auto",
+    "actual_name": "built-in imagegen",
+    "actual_version": null,
+    "version_fulfilled": null
+  },
+  "limitations": [
+    "Размещение концептуальное; размеры и проходы не подтверждены."
+  ],
+  "images": [
+    {
+      "variant": "01",
+      "shot": "v01-t01",
+      "path": "source-images/01-v01-t01.png",
+      "prompt": "Заменить только диван вариантом 01; сохранить комнату, камеру, освещение и остальные предметы.",
+      "origin": "generated",
+      "review": {
+        "requirements": "pass",
+        "room": "pass",
+        "identity": "pass",
+        "placement": "pass"
+      },
+      "notes": "Первый проверенный кадр варианта."
+    },
+    {
+      "variant": "01",
+      "shot": "v01-t02",
+      "path": "source-images/01-v01-t02.png",
+      "prompt": "Повторно сгенерировать тот же диван варианта 01 с той же камерой; сохранить комнату и все признаки предмета.",
+      "origin": "generated",
+      "review": {
+        "requirements": "pass",
+        "room": "pass",
+        "identity": "pass",
+        "placement": "pass"
+      },
+      "notes": "Отдельная генерация того же исходного вида."
+    },
+    {
+      "variant": "02",
+      "shot": "v01-t01",
+      "path": "source-images/02-v01-t01.png",
+      "prompt": "Заменить только диван вариантом 02; сохранить комнату, камеру, освещение и остальные предметы.",
+      "origin": "generated",
+      "review": {
+        "requirements": "pass",
+        "room": "pass",
+        "identity": "pass",
+        "placement": "pass"
+      },
+      "notes": "Первый проверенный кадр варианта."
+    },
+    {
+      "variant": "02",
+      "shot": "v01-t02",
+      "path": "source-images/02-v01-t02.png",
+      "prompt": "Повторно сгенерировать тот же диван варианта 02 с той же камерой; сохранить комнату и все признаки предмета.",
+      "origin": "generated",
+      "review": {
+        "requirements": "pass",
+        "room": "pass",
+        "identity": "pass",
+        "placement": "pass"
+      },
+      "notes": "Отдельная генерация того же исходного вида."
+    }
+  ]
+}
