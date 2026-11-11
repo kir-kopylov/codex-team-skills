@@ -562,7 +562,9 @@ def test_unreadable_images_are_rejected(tmp_path: Path, failure: str) -> None:
         "auto-requested",
         "strict-unconfirmed",
         "missing-actual-name",
-        "auto-without-goal",
+        "invalid-mode",
+        "invalid-goal",
+        "invalid-shot-kind",
     ],
 )
 def test_invalid_order_contract_is_rejected(tmp_path: Path, failure: str) -> None:
@@ -602,8 +604,12 @@ def test_invalid_order_contract_is_rejected(tmp_path: Path, failure: str) -> Non
         }
     elif failure == "missing-actual-name":
         data["generator"]["actual_name"] = None
+    elif failure == "invalid-mode":
+        data["variation_mode"] = []
+    elif failure == "invalid-goal":
+        data["design_goal"] = 42
     else:
-        data["design_goal"] = None
+        data["shots"][0]["kind"] = "invented"
     write_brief(brief, data)
     assert_rejected(brief, tmp_path / "выдача")
 
@@ -669,6 +675,32 @@ def test_documented_generation_brief_runs_without_schema_changes(
     assert result.returncode == 0, result.stderr
     assert len(list((out / "images").glob("*.png"))) == 4
     assert len(list((out / "prompts").glob("*.txt"))) == 4
+    packed = json.loads((out / "generation-brief.json").read_text(encoding="utf-8"))
+    assert packed["variation_mode"] == "auto_concepts"
+    assert packed["design_goal"] == "Сравнение вариантов"
+    assert packed["shots"] == example["shots"]
+    assert [shot["kind"] for shot in packed["shots"]] == ["overview", "detail"]
+    assert "Крупный план обивки подлокотника" in (out / "index.html").read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize("goal", (None, "  ", "Подбор для объявления"))
+def test_optional_design_goal_preserves_explicit_value(
+    tmp_path: Path, goal: str | None
+) -> None:
+    brief, data = make_brief(tmp_path, variants=1, images_per_variation=1)
+    data["variation_mode"] = "provided_concepts"
+    data["design_goal"] = goal
+    write_brief(brief, data)
+    out = tmp_path / "выдача"
+
+    result = run_package(brief, out)
+
+    assert result.returncode == 0, result.stderr
+    packed = json.loads((out / "generation-brief.json").read_text(encoding="utf-8"))
+    assert packed["variation_mode"] == "provided_concepts"
+    assert packed["design_goal"] == (goal if goal and goal.strip() else "Сравнение вариантов")
 
 
 def test_help_and_argument_errors_are_localized() -> None:

@@ -201,8 +201,6 @@ def read_brief(path: Path) -> dict:
         "job_id",
         "title",
         "target",
-        "variation_mode",
-        "design_goal",
         "constraints",
         "preserve",
         "counts",
@@ -213,7 +211,10 @@ def read_brief(path: Path) -> dict:
         "limitations",
         "images",
     }
-    data = require_fields(data, name="generation-brief", required=required)
+    data = require_fields(
+        data, name="generation-brief", required=required,
+        optional={"variation_mode", "design_goal"},
+    )
     if data["schema_version"] != 1:
         raise SeriesError("Поддерживается только schema_version=1.")
     safe_id(data["job_id"], "job_id")
@@ -236,14 +237,14 @@ def read_brief(path: Path) -> dict:
     if not isinstance(target["location"], str):
         raise SeriesError("target.location должен быть строкой.")
 
-    if data["variation_mode"] not in VARIATION_MODES:
+    mode = data.get("variation_mode", "auto_concepts")
+    if not isinstance(mode, str) or mode not in VARIATION_MODES:
         raise SeriesError("variation_mode содержит неизвестный режим.")
-    if data["design_goal"] is not None and not isinstance(data["design_goal"], str):
+    goal = data.get("design_goal")
+    if goal is not None and not isinstance(goal, str):
         raise SeriesError("design_goal должен быть строкой или null.")
-    if data["variation_mode"] == "auto_concepts" and (
-        not isinstance(data["design_goal"], str) or not data["design_goal"].strip()
-    ):
-        raise SeriesError("Для auto_concepts нужен непустой design_goal.")
+    data["variation_mode"] = mode
+    data["design_goal"] = goal if goal and goal.strip() else "Сравнение вариантов"
     string_list(data["constraints"], "constraints")
     string_list(data["preserve"], "preserve")
     string_list(data["limitations"], "limitations")
@@ -311,8 +312,11 @@ def read_brief(path: Path) -> dict:
             entry,
             name="shots entry",
             required={"id", "source_view", "take", "label"},
+            optional={"kind"},
         )
         key = safe_id(entry["id"], "shots")
+        if "kind" in entry and entry["kind"] not in ("overview", "detail"):
+            raise SeriesError(f"shots/{key}/kind должен быть overview или detail.")
         source_view = safe_id(entry["source_view"], f"shots/{key}/source_view")
         take = entry["take"]
         if source_view not in source_roles:
