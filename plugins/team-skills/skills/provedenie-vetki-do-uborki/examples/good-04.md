@@ -156,8 +156,15 @@ fi
 if ! git -C "$repo" diff --cached --check; then
   exit 1
 fi
-if ! (cd -- "$repo" && python -m pytest); then
-  exit 1
+# В Team Skills отбор локальный; в другом repo действуют его проверки.
+if test -f "$repo/scripts/check_changed.py"; then
+  if ! (cd -- "$repo" && python scripts/check_changed.py --base origin/main); then
+    exit 1
+  fi
+else
+  if ! (cd -- "$repo" && python -m pytest); then
+    exit 1
+  fi
 fi
 ```
 
@@ -689,8 +696,15 @@ fi
 if ! git -C "$repo" diff --cached --check; then
   exit 1
 fi
-if ! (cd -- "$repo" && python -m pytest); then
-  exit 1
+# В Team Skills отбор локальный; в другом repo действуют его проверки.
+if test -f "$repo/scripts/check_changed.py"; then
+  if ! (cd -- "$repo" && python scripts/check_changed.py --base origin/main); then
+    exit 1
+  fi
+else
+  if ! (cd -- "$repo" && python -m pytest); then
+    exit 1
+  fi
 fi
 ```
 

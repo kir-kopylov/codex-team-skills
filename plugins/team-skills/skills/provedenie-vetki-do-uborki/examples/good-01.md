@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex сначала выполняет read-only проверку target repo: status, branch, diff, stash, upstream, reachability commit. Затем создаёт новую ветку от актуального `origin/main`, делает `cherry-pick 469c9fe`, разрешает конфликты без потери текущих строк `catalog.md`, доводит пакет до текущего repo contract, запускает `git diff --check` и `python3 -m pytest`, пушит ветку и открывает draft PR. Если после merge другого PR ветка стала conflict, Codex делает rebase на свежий `origin/main` и обновляет remote через `--force-with-lease`.
+Codex сначала выполняет read-only проверку target repo: status, branch, diff, stash, upstream, reachability commit. Затем создаёт новую ветку от актуального `origin/main`, делает `cherry-pick 469c9fe`, разрешает конфликты без потери текущих строк `catalog.md`, доводит пакет до текущего repo contract, запускает `git diff --check` и `python3 scripts/check_changed.py --base origin/main`, пушит ветку и открывает draft PR. Если после merge другого PR ветка стала conflict, Codex делает rebase на свежий `origin/main` и обновляет remote через `--force-with-lease`.
 
 ## Нельзя
 

@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex читает существующую папку skill, `skill.yaml`, `known-exceptions.yaml`, examples, `catalog.md` и тесты. Он исправляет frontmatter, description, registry-поля, добавляет недостающие good/anti examples, создаёт пустой `known-exceptions.yaml`, если skill новый или изменяемый, убирает шаблонные заглушки, добавляет строку в catalog и запускает `python3 -m pytest`.
+Codex читает существующую папку skill, `skill.yaml`, `known-exceptions.yaml`, examples, `catalog.md` и тесты. Он исправляет frontmatter, description, registry-поля, добавляет недостающие good/anti examples, создаёт пустой `known-exceptions.yaml`, если skill новый или изменяемый, убирает шаблонные заглушки, добавляет строку в catalog и запускает `python3 scripts/check_changed.py --base origin/main`.
 
 До commit Codex берёт дословную фразу запуска «Проверь этот счёт на дубли и расхождения». Заранее фиксирует признаки: первый ответ запрашивает или использует сам счёт, не объявляет проверку завершённой без файла и не предлагает оплату. Новый агент в свежем контексте получает только skill и эту фразу, без критериев оценки. Первый ответ объявляет счёт проверенным без входного файла — это `BEHAVIOR_PROBE_FAIL`. После исправления Codex повторяет пробу в ещё одном свежем контексте; только наблюдаемый корректный первый ответ получает `BEHAVIOR_PROBE_PASS` и открывает commit. В финале Codex раздельно сообщает результат pytest и результат наблюдаемой пробы.
 

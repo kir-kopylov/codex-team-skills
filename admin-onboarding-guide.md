@@ -37,4 +37,4 @@ Codex проверяет собственную версию, подключае
 
 ## Author Mode
 
-Автор создаёт branch, меняет skill, повышает semver Codex plugin, запускает `python -m pytest` и открывает Pull Request. Доставка Claude Code остаётся отдельным контрактом и проверяется своим smoke-тестом.
+Автор создаёт branch, меняет skill, повышает semver Codex plugin, запускает `python scripts/check_changed.py --base origin/main` и открывает Pull Request. Доставка Claude Code остаётся отдельным контрактом и проверяется своим smoke-тестом.

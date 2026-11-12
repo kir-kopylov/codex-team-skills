@@ -39,7 +39,7 @@ tests/                             # проверки структуры, дос
 
 Пользователь не скачивает и не запускает удалённые скрипты. Codex подключает Git marketplace, устанавливает `team-skills`, а после обновления пользователь полностью перезапускает приложение.
 
-Автор работает через Pull Request: создаёт branch, меняет skill, повышает semver plugin, запускает `python -m pytest` и отправляет изменения на review.
+Автор работает через Pull Request: создаёт branch, меняет skill, повышает semver plugin, запускает `python scripts/check_changed.py --base origin/main` и отправляет изменения на review. Локально проверяются связанные тесты и общие правила; CI проверяет весь набор.
 
 ## Как Добавляется Новый Skill
 
@@ -53,7 +53,7 @@ tests/                             # проверки структуры, дос
 3. Заполните `SKILL.md`, `skill.yaml`, `known-exceptions.yaml` и `examples/`.
 4. Добавьте строку в `catalog.md`.
 5. Повышайте patch-версию `plugins/team-skills/.codex-plugin/plugin.json` для обычного изменения skill.
-6. Запустите `python -m pytest` и откройте Pull Request.
+6. Запустите `python scripts/check_changed.py --base origin/main` и откройте Pull Request.
 
 ## Приватность
 

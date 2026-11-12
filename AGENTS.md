@@ -62,11 +62,9 @@ use only paths that exist in the repository or are documented by the runtime.
   `known-exceptions.yaml`, and feedback logger contracts described in
   `CLAUDE.md`.
 - Develop changes on a feature branch, never directly on `main`.
-- Run the complete suite before finishing a change:
-
-  ```bash
-  python -m pytest
-  ```
+- Follow the local selection and full-CI policy in `CLAUDE.md` → `Testing & CI`.
+  Use `python scripts/check_changed.py --base origin/main` locally; do not replace
+  the full CI suite with a selected run.
 
 - Fix the cause of a failed check. Do not weaken, skip, or bypass repository
   protections.
