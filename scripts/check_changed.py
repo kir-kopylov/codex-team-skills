@@ -124,8 +124,12 @@ def select_tests(root: Path, paths: set[str], *, version_only: bool = False) -> 
     selected = available - TEST_OWNERS.keys()
     affected = set()
     reasons = []
-    nested_tests = any(path.parent != root / "tests" for path in (root / "tests").rglob("test_*.py"))
-    if not available or TEST_OWNERS.keys() - available or nested_tests:
+    test_files = set((root / "tests").rglob("test_*.py")) | set((root / "tests").rglob("*_test.py"))
+    unsupported_tests = any(
+        path.parent != root / "tests" or not path.name.startswith("test_")
+        for path in test_files
+    )
+    if not available or TEST_OWNERS.keys() - available or unsupported_tests:
         return Selection(True, [], ["Состав тестов изменился; нужны все проверки."])
     for path in sorted(paths):
         parts = Path(path).parts

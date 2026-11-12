@@ -125,10 +125,11 @@ def test_map_covers_skill_names_referenced_by_mapped_tests():
         assert referenced <= owners, (name, referenced - owners)
 
 
-def test_nested_test_directory_cannot_be_silently_omitted(tmp_path):
+@pytest.mark.parametrize("path", ["tests/new/test_dependency.py", "tests/dependency_test.py"])
+def test_unmapped_test_layout_cannot_be_silently_omitted(tmp_path, path):
     for name in checker.TEST_OWNERS:
         write(tmp_path, f"tests/{name}", "")
-    write(tmp_path, "tests/new/test_dependency.py", "")
+    write(tmp_path, path, "")
     assert checker.select_tests(tmp_path, {checker.SKILL_PREFIX + "primerka-predmeta-v-komnate/SKILL.md"}).full
 
 
