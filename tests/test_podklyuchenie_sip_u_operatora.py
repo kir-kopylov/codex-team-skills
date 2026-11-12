@@ -126,7 +126,7 @@ def test_interface_exception_logger_sanitizes_and_builds_proposal(tmp_path: Path
         record["redaction_types"]
     )
     assert "human approval" in proposal
-    assert "python3 -m pytest" in proposal
+    assert "python3 scripts/check_changed.py --base origin/main" in proposal
 
 
 def test_interface_exception_logger_refuses_git_repository(tmp_path: Path) -> None:

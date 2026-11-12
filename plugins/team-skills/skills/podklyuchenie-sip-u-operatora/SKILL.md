@@ -104,7 +104,8 @@ local storage, сохранённые пароли или хранилище п�
    карточку и patch proposal вне repo.
 6. Не менять `SKILL.md`, `known-exceptions.yaml`, playbook, установленный cache
    или source repo без отдельной команды «одобрить». После одобрения применить
-   точечный patch, добавить regression test и запустить `python3 -m pytest`.
+   точечный patch, добавить regression test и запустить `python3 scripts/check_changed.py --base origin/main` в source repo Team Skills.
+   Полный pytest остаётся в CI; для другого repo действуют его правила проверок.
 
 ## Границы
 

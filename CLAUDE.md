@@ -19,7 +19,7 @@ There are two roles to keep in mind:
   legacy machine uses `START_HERE_RECONNECT_CODEX_SKILLS.md` and an
   evidence-gated local transition.
 - **Author mode** — a contributor who adds or edits skills via a Pull Request:
-  create a branch, add/fill a skill, run `python -m pytest`, open a PR.
+  create a branch, add/fill a skill, run `python scripts/check_changed.py --base origin/main`, open a PR.
 
 Most work an AI assistant does here is **author mode**.
 
@@ -145,7 +145,7 @@ python -m pip install ".[test]"   # installs PyYAML + pytest + openpyxl (Python 
 4. **Run the checks** and fix the *cause* of any failure (never bypass a check):
 
    ```bash
-   python -m pytest
+   python scripts/check_changed.py --base origin/main
    ```
 
 5. **Open a Pull Request** that answers the four mandatory questions inside the
@@ -389,15 +389,38 @@ changes here must keep the tests and the Russian user-facing messages intact.
 
 ## Testing & CI
 
-- Run the whole suite locally before finishing any change:
+- Run the affected checks locally before finishing a change:
 
   ```bash
-  python -m pytest
+  python scripts/check_changed.py --base origin/main
   ```
 
-  Pytest config lives in `pyproject.toml` (`addopts = "-q"`,
-  `testpaths = ["tests"]`). Shared helpers (`skill_dirs`, `load_frontmatter`,
-  `load_registry`, `ROOT`, …) are in `tests/conftest.py`.
+  Refresh the base through the normal Git workflow first. The command prints
+  the resolved merge-base, reasons and test files. It considers committed,
+  staged, unstaged and untracked changes independently, including both paths
+  of a rename and deletions. A passing run describes the tested working tree;
+  it does not certify different staged contents or a later commit.
+
+  The explicit dependency map in `scripts/check_changed.py` selects whole
+  per-skill test files and keeps all unmapped tests as shared validators.
+  Cross-skill consumers are included. Catalog edits include their known
+  consumers; a manifest version-only bump keeps manifest validators. A new
+  skill/test, shared code/configuration, an unknown dependency, a missing base
+  or missing mapped test triggers the full suite. Unresolved Git conflicts
+  stop the command. Never maintain a hand-picked list of individual test IDs
+  as the release gate. Update the map when adding a dependency to a mapped test.
+
+  `--explain` shows the selection without running tests and is not a PASS.
+  `--full` explicitly runs everything. After a targeted failure, fix the cause
+  and repeat the selected run. Repeat a complete run only when a new change,
+  failure, or unresolved concern requires it. Full CI remains mandatory for
+  every PR, even if local checks passed. Do not add result caching yet: first
+  measure the selected and full runs on the same state.
+
+  Pytest configuration and coverage options live in `pyproject.toml`;
+  selected runs disable partial coverage with `--no-cov`, while full runs
+  retain the repository defaults. Shared helpers (`skill_dirs`,
+  `load_frontmatter`, `load_registry`, `ROOT`, …) are in `tests/conftest.py`.
 
 - The suite is organized by concern:
   - structure & registry: `test_skill_structure.py`, `test_registry.py`,

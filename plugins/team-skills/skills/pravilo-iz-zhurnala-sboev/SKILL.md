@@ -191,7 +191,7 @@ severity
 ## Gate
 ```
 
-В `Gate` всегда укажите: human approval, `python3 -m pytest`, commit с объяснением, какое исключение стало правилом.
+В `Gate` всегда укажите: human approval, `python3 scripts/check_changed.py --base origin/main`, commit с объяснением, какое исключение стало правилом. Это локальная команда source repo Team Skills; полный pytest остаётся в CI. В другом repo следуйте его правилам проверок.
 
 ## Definition Of Done
 

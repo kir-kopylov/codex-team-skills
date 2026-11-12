@@ -51,7 +51,9 @@ codex plugin marketplace remove codex-team-skills --json
 
 ```bash
 python scripts/new_skill.py my-skill --owner @yourname --summary "Коротко: что делает скилл"
-python -m pytest
+python scripts/check_changed.py --base origin/main
 ```
+
+Локальная команда сама выбирает связанные и общие проверки; неизвестные изменения включают полный прогон. В CI для каждого PR сохраняется полный `python -m pytest`. `--explain` показывает выбор без запуска; `--full` запускает всё явно.
 
 Обычное изменение skill требует повышения patch-версии Codex plugin. Перед статусом `team-ready` обновите `catalog.md` и откройте Pull Request.

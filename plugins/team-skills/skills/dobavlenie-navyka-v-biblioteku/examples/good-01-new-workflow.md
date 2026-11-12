@@ -6,7 +6,7 @@
 
 ## Ожидаемое Поведение
 
-Codex уточняет только недостающие элементы: повторяемую задачу, естественные триггеры и границы применения. Если workflow зависит от конкретного интерфейса или рынка, он фиксирует списки `Что нельзя потерять` и `Что надо обезличить`, затем создаёт `references/domain-playbook.md`. После этого создаёт skill через `scripts/new_skill.py`, заполняет `SKILL.md`, `skill.yaml`, `known-exceptions.yaml`, 3 good examples и 2 anti-examples, добавляет строку в `catalog.md`, запускает `python3 -m pytest` и сообщает результат.
+Codex уточняет только недостающие элементы: повторяемую задачу, естественные триггеры и границы применения. Если workflow зависит от конкретного интерфейса или рынка, он фиксирует списки `Что нельзя потерять` и `Что надо обезличить`, затем создаёт `references/domain-playbook.md`. После этого создаёт skill через `scripts/new_skill.py`, заполняет `SKILL.md`, `skill.yaml`, `known-exceptions.yaml`, 3 good examples и 2 anti-examples, добавляет строку в `catalog.md`, запускает `python3 scripts/check_changed.py --base origin/main` и сообщает результат.
 
 ## Нельзя
 

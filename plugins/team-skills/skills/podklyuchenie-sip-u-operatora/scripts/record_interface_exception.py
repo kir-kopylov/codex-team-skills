@@ -157,7 +157,8 @@ def main() -> None:
                 "",
                 "- Получить human approval на постоянное изменение.",
                 "- Применить patch только к source repo, не к установленному cache.",
-                "- Запустить `python3 -m pytest`.",
+                "- В source repo Team Skills запустить `python3 scripts/check_changed.py --base origin/main`; в другом repo — его проверки.",
+                "- Перед слиянием подтвердить полный pytest в CI.",
                 "- Сделать commit с объяснением, какое исключение стало правилом.",
                 "",
             )

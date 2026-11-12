@@ -251,7 +251,7 @@ Reviewer должен выдать proposal, а не применять patch. �
 - точечная правка `SKILL.md`;
 - patch в `references/domain-playbook.md`, если сбой связан с интерфейсной механикой или доменным workaround;
 - good/anti example или regression test idea;
-- gate: human approval, `python -m pytest`, git commit.
+- gate: human approval, `python scripts/check_changed.py --base origin/main`, git commit.
 
 В публичный repo переносите только очищенное правило, синтетический example и тест. Raw logs остаются приватными.
 
