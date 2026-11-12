@@ -19,6 +19,7 @@ MANIFEST = "plugins/team-skills/.codex-plugin/plugin.json"
 # Только проверенные связи. Все остальные test_*.py запускаются как общие.
 # Несколько владельцев означают, что тест читает или проверяет несколько навыков.
 TEST_OWNERS = {
+    "test_audio_reconciliation.py": {"razbor-video-po-taymkodam"},
     "test_dobavlenie_navyka_v_biblioteku.py": {"dobavlenie-navyka-v-biblioteku"},
     "test_dobavlenie_navyka_v_biblioteku_review_loop.py": {"dobavlenie-navyka-v-biblioteku", "snos-podsistemy-iz-koda"},
     "test_dopsoglasheniya_po_oplate.py": {"dopsoglasheniya-po-oplate", "smeta-remonta-do-dogovora"},
