@@ -19,6 +19,11 @@ do_not_use_for:
   - "Присвоение неподтвержденного GitHub handle автору draft вместо сохранения авторства через authors и source_asset."
   - "Публикацию push или Pull Request без понимания scope изменений и явного запроса пользователя."
 natural_triggers:
+  - "Добавь в командную библиотеку"
+  - "Add Team Skill"
+  - "Подготовка командного навыка"
+  - "Подготовку командного навыка"
+  - "Добавь новый или перенеси мой личный skill в командную библиотеку."
   - "добавь новый skill"
   - "перенеси мой личный skill в командную библиотеку"
   - "сделай из этого skill"
@@ -40,5 +45,5 @@ example_files:
   - "examples/good-06-transparent-auto-launch.md"
   - "examples/anti-04-blocking-consent.md"
   - "examples/good-07-batch-first-responses.md"
-last_reviewed: "2026-08-24"
+last_reviewed: "2026-11-19"
 source_asset: "Discovery Gate draft передан коллегой из команды; интегрирован как repo-grade discovery и ownership gate."
