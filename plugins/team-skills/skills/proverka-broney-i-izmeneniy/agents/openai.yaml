@@ -1,6 +1,6 @@
 interface:
   display_name: "Брони и изменения в eHous"
-  short_description: "Свежие брони, ближайший заезд и авторы изменений"
+  short_description: "Простой по городу, ближайшие заезды и история броней"
   default_prompt: "Используй $proverka-broney-i-izmeneniy: проверь брони eHous и историю изменения даты выезда."
 policy:
   allow_implicit_invocation: true

@@ -8,10 +8,19 @@ param(
     [switch]$IncludeHistory,
     [ValidateRange(1,90)][int]$HorizonDays = 14,
     [datetime]$From = [datetime]::MinValue,
-    [datetime]$Until = [datetime]::MinValue
+    [datetime]$Until = [datetime]::MinValue,
+    [ValidateNotNullOrEmpty()][string]$City,
+    [ValidateRange(12,23)][int]$NightStartHour = 22,
+    [ValidateRange(1,12)][int]$NightEndHour = 6
 )
-if (-not $ValidateOnly -and -not $Address -and -not $BookingId) { throw 'Укажите адрес или номер заявки.' }
+if (-not $ValidateOnly -and -not ($Address -or $BookingId -or $City)) { throw 'Укажите город, адрес или номер заявки.' }
 if ($Address -and $BookingId) { throw 'Укажите либо адрес, либо номер заявки.' }
+if ($City -and ($Address -or $BookingId -or $IncludeHistory -or $PSBoundParameters.ContainsKey('HorizonDays'))) {
+    throw 'Для города укажите даты ночей через From и Until. Адрес, номер заявки, IncludeHistory и HorizonDays относятся к другим режимам.'
+}
+if (-not $City -and ($PSBoundParameters.ContainsKey('NightStartHour') -or $PSBoundParameters.ContainsKey('NightEndHour'))) {
+    throw 'Границы ночи применяются только при поиске по городу.'
+}
 $watch = [Diagnostics.Stopwatch]::StartNew()
 $ErrorActionPreference = 'Stop'
 if (-not $ConfigPath) { $ConfigPath = $env:EHOUS_BOOKING_CONFIG }
@@ -56,6 +65,10 @@ try {
     $connection.Open()
     $options = [FirebirdSql.Data.FirebirdClient.FbTransactionOptions]::new()
     $options.TransactionBehavior = [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::Read -bor [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::ReadCommitted -bor [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::RecVersion -bor [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::NoWait
+    if ($City) {
+        # Фонд, заявки и журнал читаются на одном снимке даже при параллельном редактировании.
+        $options.TransactionBehavior = [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::Read -bor [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::Concurrency -bor [FirebirdSql.Data.FirebirdClient.FbTransactionBehavior]::NoWait
+    }
     $transaction = $connection.BeginTransaction($options)
     function Read-Query([string] $sql, [hashtable] $parameters = @{}) {
         $command = $connection.CreateCommand()
@@ -80,6 +93,11 @@ try {
     }
     $now = @(Read-Query 'select current_timestamp as DB_TIME from rdb$database')
     $dbTime = [datetime]$now[0].DB_TIME
+    if ($City) {
+        & (Join-Path $PSScriptRoot 'city-nights.ps1') -City $City -Cities $profile.Cities -From $From -Until $Until -DbTime $dbTime -StartHour $NightStartHour -EndHour $NightEndHour |
+            ConvertTo-Json -Depth 8
+        return
+    }
     if ($From -eq [datetime]::MinValue) { $From = $dbTime.Date.AddDays(-1) }
     if ($Until -eq [datetime]::MinValue) { $Until = $dbTime.Date.AddDays($HorizonDays) }
     if ($Until -le $From) { throw 'Конец периода должен быть позже начала.' }
