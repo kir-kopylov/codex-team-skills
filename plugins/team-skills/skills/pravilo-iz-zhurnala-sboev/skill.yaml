@@ -14,6 +14,10 @@ do_not_use_for:
   - "Автоматическое применение patch, commit или публикация PR без отдельного явного запроса."
   - "Перенос raw private logs, PII, приватных путей, клиентских переписок или токенов в repo."
 natural_triggers:
+  - "разбери ошибки навыка"
+  - "Skill Exception Reviewer"
+  - "Разбор повторяющихся сбоев рабочего рецепта"
+  - "Разбери exception log skill и предложи patch proposal."
   - "разбери exception log skill"
   - "сделай reviewer по сбоям skill"
   - "преврати карточки ошибок в patch proposal"
@@ -29,5 +33,5 @@ example_files:
   - "examples/anti-02.md"
   - "examples/good-04-library-wide.md"
   - "examples/anti-03-passive-log-auto-review.md"
-last_reviewed: "2026-08-05"
+last_reviewed: "2026-11-19"
 source_asset: "Обезличенная методика превращения карточек сбоев и обратной связи в проект точечных улучшений; приватные журналы, пути и клиентские данные не переносились."

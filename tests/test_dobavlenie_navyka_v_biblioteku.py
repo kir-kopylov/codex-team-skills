@@ -516,7 +516,7 @@ def test_add_team_skill_batches_changed_first_response_probes_privately():
     assert "examples/good-07-batch-first-responses.md" in metadata[
         "example_files"
     ]
-    assert metadata["last_reviewed"] == "2026-08-24"
+    assert metadata["last_reviewed"] == "2026-11-19"
     assert "три существенно изменённых skill" in normalized_example
     assert "сырые фразы, критерии и ответы остаются приватными" in normalized_example
     assert "фактически загруженные источники" in normalized_example

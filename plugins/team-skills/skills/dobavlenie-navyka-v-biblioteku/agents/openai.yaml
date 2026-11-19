@@ -1,7 +1,7 @@
 interface:
-  display_name: "Add Team Skill"
-  short_description: "Создание командных skills по правилам repo"
-  default_prompt: "Use $dobavlenie-navyka-v-biblioteku, or just say 'добавь новый skill и доведи его до team-ready'."
+  display_name: "Добавь в командную библиотеку"
+  short_description: "Собирает, проверяет и публикует командный навык"
+  default_prompt: "Добавь в командную библиотеку"
 
 policy:
   allow_implicit_invocation: true

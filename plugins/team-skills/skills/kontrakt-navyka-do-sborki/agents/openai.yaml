@@ -1,0 +1,7 @@
+interface:
+  display_name: "Попробуй собрать контракт навыка"
+  short_description: "Проверяет контракт, критерии и нужность отдельного навыка"
+  default_prompt: "Попробуй собрать контракт навыка"
+
+policy:
+  allow_implicit_invocation: true

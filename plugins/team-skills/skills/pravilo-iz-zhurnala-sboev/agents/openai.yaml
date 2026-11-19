@@ -1,0 +1,7 @@
+interface:
+  display_name: "разбери ошибки навыка"
+  short_description: "По ошибкам и отзывам предлагает исправления навыка"
+  default_prompt: "разбери ошибки навыка"
+
+policy:
+  allow_implicit_invocation: true

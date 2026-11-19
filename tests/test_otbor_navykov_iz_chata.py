@@ -41,7 +41,7 @@ def test_chat_to_skill_miner_is_team_ready_and_has_seven_examples() -> None:
 
     assert registry["status"] == "team-ready"
     assert len(registry["example_files"]) == 7
-    assert registry["last_reviewed"] == "2026-08-24"
+    assert registry["last_reviewed"] == "2026-11-19"
     for relative_path in registry["example_files"]:
         assert (SKILL_DIR / relative_path).is_file()
 
@@ -148,7 +148,9 @@ def test_chat_to_skill_miner_example_and_ui_prompt_exclude_delivered_work() -> N
     assert "не завершайте ход строкой запуска" in skill
     assert "первый ход заканчивается доказанным `UNKNOWN`" in normalized_example
     assert "уже реализованное от предложенного" in agent["short_description"]
-    assert "уже реализованное от предложенного" in agent["default_prompt"]
+    # Короткий вызов совпадает с названием; правило отсева остаётся в skill,
+    # short_description и проверяемом выше примере, а не в длинной UI-фразе.
+    assert agent["default_prompt"] == "Предложи навыки и патчи из чата"
     assert len(agent["default_prompt"]) <= 128
 
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Сделай из промпта команду"
+  short_description: "Делает короткий вызов для уже работающего промпта"
+  default_prompt: "Сделай из промпта команду"
+
+policy:
+  allow_implicit_invocation: true
