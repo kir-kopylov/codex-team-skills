@@ -1,7 +1,9 @@
 """Проверки профиля без подключения к рабочей базе (PowerShell 7)."""
 from __future__ import annotations
+from contextlib import closing
 import json
 import shutil
+import sqlite3
 import subprocess
 from pathlib import Path
 import pytest
@@ -57,3 +59,180 @@ def test_ambiguous_selector_is_rejected_before_reading_config():
     assert result.returncode != 0
     assert 'либо адрес, либо номер заявки' in result.stderr
     assert 'Resolve-Path' not in result.stderr
+
+
+def city_request(number, unit, arrival, departure, status="Заселение", **fields):
+    return {
+        "BOOKING_ID": number, "KV": unit, "STATUS_NAME": status, "STATUS_TYPE": 1,
+        "KV_STATUS": 2, "OTBOY": "F", "IN_TM": arrival, "OUT_TM": departure,
+        "CHANNEL": "Тестовый канал", "REGISTERED_DATE": "2030-06-01", **fields,
+    }
+
+
+def city_report(tmp_path, units, bookings, *, first="2030-06-10", until="2030-06-13",
+                db_time="2030-06-13T10:00", events=(), available_until=""):
+    # Подменена только выборка строк. Классификация, календарь и переходы выполняет код навыка.
+    fixture = tmp_path / "data.json"
+    fixture.write_text(json.dumps({
+        "units": [{"ID": n, "ADR": f"Учебная {n}"} for n in units],
+        "bookings": bookings, "events": events,
+    }, ensure_ascii=False), encoding="utf-8")
+    runner = tmp_path / "run-city.ps1"
+    runner.write_text("""
+param($Script, $Fixture, $First, $Until, $Now, $AvailableUntil)
+$ErrorActionPreference = 'Stop'
+$data = Get-Content -Raw -Encoding utf8 $Fixture | ConvertFrom-Json
+function Read-Query($sql, $parameters) {
+    if ($sql -match 'from SPR_CITY') { return [pscustomobject]@{NAME='Тест'} }
+    if ($sql -match 'from KV k where') { return $data.units }
+    if ($sql -match 'from (ZAIVKA|ARH_ZAIVKA) z join') {
+        $source = $Matches[1]
+        Set-Content -LiteralPath "$Fixture.$source.sql" -Value $sql -Encoding utf8
+        $parameters | ConvertTo-Json -Compress | Set-Content -LiteralPath "$Fixture.$source.params.json" -Encoding utf8
+        if ($source -eq 'ARH_ZAIVKA') { return }
+        foreach ($row in $data.bookings) {
+            if ($null -ne $row.IN_TM) { $row.IN_TM = [datetime]$row.IN_TM }
+            if ($null -ne $row.OUT_TM) { $row.OUT_TM = [datetime]$row.OUT_TM }
+            $row
+        }
+        return
+    }
+    if ($AvailableUntil) { throw "Проверка свободного окна не запрашивает журнал: $sql" }
+    if ($sql -match 'from ZAIVKA_HIS h') { return $data.events }
+    if ($sql -match 'from ARH_ZAIVKA') { return }
+    throw "Неизвестный запрос в тесте: $sql"
+}
+$cities = [pscustomobject]@{'Тест'=[pscustomobject]@{BranchId=7;OwnerId=9}}
+$modeArgs = if ($AvailableUntil) { @{AvailableUntil=$AvailableUntil} } else { @{} }
+& $Script -City 'Тест' -Cities $cities -From $First -Until $Until -DbTime $Now -StartHour 22 -EndHour 6 @modeArgs | ConvertTo-Json -Depth 8
+""", encoding="utf-8")
+    output = subprocess.run(
+        [PWSH, "-NoProfile", "-File", str(runner), str(SCRIPT.with_name("city-nights.ps1")),
+         str(fixture), first, until, db_time, available_until],
+        check=True, capture_output=True, text=True, encoding="utf-8", timeout=30,
+    )
+    return json.loads(output.stdout)
+
+
+def test_three_nights_counts_and_transitions_follow_the_same_apartments(tmp_path):
+    nights = city_report(tmp_path, range(1, 10), [
+        city_request(21, 1, "2030-06-12T01:00", "2030-06-14T12:00"),
+        city_request(22, 2, "2030-06-12T20:00", "2030-06-14T12:00",
+                     status="Подтверждена", CHANNEL="Сотрудник компании", ZERO_CHARGE=0),
+        city_request(23, 3, "2030-06-12T22:00", "2030-06-14T12:00"),
+        city_request(24, 4, "2030-06-12T23:00", "2030-06-14T12:00"),
+        city_request(25, 5, "2030-06-10T14:00", "2030-06-14T12:00", OTBOY="T"),
+        city_request(26, 6, "2030-06-10T14:00", "2030-06-14T12:00", "Уборка прогнозная", STATUS_TYPE=4),
+        city_request(27, 7, "2030-06-10T14:00", "2030-06-14T12:00", "Ремонт", STATUS_TYPE=6),
+        city_request(28, 8, "2030-06-10T14:00", "2030-06-14T12:00", "Особый статус", KV_STATUS=None),
+        city_request(29, 9, "2030-06-10T14:00", "2030-06-14T12:00", CHANNEL="Сотрудник компании", ZERO_CHARGE=1),
+    ], events=[{"ID": 21, "FIRST_RESERVE_AT": "2030-06-08T16:45:00"}])["Nights"]
+    assert [n["Counts"]["Free"] for n in nights] == [5, 4, 1]
+    assert all(sum(n["Counts"].values()) == 9 for n in nights)
+    assert all(n["Counts"][kind] == 1 for n in nights for kind in ("Cleaning", "Blocked", "Unknown", "InternalStay"))
+    closed = [[booking for unit in n["Apartments"] for booking in unit["ClosedByBookings"]] for n in nights]
+    assert [[(b["KV"], b["BOOKING_ID"]) for b in night] for night in closed] == [[], [(1, 21)], [(2, 22), (3, 23), (4, 24)]]
+    assert closed[1][0]["FirstReserveAt"].startswith("2030-06-08T16:45")
+    assert closed[2][0]["FirstReserveAt"] is None
+    assert closed[1][0]["CHANNEL"] == "Тестовый канал"
+
+
+def test_single_night_reads_previous_even_if_vacancy_count_is_unchanged(tmp_path):
+    night, = city_report(tmp_path, [1, 2, 3], [
+        city_request(31, 1, "2030-06-10T21:00", "2030-06-11T12:00"),
+        city_request(32, 2, "2030-06-09T21:00", "2030-06-10T12:00"),
+        city_request(33, 3, "2030-06-10T16:00", "2030-06-10T22:00"),
+        city_request(34, 3, "2030-06-11T06:00", "2030-06-11T10:00"),
+    ], until="2030-06-11", db_time="2030-06-11T01:00")["Nights"]
+    assert night["Counts"]["Free"] == 2
+    assert night["IsPartial"] is True
+    assert [b["BOOKING_ID"] for u in night["Apartments"] for b in u["ClosedByBookings"]] == [31]
+    assert [u["ID"] for u in night["Apartments"] if u["State"] == "Free"] == [2, 3]
+
+
+def test_damaged_dates_keep_affected_nights_out_of_vacancy(tmp_path):
+    bookings = [
+        city_request(41, 1, "2030-06-10T23:00", "2030-06-10T22:30"),
+        city_request(42, 1, "2030-06-11T18:00", "2030-06-12T12:00"),
+        city_request(43, 2, None, "2030-06-11T01:00"),
+        city_request(44, 3, "2030-06-11T23:00", None),
+        city_request(45, 4, None, None),
+        city_request(46, 5, "2030-06-10T22:00", "2030-06-10T22:00"),
+        city_request(47, 6, None, None, OTBOY="T"),
+        city_request(48, 7, "2030-06-13T12:00", "2030-06-08T18:00"),
+        city_request(49, 8, None, "2030-06-09T22:00"),
+        city_request(50, 9, "2030-06-12T06:00", None),
+        city_request(51, 10, None, None, status="Новая", KV_STATUS=0),
+    ]
+    first, second = city_report(tmp_path, range(1, 11), bookings, until="2030-06-12")["Nights"]
+    assert [u["ID"] for u in first["Apartments"] if u["State"] == "Unknown"] == [1, 2, 4, 5, 7]
+    assert [u["ID"] for u in second["Apartments"] if u["State"] == "Unknown"] == [3, 4, 7]
+    assert [first["Counts"]["Free"], second["Counts"]["Free"]] == [5, 6]
+    assert second["Apartments"][0]["State"] == "Guest"
+    assert not any(u["ClosedByBookings"] for night in (first, second) for u in night["Apartments"])
+
+    # Выполняем оба настоящих SQL-запроса: подмена Read-Query сама не обнаружит потерю строк в WHERE.
+    with closing(sqlite3.connect(":memory:")) as db:
+        db.executescript("""
+            create table KV(ID, CITY, PIPLE, TYPE_KV, VIS);
+            insert into KV values (1, 7, 9, 1, 'T');
+            create table ZAIVKA_STATUS(ID, NAME, T, OTBOY, KV_STATUS);
+            create table REKLAMA(ID, NAME);
+            create table ZAIVKA(ID, KV, SOST, REKLAMA, IN_TM, OUT_TM, D_REG, S, SM);
+            create table ARH_ZAIVKA as select * from ZAIVKA;
+        """)
+        params = {"branch": 7, "owner": 9, "since": "2030-06-09T22:00", "until_time": "2030-06-12T06:00"}
+        for table in ("ZAIVKA", "ARH_ZAIVKA"):
+            db.executemany(
+                f"insert into {table}(ID,KV,IN_TM,OUT_TM) values (?,1,?,?)",
+                [(b["BOOKING_ID"], b["IN_TM"], b["OUT_TM"]) for b in bookings],
+            )
+            sql = (tmp_path / f"data.json.{table}.sql").read_text(encoding="utf-8")
+            selected = {row[0] for row in db.execute(sql, params)}
+            assert {41, 42, 43, 44, 45, 46, 48} <= selected
+            assert selected.isdisjoint({49, 50})
+            db.execute(f"delete from {table}")
+
+
+def test_available_until_checks_daytime_gaps_and_future_nights(tmp_path):
+    start, end = "2030-06-10T15:30:00", "2030-06-13T12:00:00"
+    report = city_report(tmp_path, range(1, 9), [
+        city_request(61, 1, "2030-06-11T12:00", "2030-06-11T18:00"),
+        city_request(62, 2, "2030-06-10T14:00", start),
+        city_request(63, 2, end, "2030-06-13T20:00"),
+        city_request(64, 3, "2030-06-12T11:00", "2030-06-12T13:00", "Уборка прогнозная", STATUS_TYPE=4),
+        city_request(65, 4, "2030-06-12T09:00", "2030-06-12T17:00", OTBOY="T"),
+        city_request(66, 5, "2030-06-12T13:00", None),
+        city_request(67, 6, "2030-06-12T18:00", "2030-06-12T12:00"),
+        city_request(68, 7, "2030-06-10T12:00", "2030-06-10T15:29"),
+        city_request(69, 8, "2030-06-13T09:00", "2030-06-13T10:00", "Ремонт", STATUS_TYPE=6),
+    ], db_time=start, available_until=end)
+    assert report == {
+        "City": "Тест", "DB_TIME": start, "WindowStart": start, "WindowEnd": end,
+        "ApartmentCount": 8, "FreeCount": 3,
+        "FreeApartments": [{"ID": n, "Address": f"Учебная {n}"} for n in (2, 4, 7)],
+        "UnknownCount": 2,
+    }
+    for source in ("ZAIVKA", "ARH_ZAIVKA"):
+        params = json.loads((tmp_path / f"data.json.{source}.params.json").read_text(encoding="utf-8"))
+        assert (params["since"], params["until_time"]) == (start, end)
+
+
+def test_available_until_returns_empty_array_when_nothing_is_free(tmp_path):
+    report = city_report(tmp_path, [1], [
+        city_request(70, 1, "2030-06-12T12:00", "2030-06-12T13:00"),
+    ], db_time="2030-06-10T15:30", available_until="2030-06-13T12:00")
+    assert report["FreeCount"] == 0
+    assert report["FreeApartments"] == []
+
+
+@pytest.mark.parametrize(("extra_args", "message"), [
+    ([], "требует город"),
+    (["-City", "Тест", "-Until", "2030-06-13"], "не сочетается"),
+])
+def test_available_until_rejects_incompatible_modes_before_reading_config(extra_args, message):
+    result = run("-AvailableUntil", "2030-06-13T12:00", "-ConfigPath", "absent.json",
+                 "-ValidateOnly", *extra_args)
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert "Resolve-Path" not in result.stderr
