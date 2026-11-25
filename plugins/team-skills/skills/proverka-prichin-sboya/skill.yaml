@@ -29,6 +29,7 @@ example_files:
   - "examples/good-02-ci-artifact-vs-runtime.md"
   - "examples/good-03-green-ui-vs-outcome.md"
   - "examples/good-04-neutral-source-selection.md"
+  - "examples/good-05-effective-handler.md"
   - "examples/anti-01-exact-assertion.md"
   - "examples/anti-02-compound-change.md"
   - "examples/anti-03-unsafe-or-nondiscriminating.md"
