@@ -70,7 +70,7 @@ def city_request(number, unit, arrival, departure, status="Заселение", 
 
 
 def city_report(tmp_path, units, bookings, *, first="2030-06-10", until="2030-06-13",
-                db_time="2030-06-13T10:00", events=()):
+                db_time="2030-06-13T10:00", events=(), available_until=""):
     # Подменена только выборка строк. Классификация, календарь и переходы выполняет код навыка.
     fixture = tmp_path / "data.json"
     fixture.write_text(json.dumps({
@@ -79,7 +79,7 @@ def city_report(tmp_path, units, bookings, *, first="2030-06-10", until="2030-06
     }, ensure_ascii=False), encoding="utf-8")
     runner = tmp_path / "run-city.ps1"
     runner.write_text("""
-param($Script, $Fixture, $First, $Until, $Now)
+param($Script, $Fixture, $First, $Until, $Now, $AvailableUntil)
 $ErrorActionPreference = 'Stop'
 $data = Get-Content -Raw -Encoding utf8 $Fixture | ConvertFrom-Json
 function Read-Query($sql, $parameters) {
@@ -88,6 +88,7 @@ function Read-Query($sql, $parameters) {
     if ($sql -match 'from (ZAIVKA|ARH_ZAIVKA) z join') {
         $source = $Matches[1]
         Set-Content -LiteralPath "$Fixture.$source.sql" -Value $sql -Encoding utf8
+        $parameters | ConvertTo-Json -Compress | Set-Content -LiteralPath "$Fixture.$source.params.json" -Encoding utf8
         if ($source -eq 'ARH_ZAIVKA') { return }
         foreach ($row in $data.bookings) {
             if ($null -ne $row.IN_TM) { $row.IN_TM = [datetime]$row.IN_TM }
@@ -96,16 +97,18 @@ function Read-Query($sql, $parameters) {
         }
         return
     }
+    if ($AvailableUntil) { throw "Проверка свободного окна не запрашивает журнал: $sql" }
     if ($sql -match 'from ZAIVKA_HIS h') { return $data.events }
     if ($sql -match 'from ARH_ZAIVKA') { return }
     throw "Неизвестный запрос в тесте: $sql"
 }
 $cities = [pscustomobject]@{'Тест'=[pscustomobject]@{BranchId=7;OwnerId=9}}
-& $Script -City 'Тест' -Cities $cities -From $First -Until $Until -DbTime $Now -StartHour 22 -EndHour 6 | ConvertTo-Json -Depth 8
+$modeArgs = if ($AvailableUntil) { @{AvailableUntil=$AvailableUntil} } else { @{} }
+& $Script -City 'Тест' -Cities $cities -From $First -Until $Until -DbTime $Now -StartHour 22 -EndHour 6 @modeArgs | ConvertTo-Json -Depth 8
 """, encoding="utf-8")
     output = subprocess.run(
         [PWSH, "-NoProfile", "-File", str(runner), str(SCRIPT.with_name("city-nights.ps1")),
-         str(fixture), first, until, db_time],
+         str(fixture), first, until, db_time, available_until],
         check=True, capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     return json.loads(output.stdout)
@@ -189,3 +192,47 @@ def test_damaged_dates_keep_affected_nights_out_of_vacancy(tmp_path):
             assert {41, 42, 43, 44, 45, 46, 48} <= selected
             assert selected.isdisjoint({49, 50})
             db.execute(f"delete from {table}")
+
+
+def test_available_until_checks_daytime_gaps_and_future_nights(tmp_path):
+    start, end = "2030-06-10T15:30:00", "2030-06-13T12:00:00"
+    report = city_report(tmp_path, range(1, 9), [
+        city_request(61, 1, "2030-06-11T12:00", "2030-06-11T18:00"),
+        city_request(62, 2, "2030-06-10T14:00", start),
+        city_request(63, 2, end, "2030-06-13T20:00"),
+        city_request(64, 3, "2030-06-12T11:00", "2030-06-12T13:00", "Уборка прогнозная", STATUS_TYPE=4),
+        city_request(65, 4, "2030-06-12T09:00", "2030-06-12T17:00", OTBOY="T"),
+        city_request(66, 5, "2030-06-12T13:00", None),
+        city_request(67, 6, "2030-06-12T18:00", "2030-06-12T12:00"),
+        city_request(68, 7, "2030-06-10T12:00", "2030-06-10T15:29"),
+        city_request(69, 8, "2030-06-13T09:00", "2030-06-13T10:00", "Ремонт", STATUS_TYPE=6),
+    ], db_time=start, available_until=end)
+    assert report == {
+        "City": "Тест", "DB_TIME": start, "WindowStart": start, "WindowEnd": end,
+        "ApartmentCount": 8, "FreeCount": 3,
+        "FreeApartments": [{"ID": n, "Address": f"Учебная {n}"} for n in (2, 4, 7)],
+        "UnknownCount": 2,
+    }
+    for source in ("ZAIVKA", "ARH_ZAIVKA"):
+        params = json.loads((tmp_path / f"data.json.{source}.params.json").read_text(encoding="utf-8"))
+        assert (params["since"], params["until_time"]) == (start, end)
+
+
+def test_available_until_returns_empty_array_when_nothing_is_free(tmp_path):
+    report = city_report(tmp_path, [1], [
+        city_request(70, 1, "2030-06-12T12:00", "2030-06-12T13:00"),
+    ], db_time="2030-06-10T15:30", available_until="2030-06-13T12:00")
+    assert report["FreeCount"] == 0
+    assert report["FreeApartments"] == []
+
+
+@pytest.mark.parametrize(("extra_args", "message"), [
+    ([], "требует город"),
+    (["-City", "Тест", "-Until", "2030-06-13"], "не сочетается"),
+])
+def test_available_until_rejects_incompatible_modes_before_reading_config(extra_args, message):
+    result = run("-AvailableUntil", "2030-06-13T12:00", "-ConfigPath", "absent.json",
+                 "-ValidateOnly", *extra_args)
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert "Resolve-Path" not in result.stderr

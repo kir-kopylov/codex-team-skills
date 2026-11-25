@@ -11,7 +11,8 @@ param(
     [datetime]$Until = [datetime]::MinValue,
     [ValidateNotNullOrEmpty()][string]$City,
     [ValidateRange(12,23)][int]$NightStartHour = 22,
-    [ValidateRange(1,12)][int]$NightEndHour = 6
+    [ValidateRange(1,12)][int]$NightEndHour = 6,
+    [datetime]$AvailableUntil
 )
 if (-not $ValidateOnly -and -not ($Address -or $BookingId -or $City)) { throw 'Укажите город, адрес или номер заявки.' }
 if ($Address -and $BookingId) { throw 'Укажите либо адрес, либо номер заявки.' }
@@ -20,6 +21,14 @@ if ($City -and ($Address -or $BookingId -or $IncludeHistory -or $PSBoundParamete
 }
 if (-not $City -and ($PSBoundParameters.ContainsKey('NightStartHour') -or $PSBoundParameters.ContainsKey('NightEndHour'))) {
     throw 'Границы ночи применяются только при поиске по городу.'
+}
+$availabilityArgs = @{}
+if ($PSBoundParameters.ContainsKey('AvailableUntil')) {
+    if (-not $City -or $PSBoundParameters.ContainsKey('From') -or $PSBoundParameters.ContainsKey('Until') -or
+        $PSBoundParameters.ContainsKey('NightStartHour') -or $PSBoundParameters.ContainsKey('NightEndHour')) {
+        throw 'AvailableUntil требует город и не сочетается с датами From/Until или часами ночного отчёта.'
+    }
+    $availabilityArgs.AvailableUntil = $AvailableUntil
 }
 $watch = [Diagnostics.Stopwatch]::StartNew()
 $ErrorActionPreference = 'Stop'
@@ -94,7 +103,7 @@ try {
     $now = @(Read-Query 'select current_timestamp as DB_TIME from rdb$database')
     $dbTime = [datetime]$now[0].DB_TIME
     if ($City) {
-        & (Join-Path $PSScriptRoot 'city-nights.ps1') -City $City -Cities $profile.Cities -From $From -Until $Until -DbTime $dbTime -StartHour $NightStartHour -EndHour $NightEndHour |
+        & (Join-Path $PSScriptRoot 'city-nights.ps1') -City $City -Cities $profile.Cities -From $From -Until $Until -DbTime $dbTime -StartHour $NightStartHour -EndHour $NightEndHour @availabilityArgs |
             ConvertTo-Json -Depth 8
         return
     }

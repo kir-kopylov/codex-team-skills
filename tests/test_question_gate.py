@@ -31,6 +31,7 @@ QUESTION_DRIVEN_SKILLS = (
     "podsadka-nezvanyh-v-snimok",
     "raspiska-o-poluchenii-deneg",
     "razbor-bardaka",
+    "razobrat-mysl-voprosami",
     "remont-dogovor-i-raspiski",
     "smeta-remonta-do-dogovora",
     "sverka-rashodov-po-istochnikam",

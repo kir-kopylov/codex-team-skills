@@ -1,0 +1,4 @@
+interface:
+  display_name: "Помоги разобраться. Задавай по одному вопросу"
+  short_description: "Один вопрос за ход до твоего собственного вывода"
+  default_prompt: 'Примени $razobrat-mysl-voprosami. Помоги разобраться. Задавай по одному вопросу'

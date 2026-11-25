@@ -1,5 +1,5 @@
 # Вызывается из check-booking.ps1 внутри его читающей транзакции через Read-Query.
-param([string]$City, $Cities, [datetime]$From, [datetime]$Until, [datetime]$DbTime, [int]$StartHour, [int]$EndHour)
+param([string]$City, $Cities, [datetime]$From, [datetime]$Until, [datetime]$DbTime, [int]$StartHour, [int]$EndHour, [datetime]$AvailableUntil)
 
 function Get-PositiveId($value) {
     $id = 0
@@ -26,13 +26,36 @@ function Get-UseKind($row) {
     return 'Unknown'
 }
 
-if ($From -eq [datetime]::MinValue) { $From = $DbTime.Date.AddDays(-1) }
-if ($Until -eq [datetime]::MinValue) { $Until = $From.AddDays(1) }
-if ($From.TimeOfDay.Ticks -or $Until.TimeOfDay.Ticks -or ($Until - $From).Days -notin (1..90)) {
-    throw 'From и Until задают от 1 до 90 ночей календарными датами. Последняя дата — утро после последней ночи.'
+function Get-WindowOverlaps($Rows, [datetime]$Start, [datetime]$End) {
+    $Rows | Where-Object {
+        if ($null -ne $_.IN_TM -and $null -ne $_.OUT_TM -and $_.OUT_TM -le $_.IN_TM) {
+            # При перепутанных или равных датах обе точки относятся к периоду неопределённости.
+            $_.OUT_TM -lt $End -and $_.IN_TM -ge $Start
+        } else {
+            ($null -eq $_.IN_TM -or $_.IN_TM -lt $End) -and ($null -eq $_.OUT_TM -or $_.OUT_TM -gt $Start)
+        }
+    }
 }
-if ($Until.AddDays(-1).AddHours($StartHour) -gt $DbTime) {
-    throw 'Запрошенная ночь ещё не началась по часам базы.'
+
+$checkAvailability = $PSBoundParameters.ContainsKey('AvailableUntil')
+if ($checkAvailability) {
+    if ($AvailableUntil -le $DbTime -or $AvailableUntil -gt $DbTime.AddDays(90)) {
+        throw 'Дата и время выезда должны быть позже DB_TIME и не дальше 90 суток от него.'
+    }
+    $queryStart = $DbTime
+    $queryEnd = $AvailableUntil
+} else {
+    if ($From -eq [datetime]::MinValue) { $From = $DbTime.Date.AddDays(-1) }
+    if ($Until -eq [datetime]::MinValue) { $Until = $From.AddDays(1) }
+    if ($From.TimeOfDay.Ticks -or $Until.TimeOfDay.Ticks -or ($Until - $From).Days -notin (1..90)) {
+        throw 'From и Until задают от 1 до 90 ночей календарными датами. Последняя дата — утро после последней ночи.'
+    }
+    if ($Until.AddDays(-1).AddHours($StartHour) -gt $DbTime) {
+        throw 'Запрошенная ночь ещё не началась по часам базы.'
+    }
+    # Предыдущая ночь нужна для переходов в отчёте даже при запросе об одной ночи.
+    $queryStart = $From.AddDays(-1).AddHours($StartHour)
+    $queryEnd = $Until.AddHours($EndHour)
 }
 
 $scope = if ($Cities) { $Cities.PSObject.Properties[$City] }
@@ -66,9 +89,8 @@ if (-not $units.Count -or ($include -and $units.Count -ne $ids.Count)) {
     throw 'Городской фонд пуст или часть выбранных квартир не соответствует активному фонду филиала и владельца.'
 }
 
-# Предыдущая ночь нужна, чтобы определить переход даже для запроса об одной ночи.
-$params.since = $From.AddDays(-1).AddHours($StartHour)
-$params.until_time = $Until.AddHours($EndHour)
+$params.since = $queryStart
+$params.until_time = $queryEnd
 $byUnit = @{}
 foreach ($unit in $units) { $byUnit[$unit.ID] = [Collections.Generic.List[object]]::new() }
 foreach ($source in 'ZAIVKA','ARH_ZAIVKA') {
@@ -97,6 +119,24 @@ order by z.KV,z.IN_TM,z.ID
     }
 }
 
+if ($checkAvailability) {
+    $unknownCount = 0
+    $freeApartments = @(foreach ($unit in $units) {
+        $overlaps = @(Get-WindowOverlaps $byUnit[$unit.ID] $queryStart $queryEnd)
+        if ($overlaps.Count -eq 0) {
+            [pscustomobject]@{ID=$unit.ID; Address=$unit.ADR}
+        } elseif (@($overlaps | Where-Object Kind -ne 'Unknown').Count -eq 0) {
+            $unknownCount++
+        }
+    })
+    [pscustomobject]@{
+        City=$City; DB_TIME=$DbTime; WindowStart=$queryStart; WindowEnd=$queryEnd
+        ApartmentCount=$units.Count; FreeCount=$freeApartments.Count
+        FreeApartments=$freeApartments; UnknownCount=$unknownCount
+    }
+    return
+}
+
 $nights = [Collections.Generic.List[object]]::new()
 $previous = @{}
 $reserveByBooking = @{}
@@ -105,14 +145,7 @@ for ($day=$From.AddDays(-1); $day -lt $Until; $day=$day.AddDays(1)) {
     $end = $day.AddDays(1).AddHours($EndHour)
     $counts = [ordered]@{Free=0; Guest=0; InternalStay=0; Blocked=0; Cleaning=0; Unknown=0}
     $apartments = foreach ($unit in $units) {
-        $overlaps = @($byUnit[$unit.ID] | Where-Object {
-            if ($null -ne $_.IN_TM -and $null -ne $_.OUT_TM -and $_.OUT_TM -le $_.IN_TM) {
-                # При перепутанных или равных датах обе указанные точки относятся к периоду неопределённости.
-                $_.OUT_TM -lt $end -and $_.IN_TM -ge $start
-            } else {
-                ($null -eq $_.IN_TM -or $_.IN_TM -lt $end) -and ($null -eq $_.OUT_TM -or $_.OUT_TM -gt $start)
-            }
-        })
+        $overlaps = @(Get-WindowOverlaps $byUnit[$unit.ID] $start $end)
         $kind = 'Free'
         foreach ($category in 'Guest','InternalStay','Blocked','Cleaning','Unknown') {
             if ($category -in $overlaps.Kind) { $kind=$category; break }
