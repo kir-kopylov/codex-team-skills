@@ -1,7 +1,9 @@
 """Проверки профиля без подключения к рабочей базе (PowerShell 7)."""
 from __future__ import annotations
+from contextlib import closing
 import json
 import shutil
+import sqlite3
 import subprocess
 from pathlib import Path
 import pytest
@@ -83,10 +85,13 @@ $data = Get-Content -Raw -Encoding utf8 $Fixture | ConvertFrom-Json
 function Read-Query($sql, $parameters) {
     if ($sql -match 'from SPR_CITY') { return [pscustomobject]@{NAME='Тест'} }
     if ($sql -match 'from KV k where') { return $data.units }
-    if ($sql -match 'from ZAIVKA z join') {
+    if ($sql -match 'from (ZAIVKA|ARH_ZAIVKA) z join') {
+        $source = $Matches[1]
+        Set-Content -LiteralPath "$Fixture.$source.sql" -Value $sql -Encoding utf8
+        if ($source -eq 'ARH_ZAIVKA') { return }
         foreach ($row in $data.bookings) {
-            $row.IN_TM = [datetime]$row.IN_TM
-            $row.OUT_TM = [datetime]$row.OUT_TM
+            if ($null -ne $row.IN_TM) { $row.IN_TM = [datetime]$row.IN_TM }
+            if ($null -ne $row.OUT_TM) { $row.OUT_TM = [datetime]$row.OUT_TM }
             $row
         }
         return
@@ -140,3 +145,47 @@ def test_single_night_reads_previous_even_if_vacancy_count_is_unchanged(tmp_path
     assert night["IsPartial"] is True
     assert [b["BOOKING_ID"] for u in night["Apartments"] for b in u["ClosedByBookings"]] == [31]
     assert [u["ID"] for u in night["Apartments"] if u["State"] == "Free"] == [2, 3]
+
+
+def test_damaged_dates_keep_affected_nights_out_of_vacancy(tmp_path):
+    bookings = [
+        city_request(41, 1, "2030-06-10T23:00", "2030-06-10T22:30"),
+        city_request(42, 1, "2030-06-11T18:00", "2030-06-12T12:00"),
+        city_request(43, 2, None, "2030-06-11T01:00"),
+        city_request(44, 3, "2030-06-11T23:00", None),
+        city_request(45, 4, None, None),
+        city_request(46, 5, "2030-06-10T22:00", "2030-06-10T22:00"),
+        city_request(47, 6, None, None, OTBOY="T"),
+        city_request(48, 7, "2030-06-13T12:00", "2030-06-08T18:00"),
+        city_request(49, 8, None, "2030-06-09T22:00"),
+        city_request(50, 9, "2030-06-12T06:00", None),
+        city_request(51, 10, None, None, status="Новая", KV_STATUS=0),
+    ]
+    first, second = city_report(tmp_path, range(1, 11), bookings, until="2030-06-12")["Nights"]
+    assert [u["ID"] for u in first["Apartments"] if u["State"] == "Unknown"] == [1, 2, 4, 5, 7]
+    assert [u["ID"] for u in second["Apartments"] if u["State"] == "Unknown"] == [3, 4, 7]
+    assert [first["Counts"]["Free"], second["Counts"]["Free"]] == [5, 6]
+    assert second["Apartments"][0]["State"] == "Guest"
+    assert not any(u["ClosedByBookings"] for night in (first, second) for u in night["Apartments"])
+
+    # Выполняем оба настоящих SQL-запроса: подмена Read-Query сама не обнаружит потерю строк в WHERE.
+    with closing(sqlite3.connect(":memory:")) as db:
+        db.executescript("""
+            create table KV(ID, CITY, PIPLE, TYPE_KV, VIS);
+            insert into KV values (1, 7, 9, 1, 'T');
+            create table ZAIVKA_STATUS(ID, NAME, T, OTBOY, KV_STATUS);
+            create table REKLAMA(ID, NAME);
+            create table ZAIVKA(ID, KV, SOST, REKLAMA, IN_TM, OUT_TM, D_REG, S, SM);
+            create table ARH_ZAIVKA as select * from ZAIVKA;
+        """)
+        params = {"branch": 7, "owner": 9, "since": "2030-06-09T22:00", "until_time": "2030-06-12T06:00"}
+        for table in ("ZAIVKA", "ARH_ZAIVKA"):
+            db.executemany(
+                f"insert into {table}(ID,KV,IN_TM,OUT_TM) values (?,1,?,?)",
+                [(b["BOOKING_ID"], b["IN_TM"], b["OUT_TM"]) for b in bookings],
+            )
+            sql = (tmp_path / f"data.json.{table}.sql").read_text(encoding="utf-8")
+            selected = {row[0] for row in db.execute(sql, params)}
+            assert {41, 42, 43, 44, 45, 46, 48} <= selected
+            assert selected.isdisjoint({49, 50})
+            db.execute(f"delete from {table}")

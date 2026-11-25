@@ -80,12 +80,18 @@ select z.ID as BOOKING_ID,z.KV,s.NAME as STATUS_NAME,s.T as STATUS_TYPE,s.OTBOY,
 from $source z join KV k on k.ID=z.KV
 left join ZAIVKA_STATUS s on s.ID=z.SOST
 left join REKLAMA r on r.ID=z.REKLAMA
-where $predicate and z.OUT_TM>@since and z.IN_TM<@until_time and z.OUT_TM>z.IN_TM $distinct
+where $predicate $distinct and (
+    ((z.IN_TM is null or z.IN_TM < @until_time) and (z.OUT_TM is null or z.OUT_TM > @since))
+    or (z.OUT_TM <= z.IN_TM and z.OUT_TM < @until_time and z.IN_TM >= @since)
+)
 order by z.KV,z.IN_TM,z.ID
 "@
     foreach ($row in (Read-Query $sql $params)) {
         $kind = Get-UseKind $row
         if ($kind -eq 'Ignored') { continue }
+        if ($null -eq $row.IN_TM -or $null -eq $row.OUT_TM -or $row.OUT_TM -le $row.IN_TM) {
+            $kind = 'Unknown'
+        }
         $row | Add-Member -NotePropertyName Kind -NotePropertyValue $kind
         $byUnit[$row.KV].Add($row)
     }
@@ -99,7 +105,14 @@ for ($day=$From.AddDays(-1); $day -lt $Until; $day=$day.AddDays(1)) {
     $end = $day.AddDays(1).AddHours($EndHour)
     $counts = [ordered]@{Free=0; Guest=0; InternalStay=0; Blocked=0; Cleaning=0; Unknown=0}
     $apartments = foreach ($unit in $units) {
-        $overlaps = @($byUnit[$unit.ID] | Where-Object { $_.IN_TM -lt $end -and $_.OUT_TM -gt $start })
+        $overlaps = @($byUnit[$unit.ID] | Where-Object {
+            if ($null -ne $_.IN_TM -and $null -ne $_.OUT_TM -and $_.OUT_TM -le $_.IN_TM) {
+                # При перепутанных или равных датах обе указанные точки относятся к периоду неопределённости.
+                $_.OUT_TM -lt $end -and $_.IN_TM -ge $start
+            } else {
+                ($null -eq $_.IN_TM -or $_.IN_TM -lt $end) -and ($null -eq $_.OUT_TM -or $_.OUT_TM -gt $start)
+            }
+        })
         $kind = 'Free'
         foreach ($category in 'Guest','InternalStay','Blocked','Cleaning','Unknown') {
             if ($category -in $overlaps.Kind) { $kind=$category; break }
